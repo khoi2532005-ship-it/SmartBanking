@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Environment
+.env
+
+# SQLite databases (each database-service builds its own at image build time)
+*.db
+*.sqlite
+*.sqlite3
+
+# Agentic loop output
+reports/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
