@@ -23,3 +23,7 @@ Thumbs.db
 # Editors
 .vscode/
 .idea/
+/src/SmartBanking.Service/SmartBanking.Service/.vs
+/src/SmartBanking.Service/SmartBanking.Service/SmartBanking.Service/obj
+/src/SmartBanking.Service/SmartBanking.Service/SmartBanking.Transactions.Service/obj
+/src/SmartBanking.Service/SmartBanking.Service/SmartBanking.Database.Service/obj
