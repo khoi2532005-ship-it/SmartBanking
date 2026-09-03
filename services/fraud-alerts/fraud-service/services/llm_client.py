@@ -12,10 +12,16 @@ if _PROVIDER == "ollama":
 else:
     _BASE_URL = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
     _API_KEY = os.getenv("GEMINI_API_KEY", "")
-    _MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    _MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
     _KEY_VAR = "GEMINI_API_KEY"
 
 _client = None
+
+
+# The SDK's own default (~600s) is far too long for a request a browser is
+# waiting on - a slow or rate-limited call should fail fast into the
+# degraded-explanation path instead of hanging the whole HTTP request.
+REQUEST_TIMEOUT = 20
 
 
 def _get_client():
@@ -25,7 +31,7 @@ def _get_client():
             raise RuntimeError(
                 f"{_KEY_VAR} is not set. Set it in your environment to use AI features."
             )
-        _client = OpenAI(base_url=_BASE_URL, api_key=_API_KEY)
+        _client = OpenAI(base_url=_BASE_URL, api_key=_API_KEY, timeout=REQUEST_TIMEOUT)
     return _client
 
 

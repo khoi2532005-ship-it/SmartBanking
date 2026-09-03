@@ -48,7 +48,10 @@ def _ask(evidence, extra_instruction=""):
                 "content": f"{context_prompt}\n\n{task_prompt}{extra_instruction}\n\nEvidence:\n{evidence}",
             },
         ],
-        max_tokens=300,
+        # Newer Gemini models spend part of this budget on hidden reasoning
+        # before the visible answer - 300 was cutting real answers off
+        # mid-sentence in testing even though the call itself succeeded.
+        max_tokens=1000,
         temperature=0.2,
     )
 
