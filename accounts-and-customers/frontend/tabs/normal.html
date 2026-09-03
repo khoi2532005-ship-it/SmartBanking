@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Accounts &amp; Customers Dashboard</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { margin: 0; min-height: auto; background: transparent; }
+        .app-shell { max-width: none; padding: 0; }
+        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
+        th { background: #f0f3f7; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > div { display: flex; flex-direction: column; }
+        pre { white-space: pre-wrap; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+<main class="app-shell">
+    <section class="card">
+        <h2>Create Customer Profile</h2>
+        <form id="create-customer-form" class="row">
+            <div><label for="first_name">First Name</label>
+                <input id="first_name" name="first_name" type="text" placeholder="Amelia" required></div>
+            <div><label for="last_name">Last Name</label>
+                <input id="last_name" name="last_name" type="text" placeholder="Turner" required></div>
+            <div><label for="email">Email</label>
+                <input id="email" name="email" type="email" placeholder="amelia@example.com" required></div>
+            <div><label for="phone">Phone</label>
+                <input id="phone" name="phone" type="text" placeholder="0410 111 222"></div>
+            <div><label for="date_of_birth">Date of Birth</label>
+                <input id="date_of_birth" name="date_of_birth" type="date"></div>
+            <div style="flex-basis: 100%;"><label for="address">Address</label>
+                <input id="address" name="address" type="text" placeholder="12 Harbour St, Sydney NSW"></div>
+            <button type="submit">Create Customer</button>
+        </form>
+        <div id="create-customer-result" class="panel is-hidden"></div>
+
+        <h2>Search &amp; Filter Customers</h2>
+        <form id="search-customer-form" class="row">
+            <div><label for="q">Free text</label>
+                <input id="q" name="q" type="text" placeholder="name, email, phone..."></div>
+            <button type="submit">Search Customers</button>
+        </form>
+        <div id="customers-result" class="panel is-hidden"></div>
+
+        <h2>Customer Dashboard</h2>
+        <form id="detail-form" class="row">
+            <div><label for="detail_id">Customer ID</label>
+                <input id="detail_id" type="number" min="1" placeholder="1"></div>
+            <button type="submit">View Dashboard</button>
+            <button type="button" id="delete-customer-btn">Delete Customer</button>
+        </form>
+        <div id="detail-result" class="panel is-hidden"></div>
+
+        <h2>Edit Customer</h2>
+        <form id="edit-customer-form" class="row">
+            <div><label for="edit_customer_id">Customer ID</label>
+                <input id="edit_customer_id" type="number" min="1" placeholder="1"></div>
+            <div><label for="edit_first_name">First Name</label>
+                <input id="edit_first_name" type="text" placeholder="(unchanged)"></div>
+            <div><label for="edit_last_name">Last Name</label>
+                <input id="edit_last_name" type="text" placeholder="(unchanged)"></div>
+            <div><label for="edit_email">Email</label>
+                <input id="edit_email" type="email" placeholder="(unchanged)"></div>
+            <div><label for="edit_phone">Phone</label>
+                <input id="edit_phone" type="text" placeholder="(unchanged)"></div>
+            <div><label for="edit_address">Address</label>
+                <input id="edit_address" type="text" placeholder="(unchanged)"></div>
+            <button type="submit">Update Customer</button>
+        </form>
+        <div id="edit-customer-result" class="panel is-hidden"></div>
+
+        <h2>Create &amp; Link Bank Account</h2>
+        <form id="create-account-form" class="row">
+            <div><label for="acc_customer_id">Customer ID</label>
+                <input id="acc_customer_id" type="number" min="1" placeholder="1" required></div>
+            <div><label for="account_number">Account Number</label>
+                <input id="account_number" type="text" placeholder="AC-100012" required></div>
+            <div><label for="account_type">Account Type</label>
+                <select id="account_type"><option>SAVINGS</option><option>CHECKING</option><option>CREDIT</option></select></div>
+            <div><label for="balance">Opening Balance</label>
+                <input id="balance" type="number" step="0.01" placeholder="0.00"></div>
+            <div><label for="currency">Currency</label>
+                <input id="currency" type="text" value="AUD"></div>
+            <button type="submit">Create Account</button>
+        </form>
+        <div id="create-account-result" class="panel is-hidden"></div>
+
+        <h2>Search &amp; Filter Accounts</h2>
+        <form id="search-account-form" class="row">
+            <div><label for="acc_q">Free text</label>
+                <input id="acc_q" type="text" placeholder="account number, type..."></div>
+            <div><label for="acc_f_status">Status</label>
+                <select id="acc_f_status"><option value="">Any</option>
+                    <option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></select></div>
+            <div><label for="acc_f_type">Type</label>
+                <select id="acc_f_type"><option value="">Any</option>
+                    <option>SAVINGS</option><option>CHECKING</option><option>CREDIT</option></select></div>
+            <button type="submit">Search Accounts</button>
+        </form>
+        <div id="accounts-result" class="panel is-hidden"></div>
+
+        <h2>Edit / Close / Delete Account</h2>
+        <form id="edit-account-form" class="row">
+            <div><label for="edit_account_id">Account ID</label>
+                <input id="edit_account_id" type="number" min="1" placeholder="1"></div>
+            <div><label for="edit_account_type">Account Type</label>
+                <select id="edit_account_type"><option value="">(unchanged)</option>
+                    <option>SAVINGS</option><option>CHECKING</option><option>CREDIT</option></select></div>
+            <div><label for="edit_balance">Balance</label>
+                <input id="edit_balance" type="number" step="0.01" placeholder="(unchanged)"></div>
+            <div><label for="edit_status">Status</label>
+                <select id="edit_status"><option value="">(unchanged)</option>
+                    <option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></select></div>
+            <button type="submit">Update Account</button>
+            <button type="button" id="close-account-btn">Close Account</button>
+            <button type="button" id="delete-account-btn">Delete Account</button>
+        </form>
+        <div id="edit-account-result" class="panel is-hidden"></div>
+    </section>
+</main>
+
+<script>
+const API = "http://localhost:5001";
+
+async function api(path, options = {}) {
+    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+    const response = await fetch(`${API}${path}`, options);
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+}
+
+function show(panelId, content) {
+    const panel = document.getElementById(panelId);
+    panel.classList.remove("is-hidden");
+    panel.innerHTML = content;
+}
+
+function errorBox(error) {
+    return `<p>Request failed.</p><pre>${error}</pre>`;
+}
+
+function customersTable(customers) {
+    if (!Array.isArray(customers) || !customers.length) return "<p>No customers found.</p>";
+    const rows = customers.map((c) => `
+        <tr>
+            <td>${c.customer_id}</td><td>${c.first_name} ${c.last_name}</td>
+            <td>${c.email}</td><td>${c.phone ?? "-"}</td><td>${c.address ?? "-"}</td>
+        </tr>`).join("");
+    return `<table><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th></tr>${rows}</table>`;
+}
+
+function accountsTable(accounts) {
+    if (!Array.isArray(accounts) || !accounts.length) return "<p>No accounts found.</p>";
+    const rows = accounts.map((a) => `
+        <tr>
+            <td>${a.account_id}</td><td>${a.customer_id}</td><td>${a.account_number}</td>
+            <td>${a.account_type}</td><td>${a.currency} $${Number(a.balance).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+            <td>${a.status}</td>
+        </tr>`).join("");
+    return `<table><tr><th>ID</th><th>Customer</th><th>Number</th><th>Type</th><th>Balance</th><th>Status</th></tr>${rows}</table>`;
+}
+
+document.getElementById("create-customer-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const payload = {};
+    ["first_name", "last_name", "email", "phone", "date_of_birth", "address"].forEach((name) => {
+        if (form.elements[name].value !== "") payload[name] = form.elements[name].value;
+    });
+    try {
+        const result = await api("/api/customers", { method: "POST", body: JSON.stringify(payload) });
+        show("create-customer-result", result.ok
+            ? `<p><b>Customer #${result.body.customer_id} created.</b></p>`
+            : `<p>Error: ${result.body.error || result.status}</p>`);
+        if (result.ok) form.reset();
+    } catch (error) { show("create-customer-result", errorBox(error)); }
+});
+
+document.getElementById("search-customer-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    if (document.getElementById("q").value) params.set("q", document.getElementById("q").value);
+    try {
+        const result = await api(`/api/customers?${params}`);
+        result.ok ? show("customers-result", customersTable(result.body))
+                  : show("customers-result", `<p>Error: ${result.body.error || result.status}</p>`);
+    } catch (error) { show("customers-result", errorBox(error)); }
+});
+
+const detailIdInput = document.getElementById("detail_id");
+
+async function viewDashboard() {
+    try {
+        const result = await api(`/api/customers/${detailIdInput.value}`);
+        if (!result.ok) return show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        const c = result.body;
+        show("detail-result",
+            `<p><b>${c.first_name} ${c.last_name}</b> (Customer #${c.customer_id})<br>
+             Email: ${c.email} | Phone: ${c.phone ?? "-"}<br>
+             DOB: ${c.date_of_birth ?? "-"} | Address: ${c.address ?? "-"}</p>
+             <h3>Accounts</h3>${accountsTable(c.accounts)}`);
+    } catch (error) { show("detail-result", errorBox(error)); }
+}
+
+document.getElementById("detail-form").addEventListener("submit", (e) => { e.preventDefault(); viewDashboard(); });
+
+document.getElementById("delete-customer-btn").addEventListener("click", async () => {
+    try {
+        const result = await api(`/api/customers/${detailIdInput.value}`, { method: "DELETE" });
+        show("detail-result", result.ok
+            ? `<p>Deleted customer ${detailIdInput.value}.</p>`
+            : `<p>Error: ${JSON.stringify(result.body)}</p>`);
+    } catch (error) { show("detail-result", errorBox(error)); }
+});
+
+document.getElementById("edit-customer-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const id = document.getElementById("edit_customer_id").value;
+    const payload = {};
+    [["edit_first_name", "first_name"], ["edit_last_name", "last_name"], ["edit_email", "email"],
+     ["edit_phone", "phone"], ["edit_address", "address"]].forEach(([elId, key]) => {
+        const value = document.getElementById(elId).value;
+        if (value !== "") payload[key] = value;
+    });
+    try {
+        const result = await api(`/api/customers/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        show("edit-customer-result", result.ok
+            ? `<p>Customer ${id} updated.</p>`
+            : `<p>Error: ${result.body.error || result.status}</p>`);
+    } catch (error) { show("edit-customer-result", errorBox(error)); }
+});
+
+document.getElementById("create-account-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+        customer_id: document.getElementById("acc_customer_id").value,
+        account_number: document.getElementById("account_number").value,
+        account_type: document.getElementById("account_type").value,
+        currency: document.getElementById("currency").value || "AUD",
+    };
+    if (document.getElementById("balance").value !== "") payload.balance = document.getElementById("balance").value;
+    try {
+        const result = await api("/api/accounts", { method: "POST", body: JSON.stringify(payload) });
+        show("create-account-result", result.ok
+            ? `<p><b>Account #${result.body.account_id} created and linked to customer ${payload.customer_id}.</b></p>`
+            : `<p>Error: ${result.body.error || result.status}</p>`);
+    } catch (error) { show("create-account-result", errorBox(error)); }
+});
+
+document.getElementById("search-account-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    if (document.getElementById("acc_q").value) params.set("q", document.getElementById("acc_q").value);
+    if (document.getElementById("acc_f_status").value) params.set("status", document.getElementById("acc_f_status").value);
+    if (document.getElementById("acc_f_type").value) params.set("account_type", document.getElementById("acc_f_type").value);
+    try {
+        const result = await api(`/api/accounts?${params}`);
+        result.ok ? show("accounts-result", accountsTable(result.body))
+                  : show("accounts-result", `<p>Error: ${result.body.error || result.status}</p>`);
+    } catch (error) { show("accounts-result", errorBox(error)); }
+});
+
+const editAccountIdInput = document.getElementById("edit_account_id");
+
+document.getElementById("edit-account-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {};
+    if (document.getElementById("edit_account_type").value) payload.account_type = document.getElementById("edit_account_type").value;
+    if (document.getElementById("edit_balance").value !== "") payload.balance = document.getElementById("edit_balance").value;
+    if (document.getElementById("edit_status").value) payload.status = document.getElementById("edit_status").value;
+    try {
+        const result = await api(`/api/accounts/${editAccountIdInput.value}`, { method: "PUT", body: JSON.stringify(payload) });
+        show("edit-account-result", result.ok
+            ? `<p>Account ${editAccountIdInput.value} updated.</p>`
+            : `<p>Error: ${result.body.error || result.status}</p>`);
+    } catch (error) { show("edit-account-result", errorBox(error)); }
+});
+
+document.getElementById("close-account-btn").addEventListener("click", async () => {
+    try {
+        const result = await api(`/api/accounts/${editAccountIdInput.value}/close`, { method: "POST" });
+        show("edit-account-result", result.ok
+            ? `<p>Account ${editAccountIdInput.value} closed.</p>`
+            : `<p>Error: ${result.body.error || result.status}</p>`);
+    } catch (error) { show("edit-account-result", errorBox(error)); }
+});
+
+document.getElementById("delete-account-btn").addEventListener("click", async () => {
+    try {
+        const result = await api(`/api/accounts/${editAccountIdInput.value}`, { method: "DELETE" });
+        show("edit-account-result", result.ok
+            ? `<p>Deleted account ${editAccountIdInput.value}.</p>`
+            : `<p>Error: ${JSON.stringify(result.body)}</p>`);
+    } catch (error) { show("edit-account-result", errorBox(error)); }
+});
+</script>
+</body>
+</html>
