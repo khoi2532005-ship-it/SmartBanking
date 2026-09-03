@@ -14,6 +14,4 @@ RUN pip install --no-cache-dir -r database-requirements.txt \
 
 RUN python database/init_db.py
 
-EXPOSE 5001 5012 8080
-
-CMD ["python", "run.py"]
+EXPOSE 5001 5012 3002
