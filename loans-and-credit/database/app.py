@@ -594,5 +594,170 @@ def delete_repayment(repayment_id):
     })
 
 
+# ============================================================
+# ACCOUNTS & CUSTOMERS (for Transactions feature)
+# ============================================================
+
+
+@app.get("/customers")
+def get_customers():
+    conn = get_db_connection()
+    customers = conn.execute(
+        "SELECT customer_id, first_name, last_name, email, phone, date_of_birth, address FROM customers"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in customers])
+
+
+@app.get("/accounts")
+def get_accounts():
+    conn = get_db_connection()
+    accounts = conn.execute(
+        "SELECT account_id, customer_id, account_number, account_type, balance, currency, status FROM accounts"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in accounts])
+
+
+# ============================================================
+# TRANSACTIONS
+# ============================================================
+
+
+@app.post("/transactions")
+def create_transaction():
+    data = request.get_json()
+
+    required_fields = ["account_id", "amount", "currency", "type", "date"]
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"{field} required"}), 400
+
+    conn = get_db_connection()
+
+    # Check account exists
+    account = conn.execute(
+        "SELECT account_id FROM accounts WHERE account_id = ?",
+        (data["account_id"],),
+    ).fetchone()
+
+    if account is None:
+        conn.close()
+        return jsonify({"error": "Account not found"}), 404
+
+    cursor = conn.execute(
+        """
+        INSERT INTO transactions (
+            account_id, amount, currency, type, category, description, date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            data["account_id"],
+            data["amount"],
+            data["currency"],
+            data["type"],
+            data.get("category"),
+            data.get("description"),
+            data["date"],
+        ),
+    )
+
+    conn.commit()
+    transaction_id = cursor.lastrowid
+    conn.close()
+
+    return jsonify({"transaction_id": transaction_id, "message": "Transaction created"}), 201
+
+
+@app.get("/transactions")
+def get_transactions():
+    conn = get_db_connection()
+
+    conditions = []
+    params = []
+
+    account_id = request.args.get("account_id")
+    if account_id:
+        conditions.append("t.account_id = ?")
+        params.append(account_id)
+
+    customer_id = request.args.get("customer_id")
+    if customer_id:
+        # join accounts
+        conditions.append("a.customer_id = ?")
+        params.append(customer_id)
+
+    ttype = request.args.get("type")
+    if ttype:
+        conditions.append("LOWER(t.type) = LOWER(?)")
+        params.append(ttype)
+
+    category = request.args.get("category")
+    if category:
+        conditions.append("LOWER(t.category) = LOWER(?)")
+        params.append(category)
+
+    min_amount = request.args.get("min_amount")
+    if min_amount:
+        conditions.append("t.amount >= ?")
+        params.append(min_amount)
+
+    max_amount = request.args.get("max_amount")
+    if max_amount:
+        conditions.append("t.amount <= ?")
+        params.append(max_amount)
+
+    date_from = request.args.get("date_from")
+    if date_from:
+        conditions.append("t.date >= ?")
+        params.append(date_from)
+
+    date_to = request.args.get("date_to")
+    if date_to:
+        conditions.append("t.date <= ?")
+        params.append(date_to)
+
+    q = request.args.get("q")
+    if q:
+        conditions.append("(t.description LIKE ? OR t.category LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%"])
+
+    query = """
+        SELECT t.transaction_id, t.account_id, t.amount, t.currency, t.type, t.category, t.description, t.date,
+               a.customer_id
+        FROM transactions t
+        LEFT JOIN accounts a ON a.account_id = t.account_id
+    """
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    txs = conn.execute(query, params).fetchall()
+    conn.close()
+
+    return jsonify([dict(row) for row in txs])
+
+
+@app.get("/transactions/<int:transaction_id>")
+def get_transaction(transaction_id):
+    conn = get_db_connection()
+
+    tx = conn.execute(
+        """
+        SELECT transaction_id, account_id, amount, currency, type, category, description, date
+        FROM transactions
+        WHERE transaction_id = ?
+        """,
+        (transaction_id,),
+    ).fetchone()
+
+    conn.close()
+
+    if tx is None:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    return jsonify(dict(tx))
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5012, debug=False, threaded=True)

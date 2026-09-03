@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using SmartBanking.Database.Service;
 
 namespace SmartBanking.Service.Controllers
 {
@@ -7,17 +9,30 @@ namespace SmartBanking.Service.Controllers
     [Route("api/[controller]")]
     public class TransactionsController : ControllerBase
     {
-        [HttpGet]
-        public IActionResult Get()
-        {
-            var sample = new List<object>
-            {
-                new { transaction_id = 1, account_id = 1001, amount = 250.00, currency = "AUD", type = "Deposit", category = "Salary", date = "2024-08-01" },
-                new { transaction_id = 2, account_id = 1001, amount = -50.25, currency = "AUD", type = "Withdrawal", category = "Groceries", date = "2024-08-02" },
-                new { transaction_id = 3, account_id = 1002, amount = -120.00, currency = "AUD", type = "Transfer", category = "Rent", date = "2024-08-03" }
-            };
+        private readonly IDatabaseClient _db;
 
-            return Ok(sample);
+        public TransactionsController(IDatabaseClient db)
+        {
+            _db = db;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Get([FromQuery] string? account_id, [FromQuery] string? customer_id)
+        {
+            var filters = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(account_id)) filters["account_id"] = account_id;
+            if (!string.IsNullOrEmpty(customer_id)) filters["customer_id"] = customer_id;
+
+            var tx = await _db.GetTransactionsAsync(filters);
+            return Ok(tx);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var tx = await _db.GetTransactionAsync(id);
+            if (tx == null) return NotFound();
+            return Ok(tx);
         }
     }
 }

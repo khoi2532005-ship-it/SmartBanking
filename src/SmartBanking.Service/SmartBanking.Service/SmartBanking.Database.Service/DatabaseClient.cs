@@ -32,5 +32,22 @@ namespace SmartBanking.Database.Service
         {
             return await _http.GetFromJsonAsync<Dictionary<string, object>>($"/loans/{loanId}");
         }
+
+        public async Task<IEnumerable<Dictionary<string, object>>> GetTransactionsAsync(Dictionary<string, string>? filters = null)
+        {
+            var url = "/transactions";
+            if (filters != null && filters.Any())
+            {
+                url += "?" + string.Join("&", filters.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
+            }
+
+            var resp = await _http.GetFromJsonAsync<IEnumerable<Dictionary<string, object>>>(url);
+            return resp ?? Enumerable.Empty<Dictionary<string, object>>();
+        }
+
+        public async Task<Dictionary<string, object>?> GetTransactionAsync(int transactionId)
+        {
+            return await _http.GetFromJsonAsync<Dictionary<string, object>>($"/transactions/{transactionId}");
+        }
     }
 }
