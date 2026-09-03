@@ -1,0 +1,294 @@
+/* ==========================================================================
+   SmartBank shared theme
+   Used by the unified home page and every student's frontend microservice.
+   Class names match the conventions already used by the feature tabs:
+   .app-shell, .card, .panel, .is-hidden, .row, table.
+   ========================================================================== */
+
+:root {
+    --brand: #1f6feb;
+    --brand-dark: #1a5ac4;
+    --brand-tint: #eaf2ff;
+
+    --ink: #1c2430;
+    --ink-soft: #5b6673;
+    --ink-faint: #8a94a1;
+
+    --ground: #f4f6f9;
+    --surface: #ffffff;
+    --line: #d5dbe3;
+    --line-soft: #e7ebf0;
+
+    --ok: #1a7f4b;
+    --ok-tint: #e8f6ee;
+    --warn: #a4630a;
+    --warn-tint: #fdf3e2;
+    --over: #c0362c;
+    --over-tint: #fdecea;
+
+    --radius: 10px;
+    --radius-small: 6px;
+    --shadow: 0 1px 3px rgba(28, 36, 48, 0.08);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+        Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.app-shell {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+.app-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 1rem 1.5rem;
+}
+
+.app-header .app-shell { padding: 0; }
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.15rem;
+    font-weight: 650;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.brand-mark {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--brand);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.tagline { color: var(--ink-soft); margin: 0.35rem 0 0; }
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.card > h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }
+.card > h2 + p { margin-top: 0; color: var(--ink-soft); }
+
+.panel {
+    background: var(--ground);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-small);
+    padding: 0.9rem;
+    margin-top: 0.75rem;
+}
+
+.is-hidden { display: none; }
+
+.row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.row > div { display: flex; flex-direction: column; }
+
+/* ------------------------------------------------------------ typography */
+
+.muted { color: var(--ink-soft); font-size: 0.87rem; }
+.empty { color: var(--ink-soft); padding: 0.9rem 0; margin: 0; }
+code { font-size: 0.85em; background: var(--brand-tint); padding: 0.1em 0.4em;
+       border-radius: 4px; }
+
+/* ---------------------------------------------------------------- forms */
+
+label { font-size: 0.82rem; font-weight: 600; color: var(--ink-soft);
+        margin-bottom: 0.25rem; }
+
+input, select, textarea {
+    font: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-small);
+}
+
+input:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 1px;
+}
+
+button, .btn {
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--brand);
+    border-radius: var(--radius-small);
+    background: var(--brand);
+    color: #fff;
+}
+
+button:hover, .btn:hover { background: var(--brand-dark);
+                           border-color: var(--brand-dark); }
+
+.btn-secondary {
+    background: var(--surface);
+    color: var(--brand);
+}
+.btn-secondary:hover { background: var(--brand-tint); }
+
+.btn-small { padding: 0.3rem 0.55rem; font-size: 0.82rem; }
+
+.btn-danger { background: var(--surface); color: var(--over);
+              border-color: var(--line); }
+.btn-danger:hover { background: var(--over-tint); border-color: var(--over); }
+
+.btn-ai { background: var(--surface); color: var(--brand);
+          border-color: var(--line); }
+.btn-ai:hover { background: var(--brand-tint); border-color: var(--brand); }
+
+/* --------------------------------------------------------------- tables */
+
+table { border-collapse: collapse; width: 100%; margin: 0.5rem 0;
+        font-size: 0.9rem; }
+th, td { border: 1px solid var(--line); padding: 0.5rem 0.6rem;
+         text-align: left; vertical-align: middle; }
+th { background: #f0f3f7; font-size: 0.8rem; text-transform: uppercase;
+     letter-spacing: 0.03em; color: var(--ink-soft); }
+td.num { white-space: nowrap; }
+
+.table-scroll { overflow-x: auto; }
+
+/* --------------------------------------------------------------- alerts */
+
+.alert {
+    margin: 0 0 0.9rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--radius-small);
+    border: 1px solid var(--line);
+    font-size: 0.9rem;
+}
+.alert-success { background: var(--ok-tint); border-color: #b7e0c7;
+                 color: var(--ok); }
+.alert-warn { background: var(--warn-tint); border-color: #f0d9ac;
+              color: var(--warn); }
+.alert-error { background: var(--over-tint); border-color: #f3c2bd;
+               color: var(--over); }
+
+/* --------------------------------------------------------------- badges */
+
+.badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.12rem 0.42rem;
+    border-radius: 999px;
+    margin-left: 0.45rem;
+    vertical-align: 1px;
+}
+.badge-ok { background: var(--ok-tint); color: var(--ok); }
+.badge-near { background: var(--warn-tint); color: var(--warn); }
+.badge-over { background: var(--over-tint); color: var(--over); }
+
+.chip {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: var(--brand-tint);
+    color: var(--brand-dark);
+}
+.chip-over { background: var(--over-tint); color: var(--over); }
+.chips { display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;
+         margin: 0.6rem 0; font-size: 0.87rem; color: var(--ink-soft); }
+
+/* ------------------------------------------------------- progress bars */
+
+.progress {
+    position: relative;
+    height: 9px;
+    min-width: 110px;
+    background: var(--line-soft);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+
+.bar-ok { background: var(--ok); }
+.bar-near { background: var(--warn); }
+.bar-over { background: var(--over); }
+
+.bar-cell { min-width: 170px; }
+.pct { font-size: 0.8rem; color: var(--ink-soft); margin-left: 0.5rem; }
+
+/* ------------------------------------------------------ loading states */
+
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { display: inline-block; }
+
+.spinner {
+    color: var(--ink-soft);
+    font-size: 0.87rem;
+    font-style: italic;
+}
+
+/* ------------------------------------------------------- feature cards */
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+.feature-card {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.1rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.feature-card:hover { border-color: var(--brand); transform: translateY(-2px); }
+.feature-card h3 { margin: 0.5rem 0 0.3rem; font-size: 1rem; }
+.feature-card p { margin: 0; color: var(--ink-soft); font-size: 0.88rem; }
+.feature-card .owner { font-size: 0.78rem; color: var(--ink-faint);
+                       margin-top: 0.6rem; display: block; }
+.feature-icon { font-size: 1.4rem; }

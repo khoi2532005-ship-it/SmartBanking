@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Budgeting &amp; Spending Insights - SmartBank</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <!-- Vendored locally so the demo does not depend on network access. -->
+    <script src="/js/htmx.min.js"></script>
+    <style>
+        .inline-edit { display: flex; gap: 0.3rem; align-items: center; }
+        .inline-edit input { width: 92px; }
+        td.actions { white-space: nowrap; }
+        td.actions .btn { margin-left: 0.25rem; }
+        .category { font-weight: 600; }
+        .over-by { color: var(--over); font-weight: 600; }
+        .summary-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .stat {
+            background: var(--ground);
+            border: 1px solid var(--line-soft);
+            border-radius: var(--radius-small);
+            padding: 0.7rem 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+        .stat-label { font-size: 0.74rem; text-transform: uppercase;
+                      letter-spacing: 0.04em; color: var(--ink-faint);
+                      font-weight: 700; }
+        .stat-value { font-size: 1.15rem; font-weight: 650; }
+        .stat-sub { font-size: 0.8rem; color: var(--ink-soft); }
+        .stat-over { background: var(--over-tint); border-color: #f3c2bd; }
+        .stat-over .stat-value { color: var(--over); font-size: 0.95rem; }
+        .stat-ok { background: var(--ok-tint); border-color: #b7e0c7; }
+        .stat-ok .stat-value { color: var(--ok); font-size: 0.95rem; }
+        .insight-card h3 { margin: 0 0 0.5rem; font-size: 0.98rem; }
+        .insight-card p { margin: 0 0 0.6rem; }
+        .insight-meta { margin-bottom: 0 !important; }
+        .insight-history { list-style: none; padding: 0; margin: 0; }
+        .insight-history li { border-top: 1px solid var(--line-soft);
+                              padding: 0.7rem 0; }
+        .insight-history li:first-child { border-top: 0; }
+        .history-head { display: flex; gap: 0.5rem; align-items: center;
+                        margin-bottom: 0.3rem; flex-wrap: wrap; }
+        .insight-history p { margin: 0; font-size: 0.9rem; }
+        .source-note { margin-bottom: 0; }
+        .unbudgeted { margin: 0.5rem 0 0; }
+    </style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="app-shell">
+        <a class="brand" href="/index.html">
+            <span class="brand-mark">SB</span>
+            SmartBank
+        </a>
+    </div>
+</header>
+
+<main class="app-shell">
+
+    <section class="card">
+        <h2>Budgeting &amp; Spending Insights</h2>
+        <p class="tagline">
+            Set a monthly limit per spending category and track it against your
+            actual transactions.
+        </p>
+
+        <form class="row" id="period-form"
+              hx-get="/ui/budgets"
+              hx-target="#budget-list"
+              hx-swap="innerHTML"
+              hx-trigger="submit, change">
+            <div>
+                <label for="customer_id">Customer</label>
+                <select id="customer_id" name="customer_id">
+                    <option value="1">Customer 1</option>
+                    <option value="2">Customer 2</option>
+                </select>
+            </div>
+            <div>
+                <label for="month">Month</label>
+                <select id="month" name="month">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9" selected>September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div>
+                <label for="year">Year</label>
+                <input id="year" name="year" type="number" value="2026"
+                       min="2020" max="2100" step="1">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-secondary">Refresh</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Create a budget</h2>
+        <p class="muted">The customer, month and year above are used for the new budget.</p>
+
+        <form class="row" id="create-form"
+              hx-post="/ui/budgets"
+              hx-target="#budget-list"
+              hx-swap="innerHTML"
+              hx-include="#period-form">
+            <div>
+                <label for="category">Category</label>
+                <select id="category" name="category" required
+                        hx-get="/ui/categories-options"
+                        hx-trigger="load"
+                        hx-swap="innerHTML">
+                    <option value="">Loading categories...</option>
+                </select>
+            </div>
+            <div>
+                <label for="monthly_limit">Monthly limit (AUD)</label>
+                <input id="monthly_limit" name="monthly_limit" type="number"
+                       step="0.01" min="0.01" placeholder="300.00" required>
+            </div>
+            <div>
+                <button type="submit">Create budget</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Budgets this period</h2>
+        <div id="budget-list" class="table-scroll"
+             hx-get="/ui/budgets"
+             hx-trigger="load"
+             hx-include="#period-form"
+             hx-swap="innerHTML">
+            <p class="empty">Loading budgets...</p>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>AI insight</h2>
+        <p class="muted">
+            Sends your budget-versus-actual summary to Ollama and returns advice
+            in plain English.
+        </p>
+
+        <div class="row">
+            <div>
+                <button type="button" class="btn btn-ai"
+                        hx-post="/ui/insight"
+                        hx-target="#insight-panel"
+                        hx-swap="innerHTML"
+                        hx-include="#period-form"
+                        hx-indicator="#insight-spinner">Get AI Insight</button>
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary"
+                        hx-get="/ui/insights"
+                        hx-target="#history-panel"
+                        hx-swap="innerHTML"
+                        hx-include="#period-form">Insight history</button>
+            </div>
+            <div>
+                <span id="insight-spinner" class="htmx-indicator spinner">
+                    Asking the model, this can take a few seconds...
+                </span>
+            </div>
+        </div>
+
+        <div id="insight-panel" class="panel">
+            <p class="empty">No insight requested yet.</p>
+        </div>
+
+        <div id="history-panel" class="panel is-hidden"></div>
+    </section>
+
+</main>
+
+<script>
+// The frontend is a separate microservice, so HTMX requests must be sent to
+// the budgets backend/API service rather than to this static host.
+const BUDGETS_API = window.BUDGETS_API || "http://localhost:5004";
+
+document.body.addEventListener("htmx:configRequest", (event) => {
+    if (event.detail.path.startsWith("/ui/")) {
+        event.detail.path = BUDGETS_API + event.detail.path;
+    }
+});
+
+// Reveal the history panel the first time it is populated.
+document.body.addEventListener("htmx:afterSwap", (event) => {
+    if (event.detail.target.id === "history-panel") {
+        event.detail.target.classList.remove("is-hidden");
+    }
+});
+
+// Clear the create form once a budget has been created successfully.
+document.body.addEventListener("htmx:afterRequest", (event) => {
+    const form = document.getElementById("create-form");
+    if (event.detail.elt === form && event.detail.successful) {
+        form.reset();
+    }
+});
+
+// Surface network/server failures instead of leaving the panel blank.
+document.body.addEventListener("htmx:responseError", (event) => {
+    event.detail.target.innerHTML =
+        '<p class="alert alert-error">Request failed (HTTP ' +
+        event.detail.xhr.status + "). Is the budgets API running on " +
+        BUDGETS_API + "?</p>";
+});
+
+document.body.addEventListener("htmx:sendError", (event) => {
+    event.detail.target.innerHTML =
+        '<p class="alert alert-error">Could not reach the budgets API at ' +
+        BUDGETS_API + ". Start budgets-api and try again.</p>";
+});
+</script>
+
+</body>
+</html>

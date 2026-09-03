@@ -1,0 +1,92 @@
+# Budgeting & Spending Insights (Student 4) - standalone Compose stack.
+#
+# This file runs my three microservices on their own so the feature can be
+# built, validated and demonstrated independently, and so CI has something
+# concrete to smoke-test (.github/workflows/student-4.yml).
+#
+# TO MERGE INTO THE TEAM docker-compose.yml: copy the four service blocks
+# below plus the ollama-models volume. The ollama service is shared by all
+# five features, so include it only once.
+#
+#   docker compose -f docker-compose.budgets.yml build
+#   docker compose -f docker-compose.budgets.yml up -d
+#   docker compose -f docker-compose.budgets.yml down -v
+
+services:
+
+  # ---------------------------------------------------------------------
+  # Database microservice - exclusive owner of the budgets SQLite file
+  # ---------------------------------------------------------------------
+  budgets-db-api:
+    build:
+      context: .
+      dockerfile: budgeting-and-insights/database/Dockerfile
+    image: budgets-db-api:1.0
+    container_name: budgets-db-api
+    ports:
+      - "5014:5014"
+    volumes:
+      - budgets-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5014/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------
+  # Backend/API microservice - business logic and AI-Mode
+  # ---------------------------------------------------------------------
+  budgets-api:
+    build:
+      context: .
+      dockerfile: budgeting-and-insights/backend/Dockerfile
+    image: budgets-api:1.0
+    container_name: budgets-api
+    ports:
+      - "5004:5004"
+    environment:
+      # Service-to-service calls use Compose service names.
+      BUDGET_DB_URL: http://budgets-db-api:5014
+      TRANSACTIONS_SERVICE_URL: http://transactions-api:5005
+      # auto = use the Transactions API when it is up, mock data when it is not.
+      USE_MOCK_TRANSACTIONS: auto
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: qwen2.5:0.5b
+    depends_on:
+      budgets-db-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------
+  # Frontend microservice - static HTMX UI behind nginx
+  # ---------------------------------------------------------------------
+  budgets-frontend:
+    build:
+      context: .
+      dockerfile: budgeting-and-insights/frontend/Dockerfile
+    image: budgets-frontend:1.0
+    container_name: budgets-frontend
+    ports:
+      - "8030:80"
+    depends_on:
+      - budgets-api
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------
+  # Shared AI runtime - include ONCE in the team compose file
+  # ---------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  budgets-data:
+  ollama-models:

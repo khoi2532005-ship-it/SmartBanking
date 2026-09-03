@@ -1,0 +1,9 @@
+Review this customer's budgets for the month and write a personalised spending insight of 100 to 160 words.
+
+Cover, in this order:
+1. One sentence on overall position: total spent against total budgeted.
+2. The categories that are over budget, with the amount over for each.
+3. The categories with room left that could absorb the overspend.
+4. One or two specific adjustments to make for the rest of the month.
+
+If nothing is over budget, say so plainly and point out where the customer is doing well.

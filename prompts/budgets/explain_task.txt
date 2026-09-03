@@ -1,0 +1,6 @@
+Explain in 60 to 110 words why this single budget category is over or under its limit.
+
+Cover:
+1. Where the category stands: amount spent against the limit, and by how much it is over or under.
+2. What drove the spending, referring to the actual transactions listed.
+3. One concrete suggestion: either how to pull the category back on track, or whether the limit itself should be adjusted.
