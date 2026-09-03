@@ -1,0 +1,1 @@
+Write a short, plain-English summary of this customer's accounts and financial position. Mention how many accounts they hold, the account types, the total balance across active accounts, and call out anything noteworthy (a negative balance, an inactive or closed account, an unusually high or low balance). Keep it to 3-5 sentences.
