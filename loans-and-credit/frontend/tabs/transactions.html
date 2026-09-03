@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Transactions</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    pre { background:#f4f4f4; padding:10px; }
+  </style>
+</head>
+<body>
+  <h1>Transactions (stub)</h1>
+  <p>This page demonstrates a stub function that calls the Transactions API and displays the results.</p>
+
+  <label>Account ID: <input id="account" /></label>
+  <button id="btn">Fetch transactions</button>
+
+  <h2>Result</h2>
+  <pre id="out">(no data)</pre>
+
+  <script>
+    document.getElementById('btn').addEventListener('click', async () => {
+      const account = document.getElementById('account').value.trim();
+      let url = 'http://localhost:5260/api/transactions';
+      if (account) url += '?account_id=' + encodeURIComponent(account);
+
+      document.getElementById('out').textContent = 'Loading...';
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        const data = await res.json();
+        document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('out').textContent = 'Error: ' + err;
+      }
+    });
+  </script>
+
+</body>
+</html>
