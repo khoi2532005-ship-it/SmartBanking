@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Fraud Alerts - AI Mode</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
+        .app-shell { max-width: none; padding: 1rem; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > div { display: flex; flex-direction: column; }
+        pre { white-space: pre-wrap; font-size: 0.9rem; }
+        .is-hidden { display: none; }
+        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
+        .panel.degraded { background: #fdf2e9; border-color: #d68910; }
+    </style>
+</head>
+<body>
+<main class="app-shell">
+    <section class="card">
+        <h2>Explain a Flagged Transaction</h2>
+        <form id="explain-form" class="row">
+            <div><label for="alert_id">Alert ID</label>
+                <input id="alert_id" type="number" min="1" placeholder="1" required></div>
+            <button type="submit">Explain</button>
+        </form>
+        <div id="explanation-result" class="panel is-hidden"></div>
+
+        <p style="font-size: 0.8rem;">
+            (<code id="provider-note">Gemini / Ollama, via LLM_PROVIDER</code>). Requires an API key configured on fraud-service.
+        </p>
+    </section>
+</main>
+
+<script>
+const API = "http://localhost:5003";
+
+async function api(path, options = {}) {
+    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+    const response = await fetch(`${API}${path}`, options);
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+}
+
+function show(elId, html, degraded) {
+    const el = document.getElementById(elId);
+    el.classList.remove("is-hidden");
+    el.classList.toggle("degraded", !!degraded);
+    el.innerHTML = html;
+}
+
+document.getElementById("explain-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const alertId = document.getElementById("alert_id").value;
+    show("explanation-result", "<p>Thinking...</p>", false);
+    try {
+        const result = await api(`/api/ai/alerts/${alertId}/explain`);
+        if (!result.ok) return show("explanation-result", `<p>Error: ${result.body.error || result.status}</p>`, true);
+        const r = result.body;
+        show(
+            "explanation-result",
+            `<pre>${r.explanation}</pre>${r.degraded ? "<p><i>AI explanation degraded - check GEMINI_API_KEY / OLLAMA_BASE_URL.</i></p>" : ""}`,
+            r.degraded
+        );
+    } catch (error) {
+        show("explanation-result", `<p>Request failed.</p><pre>${error}</pre>`, true);
+    }
+});
+</script>
+</body>
+</html>
