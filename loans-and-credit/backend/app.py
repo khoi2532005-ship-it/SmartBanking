@@ -1,0 +1,36 @@
+from pathlib import Path
+import sys
+
+from flask import Flask, jsonify
+from flask_cors import CORS
+
+
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from routes.ai import ai_bp
+from routes.loans import loans_bp
+from routes.repayments import repayments_bp
+
+
+def create_app():
+    app = Flask(__name__)
+    CORS(app)
+
+    app.register_blueprint(loans_bp)
+    app.register_blueprint(repayments_bp)
+    app.register_blueprint(ai_bp)
+
+    @app.get("/api/health")
+    def health():
+        return jsonify({"service": "loan-service", "status": "running"})
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5002, debug=False, threaded=True)

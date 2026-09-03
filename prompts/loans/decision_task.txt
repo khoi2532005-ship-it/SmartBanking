@@ -1,0 +1,1 @@
+The loan has already been decided (APPROVED or REJECTED). Explain the likely reasons behind this decision using the loan data and eligibility assessment provided. Be objective and reference the specific checks.

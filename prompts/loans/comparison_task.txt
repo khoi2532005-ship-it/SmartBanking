@@ -1,0 +1,1 @@
+Compare the loan repayment options provided. For each term, summarize the monthly payment, total interest, and total repaid. Recommend the most suitable option and justify your choice based on the data.
