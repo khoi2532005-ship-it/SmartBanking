@@ -1,7 +1,7 @@
 import os
 import sqlite3
 
-DATA_DIR = "/app/data"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 DATABASE_NAME = os.path.join(DATA_DIR, "loans_and_credit.db")
 
 os.makedirs(DATA_DIR, exist_ok=True)

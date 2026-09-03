@@ -1,0 +1,1 @@
+Explain, in simple terms, whether the given loan application is eligible for approval based on the assessment checks provided. Describe each check, whether it passed, and why. End with a clear yes/no verdict on eligibility.

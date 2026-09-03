@@ -1,0 +1,1 @@
+Explain the repayment schedule for the given loan. Summarize the total amount, monthly payment, and highlight any upcoming or overdue repayments in the provided data.

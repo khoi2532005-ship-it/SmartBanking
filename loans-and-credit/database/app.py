@@ -1,13 +1,33 @@
+import os
+
 from flask import Flask, jsonify, request
 import sqlite3
 
 app = Flask(__name__)
 
-DATABASE_NAME = "/app/data/loans_and_credit.db"
+
+@app.errorhandler(Exception)
+def handle_exception(exc):
+    app.logger.exception(exc)
+    return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+DATABASE_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "loans_and_credit.db")
+
+
+def _init_sqlite():
+    conn = sqlite3.connect(DATABASE_NAME, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.close()
+
+
+_init_sqlite()
+
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE_NAME)
+    conn = sqlite3.connect(DATABASE_NAME, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
@@ -86,14 +106,59 @@ def create_loan():
 def get_loans():
     conn = get_db_connection()
 
-    loans = conn.execute(
-        """
+    conditions = []
+    params = []
+
+    customer_id = request.args.get("customer_id")
+    if customer_id:
+        conditions.append("customer_id = ?")
+        params.append(customer_id)
+
+    status = request.args.get("status")
+    if status:
+        conditions.append("LOWER(status) = LOWER(?)")
+        params.append(status)
+
+    loan_type = request.args.get("loan_type")
+    if loan_type:
+        conditions.append("LOWER(loan_type) = LOWER(?)")
+        params.append(loan_type)
+
+    min_amount = request.args.get("min_amount")
+    if min_amount:
+        conditions.append("requested_amount >= ?")
+        params.append(min_amount)
+
+    max_amount = request.args.get("max_amount")
+    if max_amount:
+        conditions.append("requested_amount <= ?")
+        params.append(max_amount)
+
+    date_from = request.args.get("date_from")
+    if date_from:
+        conditions.append("application_date >= ?")
+        params.append(date_from)
+
+    date_to = request.args.get("date_to")
+    if date_to:
+        conditions.append("application_date <= ?")
+        params.append(date_to)
+
+    q = request.args.get("q")
+    if q:
+        conditions.append("(loan_purpose LIKE ? OR loan_type LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%"])
+
+    query = """
         SELECT loan_id, customer_id, loan_type, requested_amount,
                loan_purpose, application_date, status,
                interest_rate, approved_amount
         FROM loan_applications
-        """
-    ).fetchall()
+    """
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    loans = conn.execute(query, params).fetchall()
 
     conn.close()
 
@@ -318,14 +383,48 @@ def create_repayment():
 def get_repayments():
     conn = get_db_connection()
 
-    repayments = conn.execute(
-        """
+    conditions = []
+    params = []
+
+    loan_id = request.args.get("loan_id")
+    if loan_id:
+        conditions.append("loan_id = ?")
+        params.append(loan_id)
+
+    payment_status = request.args.get("payment_status")
+    if payment_status:
+        conditions.append("LOWER(payment_status) = LOWER(?)")
+        params.append(payment_status)
+
+    due_before = request.args.get("due_before")
+    if due_before:
+        conditions.append("due_date <= ?")
+        params.append(due_before)
+
+    due_after = request.args.get("due_after")
+    if due_after:
+        conditions.append("due_date >= ?")
+        params.append(due_after)
+
+    overdue = request.args.get("overdue")
+    if overdue and overdue.lower() == "true":
+        conditions.append("due_date < date('now') AND LOWER(payment_status) != 'paid'")
+        conditions.append("(amount_paid IS NULL OR amount_paid < payment_amount)")
+
+    unpaid = request.args.get("unpaid")
+    if unpaid and unpaid.lower() == "true":
+        conditions.append("LOWER(payment_status) != 'paid'")
+
+    query = """
         SELECT repayment_id, loan_id, due_date, payment_amount,
                principal_amount, interest_amount, amount_paid,
                payment_date, payment_status
         FROM repayments
-        """
-    ).fetchall()
+    """
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    repayments = conn.execute(query, params).fetchall()
 
     conn.close()
 
@@ -496,4 +595,4 @@ def delete_repayment(repayment_id):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5002, debug=True)
+    app.run(host="0.0.0.0", port=5012, debug=False, threaded=True)

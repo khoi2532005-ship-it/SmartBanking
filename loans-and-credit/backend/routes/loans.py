@@ -63,6 +63,7 @@ def submit_loan():
     }
 
     assessment = evaluate_eligibility(loan_data)
+    loan_data["interest_rate"] = assessment.get("proposed_interest_rate")
 
     db_payload = {k: v for k, v in loan_data.items() if k in (
         "customer_id", "loan_type", "requested_amount", "loan_purpose",

@@ -9,8 +9,24 @@ LOAN_RULES = {
     "BUSINESS": {"min_amount": 10000, "max_amount": 150000, "rate": 9.8, "default_term": 60},
 }
 
+LOAN_TYPE_ALIASES = {
+    "PERSONAL LOAN": "PERSONAL",
+    "AUTO LOAN": "AUTO",
+    "CAR LOAN": "AUTO",
+    "MORTGAGE": "HOME",
+    "HOME LOAN": "HOME",
+    "STUDENT LOAN": "EDUCATION",
+    "EDUCATION LOAN": "EDUCATION",
+    "BUSINESS LOAN": "BUSINESS",
+}
+
 MAX_DEBT_TO_INCOME = 0.40
 LOAN_TYPES = sorted(LOAN_RULES.keys())
+
+
+def normalize_loan_type(value):
+    key = str(value or "").strip().upper()
+    return LOAN_TYPE_ALIASES.get(key, key)
 
 
 def add_months(base_date, months):
@@ -31,7 +47,7 @@ def monthly_payment(principal, annual_rate_pct, months):
 
 
 def evaluate_eligibility(data):
-    loan_type = str(data.get("loan_type", "") or "").strip().upper()
+    loan_type = normalize_loan_type(data.get("loan_type"))
     rule = LOAN_RULES.get(loan_type)
     checks = []
 

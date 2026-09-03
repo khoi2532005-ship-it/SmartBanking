@@ -11,7 +11,7 @@ ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
 PROMPT_DIR = "service/loans"
 
 
-def _ask(system_file, task_file, context, max_tokens=450):
+def _ask(system_file, task_file, context, max_tokens=1500):
     answer = create_chat_completion(
         [
             {"role": "system", "content": load_prompt(f"{PROMPT_DIR}/{system_file}")},
@@ -76,7 +76,7 @@ def explain_decision(loan_id):
             "explanation_system.txt",
             "decision_task.txt",
             jsonify({"loan": loan, "assessment": assessment}).get_data(as_text=True),
-            max_tokens=500,
+            max_tokens=1500,
         )
     except Exception as exc:
         return jsonify({"error": f"AI request failed: {exc}"}), 503
@@ -148,7 +148,7 @@ def compare_repayment_options():
             "explanation_system.txt",
             "comparison_task.txt",
             jsonify(payload).get_data(as_text=True),
-            max_tokens=550,
+            max_tokens=1500,
         )
     except Exception as exc:
         return jsonify({"error": f"AI request failed: {exc}"}), 503

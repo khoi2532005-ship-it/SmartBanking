@@ -3,7 +3,7 @@ import os
 import requests
 
 
-DATABASE_SERVICE_URL = os.getenv("DATABASE_SERVICE_URL", "http://localhost:5002")
+DATABASE_SERVICE_URL = os.getenv("DATABASE_SERVICE_URL", "http://localhost:5012")
 TIMEOUT = 5
 
 
