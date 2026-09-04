@@ -117,10 +117,7 @@ services:
     volumes:
       - ./services/fraud-alerts/database:/app
       - fraud-data:/app/data
-    command: >
-      sh -c "pip install --no-cache-dir -q -r requirements.txt
-             && [ -f data/fraud.db ] || python init_db.py
-             && python app.py"
+    command: ["sh", "-c", "pip install --no-cache-dir -q --root-user-action=ignore --disable-pip-version-check -r requirements.txt && { [ -f data/fraud.db ] || python init_db.py; } && exec python app.py"]
     ports:
       - "5013:5013"
     healthcheck:
@@ -139,9 +136,7 @@ services:
     volumes:
       - ./services/fraud-alerts/backend:/app
       - ./prompts:/prompts:ro
-    command: >
-      sh -c "pip install --no-cache-dir -q -r requirements.txt
-             && python app.py"
+    command: ["sh", "-c", "pip install --no-cache-dir -q --root-user-action=ignore --disable-pip-version-check -r requirements.txt && exec python app.py"]
     ports:
       - "5003:5003"
     environment:
