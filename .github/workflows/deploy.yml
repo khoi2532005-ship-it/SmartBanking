@@ -1,0 +1,73 @@
+name: deploy
+
+# Team deployment to the Azure demo VM.
+# Manual: Actions -> deploy -> Run workflow (choose the branch to deploy).
+# Automatic: every push to main.
+#
+# Repository secrets required (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_HOST     public IP of the VM
+#   DEPLOY_USER     azureuser
+#   DEPLOY_SSH_KEY  private key whose public half is in ~/.ssh/authorized_keys on the VM
+# The VM holds the repo at ~/SmartBanking and a .env with GEMINI_API_KEY; neither
+# passes through GitHub.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag to deploy
+        default: main
+        required: true
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-demo-vm
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Azure VM
+    runs-on: ubuntu-latest
+    environment: demo
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Pull, build, restart and smoke-check on the VM
+        env:
+          DEPLOY_REF: ${{ github.event.inputs.ref || 'main' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "DEPLOY_REF='$DEPLOY_REF' bash -s" < tools/ci/deploy-remote.sh
+
+      - name: Evidence
+        if: always()
+        run: |
+          mkdir -p reports
+          cat > reports/deploy-report.json <<JSON
+          {
+            "workflow_name": "deploy",
+            "run_id": "${{ github.run_id }}",
+            "commit_sha": "${{ github.sha }}",
+            "branch": "${{ github.event.inputs.ref || github.ref_name }}",
+            "generated_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "target": "azure-vm",
+            "status": "${{ job.status }}"
+          }
+          JSON
+          echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > reports/run-view.md
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deploy-report
+          path: reports/
+          retention-days: 90
