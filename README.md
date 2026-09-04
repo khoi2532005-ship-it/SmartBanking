@@ -8,6 +8,7 @@
 services/
   accounts/       Accounts & Customers  (William)  frontend + backend + database
   transactions/   Transactions          (Aidan)    ASP.NET solution
+  fraud-alerts/   Fraud Alerts          (Khoi)     frontend + backend + database
   budgeting/      Budgeting & Insights  (Bao)      frontend + backend + database
   loans/          Loans & Credit        (David)    frontend + backend + database
 shared/frontend/  Unified index.html, shared CSS theme, htmx
@@ -16,5 +17,3 @@ docs/             Project spec (smartbank-spec.md), feature registrations (featu
 agentic_loop.py   Plan -> Act -> Observe -> Adapt loop (run from the repo root)
 docker-compose.budgets.yml   Standalone stack for the budgeting feature
 ```
-
-Fraud Alerts (Khoi) lives on the `fraud-alert` branch and moves to `services/fraud-alerts/` on merge.
