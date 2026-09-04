@@ -15,9 +15,8 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Branch or tag to deploy
-        default: main
-        required: true
+        description: Branch or tag to deploy (blank = the branch chosen above)
+        required: false
   push:
     branches: [main]
 
@@ -43,7 +42,7 @@ jobs:
 
       - name: Pull, build, restart and smoke-check on the VM
         env:
-          DEPLOY_REF: ${{ github.event.inputs.ref || 'main' }}
+          DEPLOY_REF: ${{ github.event.inputs.ref || github.ref_name }}
         run: |
           ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             "DEPLOY_REF='$DEPLOY_REF' bash -s" < tools/ci/deploy-remote.sh
