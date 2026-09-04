@@ -2,11 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY accounts-and-customers/database/requirements.txt database-requirements.txt
-COPY accounts-and-customers/backend/ backend/
-COPY accounts-and-customers/database/ database/
-COPY accounts-and-customers/frontend/ frontend/
-COPY accounts-and-customers/run.py run.py
+COPY services/accounts/database/requirements.txt database-requirements.txt
+COPY services/accounts/backend/ backend/
+COPY services/accounts/database/ database/
+COPY services/accounts/frontend/ frontend/
+COPY services/accounts/run.py run.py
 COPY prompts/ prompts/
 
 RUN pip install --no-cache-dir -r database-requirements.txt \

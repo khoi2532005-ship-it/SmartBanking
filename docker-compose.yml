@@ -1,0 +1,256 @@
+# SmartBank - shared Docker Compose stack (Release 0).
+#
+# Starts every feature plus the shared home page as one application:
+#
+#   docker compose up --build -d            # all services, AI-Mode via Gemini
+#   docker compose --profile local-llm up   # add a local Ollama runtime (fallback)
+#   docker compose ps
+#   docker compose down -v
+#
+# Put GEMINI_API_KEY in a .env file next to this file (see .env.example).
+#
+# Ports (host):  home 3000 | accounts 3001/5001/5011 | loans 3002/5002/5012 |
+#                transactions API 5260 | fraud 3003/5003/5013 | budgeting 3004/5004/5014
+#
+# Release 0 notes
+# - Accounts and Loans ship as one image each that runs their tiers as processes;
+#   the Transactions (.NET) API runs inside the Loans image on 5260.
+# - Loans and Fraud have no frontend Dockerfile yet, so their tab pages are served
+#   by stock nginx over bind mounts. Fraud's backend and database run from the
+#   python image over bind mounts until Khoi adds Dockerfiles. Swap these for
+#   `build:` blocks as each owner adds them; ports and names stay the same.
+
+x-llm-env: &llm-env
+  LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  GEMINI_REVIEW_MODEL: ${GEMINI_REVIEW_MODEL:-gemini-2.5-flash}
+  OLLAMA_BASE_URL: http://ollama:11434/v1
+  OLLAMA_API_KEY: ollama
+  OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
+  OLLAMA_REVIEW_MODEL: ${OLLAMA_REVIEW_MODEL:-llama3.1:8b}
+
+services:
+
+  # ---------------------------------------------------------------------
+  # Shared home page (unified index.html + CSS theme + htmx)
+  # ---------------------------------------------------------------------
+  home:
+    image: nginx:alpine
+    container_name: smartbank-home
+    volumes:
+      - ./shared/frontend:/usr/share/nginx/html:ro
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    networks: [smartbank]
+
+  # ---------------------------------------------------------------------
+  # Accounts & Customers (William) - one image: db 5011, api 5001, web 3001
+  # ---------------------------------------------------------------------
+  accounts:
+    build:
+      context: .
+      dockerfile: services/accounts/Dockerfile
+    image: smartbank-accounts:0.1
+    container_name: accounts
+    ports:
+      - "3001:3001"
+      - "5001:5001"
+      - "5011:5011"
+    environment:
+      <<: *llm-env
+      FLASK_OPEN_CHROME: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+    networks: [smartbank]
+
+  # ---------------------------------------------------------------------
+  # Loans & Credit (David) + Transactions API (Aidan, .NET on 5260)
+  # one image: loans db 5012, loans api 5002, transactions api 5260
+  # ---------------------------------------------------------------------
+  loans:
+    build:
+      context: .
+      dockerfile: services/loans/Dockerfile
+    image: smartbank-loans:0.1
+    container_name: loans
+    ports:
+      - "5002:5002"
+      - "5012:5012"
+      - "5260:5260"
+    environment:
+      <<: *llm-env
+      ACCOUNTS_SERVICE_URL: http://accounts:5001
+      FLASK_OPEN_CHROME: "0"
+      # The .NET app runs on a python:slim base with no ICU library; without this
+      # it aborts at startup (exit 134).
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    depends_on:
+      accounts:
+        condition: service_started
+    restart: unless-stopped
+    networks: [smartbank]
+
+  loans-frontend-service:
+    image: nginx:alpine
+    container_name: loans-frontend-service
+    volumes:
+      - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
+      - ./shared/frontend/css:/usr/share/nginx/html/css:ro
+      - ./shared/frontend/js:/usr/share/nginx/html/js:ro
+      - ./services/loans/frontend/tabs:/usr/share/nginx/html/tabs:ro
+    ports:
+      - "3002:80"
+    depends_on: [loans]
+    restart: unless-stopped
+    networks: [smartbank]
+
+  # ---------------------------------------------------------------------
+  # Fraud Alerts (Khoi) - three services: db 5013, api 5003, web 3003
+  # ---------------------------------------------------------------------
+  fraud-database-service:
+    image: python:3.12-slim
+    container_name: fraud-database-service
+    working_dir: /app
+    volumes:
+      - ./services/fraud-alerts/database:/app
+      - fraud-data:/app/data
+    command: ["sh", "-c", "pip install --no-cache-dir -q --root-user-action=ignore --disable-pip-version-check -r requirements.txt && { [ -f data/fraud.db ] || python init_db.py; } && exec python app.py"]
+    ports:
+      - "5013:5013"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5013/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    networks: [smartbank]
+
+  fraud-service:
+    image: python:3.12-slim
+    container_name: fraud-service
+    working_dir: /app
+    volumes:
+      - ./services/fraud-alerts/backend:/app
+      - ./prompts:/prompts:ro
+    command: ["sh", "-c", "pip install --no-cache-dir -q --root-user-action=ignore --disable-pip-version-check -r requirements.txt && exec python app.py"]
+    ports:
+      - "5003:5003"
+    environment:
+      <<: *llm-env
+      FRAUD_DB_URL: http://fraud-database-service:5013
+      ACCOUNTS_SERVICE_URL: http://accounts:5001
+      TRANSACTIONS_SERVICE_URL: http://loans:5260
+      TRANSACTIONS_SOURCE: ${TRANSACTIONS_SOURCE:-seed}
+    depends_on:
+      fraud-database-service:
+        condition: service_healthy
+      accounts:
+        condition: service_started
+      loans:
+        condition: service_started
+    restart: unless-stopped
+    networks: [smartbank]
+
+  fraud-frontend-service:
+    image: nginx:alpine
+    container_name: fraud-frontend-service
+    volumes:
+      - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
+      - ./shared/frontend/css:/usr/share/nginx/html/css:ro
+      - ./shared/frontend/js:/usr/share/nginx/html/js:ro
+      - ./services/fraud-alerts/frontend/templates/tabs:/usr/share/nginx/html/tabs:ro
+    ports:
+      - "3003:80"
+    depends_on: [fraud-service]
+    restart: unless-stopped
+    networks: [smartbank]
+
+  # ---------------------------------------------------------------------
+  # Budgeting & Spending Insights (Bao) - three images: db 5014, api 5004, web 3004
+  # ---------------------------------------------------------------------
+  budgeting-database-service:
+    build:
+      context: .
+      dockerfile: services/budgeting/database/Dockerfile
+    image: smartbank-budgeting-db:0.1
+    container_name: budgeting-database-service
+    ports:
+      - "5014:5014"
+    volumes:
+      - budgets-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5014/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks: [smartbank]
+
+  budgeting-service:
+    build:
+      context: .
+      dockerfile: services/budgeting/backend/Dockerfile
+    image: smartbank-budgeting-api:0.1
+    container_name: budgeting-service
+    ports:
+      - "5004:5004"
+    environment:
+      <<: *llm-env
+      BUDGET_DB_URL: http://budgeting-database-service:5014
+      ACCOUNTS_SERVICE_URL: http://accounts:5001
+      TRANSACTIONS_SERVICE_URL: http://loans:5260
+      USE_MOCK_TRANSACTIONS: auto
+    depends_on:
+      budgeting-database-service:
+        condition: service_healthy
+      loans:
+        condition: service_started
+    restart: unless-stopped
+    networks: [smartbank]
+
+  budgeting-frontend-service:
+    build:
+      context: .
+      dockerfile: services/budgeting/frontend/Dockerfile
+    image: smartbank-budgeting-web:0.1
+    container_name: budgeting-frontend-service
+    ports:
+      - "3004:80"
+    depends_on: [budgeting-service]
+    restart: unless-stopped
+    networks: [smartbank]
+
+  # ---------------------------------------------------------------------
+  # Optional local AI runtime (fallback): docker compose --profile local-llm up
+  # then set LLM_PROVIDER=ollama in .env
+  # ---------------------------------------------------------------------
+  ollama:
+    profiles: ["local-llm"]
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+    networks: [smartbank]
+
+networks:
+  smartbank:
+    name: smartbank-network
+
+volumes:
+  budgets-data:
+  fraud-data:
+  ollama-models:

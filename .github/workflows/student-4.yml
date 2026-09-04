@@ -1,0 +1,210 @@
+name: student-4-budgets-ci
+
+# Student 4 - Cong Bao Nguyen - Budgeting & Spending Insights
+# Builds and validates the budgets frontend, backend/API and database
+# microservices. Validation only: nothing is deployed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/budgeting/**'
+      - 'prompts/budgeting/**'
+      - 'shared/frontend/**'
+      - 'docker-compose.budgets.yml'
+      - '.github/workflows/student-4.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/budgeting/**'
+      - 'prompts/budgeting/**'
+      - 'shared/frontend/**'
+      - 'docker-compose.budgets.yml'
+      - '.github/workflows/student-4.yml'
+  workflow_dispatch:
+
+env:
+  COMPOSE_FILE: docker-compose.budgets.yml
+
+jobs:
+
+  # =====================================================================
+  # 1. Build gate - every service image must build
+  # =====================================================================
+  build-images:
+    name: Build images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Docker Compose is available
+        run: docker compose version
+
+      - name: Build all budgets service images
+        run: docker compose -f "$COMPOSE_FILE" build budgets-db-api budgets-api budgets-frontend
+
+  # =====================================================================
+  # 2. Unit gate - budget-versus-actual maths
+  # =====================================================================
+  unit-checks:
+    name: Unit checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r services/budgeting/backend/requirements.txt
+
+      - name: Seed the database
+        run: python services/budgeting/database/init_db.py
+
+      - name: Run budget logic checks
+        working-directory: services/budgeting/backend
+        run: python -m tests.test_budget_logic
+
+  # =====================================================================
+  # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200
+  # =====================================================================
+  smoke-check:
+    name: Smoke check
+    runs-on: ubuntu-latest
+    needs: [build-images, unit-checks]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the budgets stack
+        run: docker compose -f "$COMPOSE_FILE" up -d budgets-db-api budgets-api budgets-frontend
+
+      - name: Probe required endpoints
+        run: |
+          probe() {
+            local name="$1" url="$2"
+            for attempt in $(seq 1 8); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' \
+                     --connect-timeout 5 --max-time 20 "$url" || echo 000)
+              if [ "$code" = "200" ]; then
+                echo "PASS $name -> $url ($code) on attempt $attempt"
+                return 0
+              fi
+              echo "  ... $name attempt $attempt/8 got $code"
+              sleep 2
+            done
+            echo "FAIL $name -> $url after 8 attempts"
+            return 1
+          }
+
+          probe "database-service" "http://localhost:5014/"
+          probe "backend-api"      "http://localhost:5004/api/health"
+          probe "frontend"         "http://localhost:3004/tabs/budgets.html"
+          probe "budget-crud"      "http://localhost:5004/api/budgets"
+          probe "budget-summary"   "http://localhost:5004/api/budgets/summary?customer_id=1"
+          probe "htmx-fragment"    "http://localhost:5004/ui/budgets?customer_id=1"
+
+      - name: Verify seeded records and budget calculations
+        run: |
+          budgets=$(curl -s http://localhost:5004/api/budgets | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
+          echo "budgets in database: $budgets"
+          if [ "$budgets" -lt 10 ]; then
+            echo "FAIL expected at least 10 seeded budgets, found $budgets"
+            exit 1
+          fi
+
+          curl -s "http://localhost:5004/api/budgets/summary?customer_id=1" \
+            | python3 -c '
+          import json, sys
+          s = json.load(sys.stdin)
+          assert s["budgets"], "summary returned no budgets"
+          for line in s["budgets"]:
+              assert line["status"] in ("OVER_BUDGET", "NEAR_LIMIT", "ON_TRACK"), line
+          print("summary OK:", s["totals"])
+          print("spending source:", s["spending_source"])'
+
+      - name: Container status
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" ps
+
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose -f "$COMPOSE_FILE" logs --tail 100
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" down -v
+
+  # =====================================================================
+  # 4. Evidence gate - run-linked report for the technical report
+  # =====================================================================
+  evidence-pack:
+    name: Evidence pack
+    runs-on: ubuntu-latest
+    needs: smoke-check
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate report
+        run: |
+          mkdir -p reports
+          cat > reports/report.json <<JSON
+          {
+            "workflow_name": "student-4-budgets-ci",
+            "student": "Student 4 - Cong Bao Nguyen",
+            "feature": "Budgeting & Spending Insights",
+            "services": ["budgets-frontend", "budgets-api", "budgets-db-api"],
+            "ports": [3004, 5004, 5014],
+            "commit_sha": "${GITHUB_SHA}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "branch": "${GITHUB_REF_NAME}",
+            "generated_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "gates": {
+              "build": "passed",
+              "unit": "passed",
+              "smoke": "passed"
+            }
+          }
+          JSON
+
+          cat > reports/report.md <<MD
+          # Student 4 CI Report - Budgeting & Spending Insights
+
+          | Field | Value |
+          |---|---|
+          | Workflow | student-4-budgets-ci |
+          | Commit | \`${GITHUB_SHA}\` |
+          | Branch | \`${GITHUB_REF_NAME}\` |
+          | Run ID | \`${GITHUB_RUN_ID}\` |
+          | Generated (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
+
+          ## Gates
+
+          - Build: three service images built successfully
+          - Unit: budget-versus-actual calculations verified
+          - Smoke: ports 5014, 5004 and 3004 returned HTTP 200
+          - Teardown: \`docker compose down -v\` ran
+
+          ## Validated endpoints
+
+          | Service | Endpoint |
+          |---|---|
+          | budgets-db-api | \`GET http://localhost:5014/\` |
+          | budgets-api | \`GET http://localhost:5004/api/health\` |
+          | budgets-api | \`GET http://localhost:5004/api/budgets\` |
+          | budgets-api | \`GET http://localhost:5004/api/budgets/summary\` |
+          | budgets-frontend | \`GET http://localhost:3004/tabs/budgets.html\` |
+          MD
+
+          echo "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            > reports/run-view.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: student-4-report
+          path: reports/
+          retention-days: 30
