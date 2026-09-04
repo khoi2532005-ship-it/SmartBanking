@@ -194,7 +194,7 @@
 <script>
 // The frontend is a separate microservice, so HTMX requests must be sent to
 // the budgets backend/API service rather than to this static host.
-const BUDGETS_API = window.BUDGETS_API || "http://localhost:5004";
+const BUDGETS_API = window.BUDGETS_API || `http://${window.location.hostname}:5004`;
 
 document.body.addEventListener("htmx:configRequest", (event) => {
     if (event.detail.path.startsWith("/ui/")) {
