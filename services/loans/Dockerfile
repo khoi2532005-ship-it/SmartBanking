@@ -38,6 +38,8 @@ RUN python database/init_db.py
 RUN printf '%s\n' "#!/bin/sh" \
     "# Start the Python database service in background" \
     "python /app/database/app.py &" \
+    "# Start the Python loans API service in background" \
+    "python /app/backend/app.py &" \
     "# Give the DB a moment to start" \
     "sleep 1" \
     "# Start the .NET self-contained app (executable produced by publish)" \
