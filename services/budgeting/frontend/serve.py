@@ -9,7 +9,7 @@ It serves two directories under one origin, matching the container layout:
     /tabs/...    -> this feature's tabs/
 
 Run:  python services/budgeting/frontend/serve.py
-Then: http://localhost:8030/tabs/budgets.html
+Then: http://localhost:3004/tabs/budgets.html
 """
 
 from pathlib import Path
@@ -23,7 +23,7 @@ REPO_ROOT = FRONTEND_DIR.parents[1]
 SHARED_DIR = REPO_ROOT / "shared" / "frontend"
 TABS_DIR = FRONTEND_DIR / "tabs"
 
-PORT = int(os.getenv("FRONTEND_PORT", "8030"))
+PORT = int(os.getenv("FRONTEND_PORT", "3004"))
 
 app = Flask(__name__)
 

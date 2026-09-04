@@ -102,7 +102,7 @@ jobs:
 
           probe "database-service" "http://localhost:5014/"
           probe "backend-api"      "http://localhost:5004/api/health"
-          probe "frontend"         "http://localhost:8030/tabs/budgets.html"
+          probe "frontend"         "http://localhost:3004/tabs/budgets.html"
           probe "budget-crud"      "http://localhost:5004/api/budgets"
           probe "budget-summary"   "http://localhost:5004/api/budgets/summary?customer_id=1"
           probe "htmx-fragment"    "http://localhost:5004/ui/budgets?customer_id=1"
@@ -154,14 +154,15 @@ jobs:
           mkdir -p reports
           cat > reports/report.json <<JSON
           {
+            "workflow_name": "student-4-budgets-ci",
             "student": "Student 4 - Cong Bao Nguyen",
             "feature": "Budgeting & Spending Insights",
             "services": ["budgets-frontend", "budgets-api", "budgets-db-api"],
-            "ports": [8030, 5004, 5014],
+            "ports": [3004, 5004, 5014],
             "commit_sha": "${GITHUB_SHA}",
             "run_id": "${GITHUB_RUN_ID}",
             "branch": "${GITHUB_REF_NAME}",
-            "generated_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "generated_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "gates": {
               "build": "passed",
               "unit": "passed",
@@ -175,6 +176,7 @@ jobs:
 
           | Field | Value |
           |---|---|
+          | Workflow | student-4-budgets-ci |
           | Commit | \`${GITHUB_SHA}\` |
           | Branch | \`${GITHUB_REF_NAME}\` |
           | Run ID | \`${GITHUB_RUN_ID}\` |
@@ -184,7 +186,7 @@ jobs:
 
           - Build: three service images built successfully
           - Unit: budget-versus-actual calculations verified
-          - Smoke: ports 5014, 5004 and 8030 returned HTTP 200
+          - Smoke: ports 5014, 5004 and 3004 returned HTTP 200
           - Teardown: \`docker compose down -v\` ran
 
           ## Validated endpoints
@@ -195,7 +197,7 @@ jobs:
           | budgets-api | \`GET http://localhost:5004/api/health\` |
           | budgets-api | \`GET http://localhost:5004/api/budgets\` |
           | budgets-api | \`GET http://localhost:5004/api/budgets/summary\` |
-          | budgets-frontend | \`GET http://localhost:8030/tabs/budgets.html\` |
+          | budgets-frontend | \`GET http://localhost:3004/tabs/budgets.html\` |
           MD
 
           echo "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \

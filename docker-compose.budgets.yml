@@ -79,7 +79,7 @@ services:
     image: budgets-frontend:1.0
     container_name: budgets-frontend
     ports:
-      - "8030:80"
+      - "3004:80"
     depends_on:
       - budgets-api
     restart: unless-stopped
