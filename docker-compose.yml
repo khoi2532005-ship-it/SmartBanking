@@ -103,7 +103,9 @@ services:
     image: nginx:alpine
     container_name: loans-frontend-service
     volumes:
-      - ./shared/frontend:/usr/share/nginx/html:ro
+      - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
+      - ./shared/frontend/css:/usr/share/nginx/html/css:ro
+      - ./shared/frontend/js:/usr/share/nginx/html/js:ro
       - ./services/loans/frontend/tabs:/usr/share/nginx/html/tabs:ro
     ports:
       - "3002:80"
@@ -163,7 +165,9 @@ services:
     image: nginx:alpine
     container_name: fraud-frontend-service
     volumes:
-      - ./shared/frontend:/usr/share/nginx/html:ro
+      - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
+      - ./shared/frontend/css:/usr/share/nginx/html/css:ro
+      - ./shared/frontend/js:/usr/share/nginx/html/js:ro
       - ./services/fraud-alerts/frontend/templates/tabs:/usr/share/nginx/html/tabs:ro
     ports:
       - "3003:80"
