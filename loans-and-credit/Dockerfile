@@ -45,6 +45,6 @@ RUN printf '%s\n' "#!/bin/sh" \
     > /start.sh \
     && chmod +x /start.sh
 
-EXPOSE 5001 5012 3002 5260
+EXPOSE 5002 5012 3002 5260
 
 ENTRYPOINT ["/start.sh"]
