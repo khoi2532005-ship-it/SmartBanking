@@ -1,0 +1,1 @@
+Explain, in simple terms, why this customer received the given risk_level (LOW, MEDIUM, or HIGH) based on the assessment checks provided. Walk through each check, whether it passed, and why it matters. End with one or two practical suggestions for the customer or bank staff, based only on the data given.

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Account AI Insights</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { margin: 0; min-height: auto; background: transparent; }
+        .app-shell { max-width: none; padding: 0; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > div { display: flex; flex-direction: column; }
+        pre { white-space: pre-wrap; font-size: 0.85rem; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; }
+        .badge-LOW { background: #d9f2df; color: #1e6b34; }
+        .badge-MEDIUM { background: #fdf0d0; color: #8a5a00; }
+        .badge-HIGH { background: #fbdada; color: #9c1c1c; }
+        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
+        th { background: #f0f3f7; }
+    </style>
+</head>
+<body>
+<main class="app-shell">
+    <section class="card">
+        <h2>AI Account Summary &amp; Risk Profile</h2>
+        <form id="ai-form" class="row">
+            <div><label for="ai_customer_id">Customer ID</label>
+                <input id="ai_customer_id" type="number" min="1" placeholder="1"></div>
+            <button type="button" id="summary-btn">Generate Account Summary</button>
+            <button type="button" id="risk-btn">Generate Risk Profile</button>
+            <button type="button" id="history-btn">View AI History</button>
+        </form>
+        <div id="ai-result" class="panel is-hidden"></div>
+
+        <p style="font-size: 0.8rem;">
+            AI-Mode is powered by the model configured in <code>LLM_PROVIDER</code>
+            (Ollama with Llama/Qwen, or Gemini for local dev). Make sure the provider
+            in your <code>.env</code> is running.
+        </p>
+    </section>
+</main>
+
+<script>
+const API = "http://localhost:5001";
+
+async function api(path, options = {}) {
+    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+    const response = await fetch(`${API}${path}`, options);
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+}
+
+function show(content) {
+    const panel = document.getElementById("ai-result");
+    panel.classList.remove("is-hidden");
+    panel.innerHTML = content;
+}
+
+function errorBox(error) {
+    return `<p>Request failed.</p><pre>${error}</pre>`;
+}
+
+function customerId() {
+    return document.getElementById("ai_customer_id").value;
+}
+
+document.getElementById("summary-btn").addEventListener("click", async () => {
+    show("<p>Thinking...</p>");
+    try {
+        const result = await api(`/api/ai/customers/${customerId()}/summary`);
+        if (!result.ok) return show(`<p>Error: ${result.body.error || result.status}</p>`);
+        const t = result.body.totals;
+        show(`<p><b>Account Summary</b></p><pre>${result.body.summary}</pre>
+             <p style="font-size:0.8rem;">${t.active_count} active account(s), total balance $${Number(t.total_balance).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>`);
+    } catch (error) { show(errorBox(error)); }
+});
+
+document.getElementById("risk-btn").addEventListener("click", async () => {
+    show("<p>Thinking...</p>");
+    try {
+        const result = await api(`/api/ai/customers/${customerId()}/risk-profile`);
+        if (!result.ok) return show(`<p>Error: ${result.body.error || result.status}</p>`);
+        const r = result.body;
+        show(`<p><b>Risk Level:</b> <span class="badge badge-${r.risk_level}">${r.risk_level}</span></p>
+             <pre>${r.explanation}</pre>
+             <ul>${r.checks.map((c) => `<li>${c.passed ? "PASS" : "FAIL"} - ${c.detail}</li>`).join("")}</ul>`);
+    } catch (error) { show(errorBox(error)); }
+});
+
+document.getElementById("history-btn").addEventListener("click", async () => {
+    show("<p>Loading history...</p>");
+    try {
+        const result = await api(`/api/ai/customers/${customerId()}/history`);
+        if (!result.ok) return show(`<p>Error: ${result.body.error || result.status}</p>`);
+        if (!result.body.length) return show("<p>No AI summaries generated for this customer yet.</p>");
+        const rows = result.body.map((s) => `
+            <tr><td>${s.summary_id}</td><td>${s.summary_type}</td>
+            <td>${s.risk_level ?? "-"}</td><td>${s.created_at}</td></tr>`).join("");
+        show(`<table><tr><th>ID</th><th>Type</th><th>Risk</th><th>Created</th></tr>${rows}</table>`);
+    } catch (error) { show(errorBox(error)); }
+});
+
+document.getElementById("ai-form").addEventListener("submit", (e) => e.preventDefault());
+</script>
+</body>
+</html>
