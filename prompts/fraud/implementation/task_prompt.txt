@@ -1,0 +1,1 @@
+Using only the evidence below, explain in plain English why this transaction was flagged. Name the specific rule that fired and the transaction amount. If the evidence looks like an isolated, plausible event, you may note that it could be legitimate and is presented for the customer or analyst to confirm. Keep it over 100 words

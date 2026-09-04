@@ -1,0 +1,9 @@
+SmartBank Fraud Alerts feature.
+
+Rule types:
+- amount_over: a single transaction above a dollar threshold.
+- velocity: more than N transactions within M minutes for the same customer.
+- unusual_time: a transaction occurring during an unusual hour range.
+- new_recipient_high_value: a large first-time transfer to a recipient the customer hasn't paid before.
+
+Each alert snapshots the transaction that triggered it (amount, recipient, date/time, category) plus the rule that fired. Account context, when available, describes the customer's account(s); when it says "unavailable", explain using only the transaction and rule evidence given.

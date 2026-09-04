@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Fraud Alerts Dashboard</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
+        .app-shell { max-width: none; padding: 1rem; }
+        .card { margin-bottom: 1.5rem; }
+        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
+        th { background: #f0f3f7; cursor: pointer; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > div { display: flex; flex-direction: column; }
+        pre { white-space: pre-wrap; font-size: 0.8rem; }
+        .is-hidden { display: none; }
+        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
+        .sev-high { background: #c0392b; }
+        .sev-medium { background: #d68910; }
+        .sev-low { background: #7f8c8d; }
+        button { cursor: pointer; }
+    </style>
+</head>
+<body>
+<main class="app-shell">
+    <section class="card">
+        <h2>Alert Rules</h2>
+        <form id="rule-form" class="row">
+            <div><label for="rule_name">Rule name</label>
+                <input id="rule_name" type="text" placeholder="Large Transaction Alert" required></div>
+            <div><label for="rule_type">Type</label>
+                <select id="rule_type">
+                    <option value="amount_over">amount_over</option>
+                    <option value="velocity">velocity</option>
+                    <option value="unusual_time">unusual_time</option>
+                    <option value="new_recipient_high_value">new_recipient_high_value</option>
+                </select></div>
+            <div><label for="threshold_value">Threshold</label>
+                <input id="threshold_value" type="number" step="0.01" placeholder="5000" required></div>
+            <div><label for="threshold_secondary">Secondary (velocity mins / unusual_time end hour)</label>
+                <input id="threshold_secondary" type="number" step="0.01" placeholder="optional"></div>
+            <div><label for="severity">Severity</label>
+                <select id="severity"><option>low</option><option selected>medium</option><option>high</option></select></div>
+            <button type="submit">Add Rule</button>
+        </form>
+        <div id="rules-result"></div>
+    </section>
+
+    <section class="card">
+        <h2>Detection</h2>
+        <button type="button" id="run-detection-btn">Run Detection</button>
+        <div id="detection-result" class="panel is-hidden"></div>
+    </section>
+
+    <section class="card">
+        <h2>Alert Dashboard</h2>
+        <form id="filter-form" class="row">
+            <div><label for="f_status">Status</label>
+                <select id="f_status"><option value="">Any</option>
+                    <option>new</option><option>reviewed</option><option>dismissed</option><option>confirmed</option></select></div>
+            <div><label for="f_min">Min amount</label><input id="f_min" type="number" step="0.01"></div>
+            <div><label for="f_max">Max amount</label><input id="f_max" type="number" step="0.01"></div>
+            <div><label for="f_from">Date from</label><input id="f_from" type="date"></div>
+            <div><label for="f_to">Date to</label><input id="f_to" type="date"></div>
+            <div><label for="f_q">Search</label><input id="f_q" type="text" placeholder="recipient/category"></div>
+            <div><label for="f_sort">Sort by</label>
+                <select id="f_sort"><option value="status">Status</option><option value="transaction_amount">Amount</option>
+                    <option value="transaction_datetime" selected>Date</option></select></div>
+            <button type="submit">Search Alerts</button>
+        </form>
+        <div id="alerts-result"></div>
+
+        <h3>Alert Detail</h3>
+        <div class="row">
+            <div><label for="detail_id">Alert ID</label><input id="detail_id" type="number" min="1"></div>
+            <button type="button" id="view-detail-btn">View</button>
+            <select id="status-select">
+                <option value="new">new</option><option value="reviewed">reviewed</option>
+                <option value="dismissed">dismissed</option><option value="confirmed">confirmed</option>
+            </select>
+            <button type="button" id="update-status-btn">Update Status</button>
+            <button type="button" id="delete-alert-btn">Delete</button>
+        </div>
+        <div id="detail-result" class="panel is-hidden"></div>
+    </section>
+</main>
+
+<script>
+const API = "http://localhost:5003";
+let currentAlerts = [];
+
+async function api(path, options = {}) {
+    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+    const response = await fetch(`${API}${path}`, options);
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+}
+
+function show(elId, html) {
+    const el = document.getElementById(elId);
+    el.classList.remove("is-hidden");
+    el.innerHTML = html;
+}
+
+function errorBox(error) {
+    return `<p>Request failed.</p><pre>${error}</pre>`;
+}
+
+function severityBadge(sev) {
+    return `<span class="badge sev-${sev}">${sev}</span>`;
+}
+
+function rulesTable(rules) {
+    if (!Array.isArray(rules) || !rules.length) return "<p>No rules configured.</p>";
+    const rows = rules.map((r) => `
+        <tr>
+            <td>${r.rule_id}</td><td>${r.rule_name}</td><td>${r.rule_type}</td>
+            <td>${r.threshold_value}${r.threshold_secondary != null ? " / " + r.threshold_secondary : ""}</td>
+            <td>${severityBadge(r.severity)}</td>
+            <td>${r.enabled ? "Yes" : "No"}</td>
+            <td>
+                <button type="button" onclick="toggleRule(${r.rule_id}, ${r.enabled ? 0 : 1})">${r.enabled ? "Disable" : "Enable"}</button>
+                <button type="button" onclick="deleteRule(${r.rule_id})">Delete</button>
+            </td>
+        </tr>`).join("");
+    return `<table><tr><th>ID</th><th>Name</th><th>Type</th><th>Threshold</th><th>Severity</th><th>Enabled</th><th></th></tr>${rows}</table>`;
+}
+
+async function loadRules() {
+    const result = await api("/api/rules");
+    result.ok ? show("rules-result", rulesTable(result.body)) : show("rules-result", `<p>Error: ${result.body.error || result.status}</p>`);
+}
+
+async function toggleRule(ruleId, enabled) {
+    await api(`/api/rules/${ruleId}`, { method: "PUT", body: JSON.stringify({ enabled }) });
+    loadRules();
+}
+
+async function deleteRule(ruleId) {
+    await api(`/api/rules/${ruleId}`, { method: "DELETE" });
+    loadRules();
+}
+
+document.getElementById("rule-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+        rule_name: document.getElementById("rule_name").value,
+        rule_type: document.getElementById("rule_type").value,
+        threshold_value: document.getElementById("threshold_value").value,
+        threshold_secondary: document.getElementById("threshold_secondary").value || null,
+        severity: document.getElementById("severity").value,
+        enabled: 1,
+    };
+    const result = await api("/api/rules", { method: "POST", body: JSON.stringify(payload) });
+    if (result.ok) {
+        event.target.reset();
+        loadRules();
+    } else {
+        show("rules-result", `<p>Error: ${result.body.error || result.status}</p>`);
+    }
+});
+
+function alertsTable(alerts) {
+    if (!Array.isArray(alerts) || !alerts.length) return "<p>No alerts found.</p>";
+    const rows = alerts.map((a) => `
+        <tr>
+            <td>${a.alert_id}</td><td>${a.customer_id}</td><td>${a.transaction_id}</td>
+            <td>$${Number(a.transaction_amount).toLocaleString()}</td><td>${a.transaction_recipient ?? "-"}</td>
+            <td>${String(a.transaction_datetime ?? "").replace("T", " ")}</td>
+            <td>${severityBadge(a.severity)}</td><td>${a.status}</td>
+            <td>${a.ai_explanation ? "Yes" : "No"}</td>
+        </tr>`).join("");
+    return `<table><tr><th>ID</th><th>Customer</th><th>Txn</th><th>Amount</th><th>Recipient</th>
+        <th>Date/Time</th><th>Severity</th><th>Status</th><th>Explained</th></tr>${rows}</table>`;
+}
+
+function sortAlerts(alerts, key) {
+    return [...alerts].sort((a, b) => {
+        if (key === "transaction_amount") return b.transaction_amount - a.transaction_amount;
+        if (key === "transaction_datetime") return String(b.transaction_datetime).localeCompare(String(a.transaction_datetime));
+        return String(a.status).localeCompare(String(b.status));
+    });
+}
+
+document.getElementById("filter-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    const map = { f_status: "status", f_min: "min_amount", f_max: "max_amount", f_from: "date_from", f_to: "date_to", f_q: "q" };
+    Object.entries(map).forEach(([elId, param]) => {
+        const value = document.getElementById(elId).value;
+        if (value) params.set(param, value);
+    });
+    try {
+        const result = await api(`/api/alerts?${params}`);
+        if (!result.ok) return show("alerts-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        currentAlerts = result.body;
+        const sorted = sortAlerts(currentAlerts, document.getElementById("f_sort").value);
+        show("alerts-result", alertsTable(sorted));
+    } catch (error) { show("alerts-result", errorBox(error)); }
+});
+
+document.getElementById("f_sort").addEventListener("change", () => {
+    if (currentAlerts.length) show("alerts-result", alertsTable(sortAlerts(currentAlerts, document.getElementById("f_sort").value)));
+});
+
+async function viewDetail() {
+    const id = document.getElementById("detail_id").value;
+    try {
+        const result = await api(`/api/alerts/${id}`);
+        if (!result.ok) return show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        const a = result.body;
+        show("detail-result", `
+            <p><b>Alert #${a.alert_id}</b> - ${severityBadge(a.severity)} - <b>${a.status}</b><br>
+            Rule: ${a.rule_name ?? "-"} (${a.rule_type ?? "-"}), threshold ${a.threshold_value ?? "-"}${a.threshold_secondary != null ? " / " + a.threshold_secondary : ""}<br>
+            Customer ${a.customer_id} | Transaction ${a.transaction_id} | $${Number(a.transaction_amount).toLocaleString()} to ${a.transaction_recipient ?? "-"}<br>
+            Date: ${a.transaction_datetime ?? "-"} | Category: ${a.transaction_category ?? "-"}</p>
+            <p><b>AI Explanation:</b></p>
+            <pre>${a.ai_explanation ?? "Not yet explained - use the AI Mode tab, or the on-demand explain endpoint."}</pre>`);
+    } catch (error) { show("detail-result", errorBox(error)); }
+}
+
+document.getElementById("view-detail-btn").addEventListener("click", viewDetail);
+
+document.getElementById("update-status-btn").addEventListener("click", async () => {
+    const id = document.getElementById("detail_id").value;
+    const status = document.getElementById("status-select").value;
+    const result = await api(`/api/alerts/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
+    result.ok ? viewDetail() : show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+});
+
+document.getElementById("delete-alert-btn").addEventListener("click", async () => {
+    const id = document.getElementById("detail_id").value;
+    const result = await api(`/api/alerts/${id}`, { method: "DELETE" });
+    show("detail-result", result.ok ? `<p>Deleted alert ${id}.</p>` : `<p>Error: ${result.body.error || result.status}</p>`);
+});
+
+document.getElementById("run-detection-btn").addEventListener("click", async () => {
+    show("detection-result", "<p>Running detection...</p>");
+    try {
+        const result = await api("/api/detection/run", { method: "POST" });
+        if (!result.ok) return show("detection-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        const r = result.body;
+        show("detection-result", `
+            <p><b>${r.new_alert_count} new alert(s)</b> from ${r.evaluated} transactions scanned against ${r.rules_applied} rule(s).
+            ${r.skipped_duplicates ? `${r.skipped_duplicates} duplicate(s) skipped. ` : ""}
+            ${r.explanations_skipped ? `${r.explanations_skipped} explanation(s) unavailable. ` : ""}
+            ${r.degraded ? "<b>Degraded:</b> transaction source fell back to seed data." : ""}</p>
+            ${alertsTable(r.new_alerts)}`);
+    } catch (error) { show("detection-result", errorBox(error)); }
+});
+
+loadRules();
+</script>
+</body>
+</html>
