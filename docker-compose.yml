@@ -89,6 +89,10 @@ services:
       <<: *llm-env
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       FLASK_OPEN_CHROME: "0"
+      # The .NET app runs on a python:slim base with no ICU library; without this
+      # it aborts at startup (exit 134).
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
     depends_on:
       accounts:
         condition: service_started
