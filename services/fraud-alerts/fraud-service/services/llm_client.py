@@ -35,7 +35,7 @@ def _get_client():
     return _client
 
 
-def create_chat_completion(messages, max_tokens=400, temperature=0.2, model=None):
+def create_chat_completion(messages, max_tokens=4000, temperature=0.2, model=None):
     response = _get_client().chat.completions.create(
         model=model or _MODEL,
         messages=messages,
