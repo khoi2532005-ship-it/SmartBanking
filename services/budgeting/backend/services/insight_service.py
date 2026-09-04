@@ -1,7 +1,8 @@
 """AI insight generation, shared by the JSON API and the HTMX UI routes.
 
 Each function returns (payload, status_code) so callers can relay the result
-without duplicating any of the Ollama or budget-analysis logic.
+without duplicating any of the LLM or budget-analysis logic. The LLM is
+reached through services.llm_client (Gemini by default).
 """
 
 import json
@@ -9,11 +10,11 @@ from datetime import date
 
 from services import database_api, transactions_client
 from services.budget_logic import build_summary, evaluate_budget
-from services.llm_client import generate, get_model
+from services.llm_client import create_chat_completion, get_model
 from services.prompt_loader import load_prompt
 
 
-PROMPT_DIR = "budgets"
+PROMPT_DIR = "budgeting"
 
 
 def current_period():
@@ -22,12 +23,15 @@ def current_period():
 
 
 def _ask(task_file, context, max_tokens=500):
-    return generate(
-        prompt=f"{load_prompt(f'{PROMPT_DIR}/{task_file}')}"
-        f"\n\nBudget data (JSON):\n{context}",
-        system=load_prompt(f"{PROMPT_DIR}/insight_system.txt"),
-        max_tokens=max_tokens,
-    )
+    messages = [
+        {"role": "system", "content": load_prompt(f"{PROMPT_DIR}/insight_system.txt")},
+        {
+            "role": "user",
+            "content": f"{load_prompt(f'{PROMPT_DIR}/{task_file}')}"
+            f"\n\nBudget data (JSON):\n{context}",
+        },
+    ]
+    return create_chat_completion(messages, max_tokens=max_tokens)
 
 
 def _store(budget_id, insight_text, model_used):

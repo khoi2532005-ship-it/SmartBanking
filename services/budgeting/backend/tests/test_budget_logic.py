@@ -1,7 +1,7 @@
 """Checks for the budget-versus-actual calculations.
 
 Plain assertions with a __main__ runner, so CI needs no test framework
-(pytest arrives in Release 2). Run from budgeting-and-insights/backend:
+(pytest arrives in Release 2). Run from services/budgeting/backend:
 
     python -m tests.test_budget_logic
 """

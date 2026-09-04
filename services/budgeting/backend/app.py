@@ -10,6 +10,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from routes.budgets import budgets_bp
+from services import llm_client
 from routes.insights import insights_bp
 from routes.ui import ui_bp
 
@@ -24,7 +25,9 @@ def create_app():
 
     @app.get("/api/health")
     def health():
-        return jsonify({"service": "budgets-service", "status": "running"})
+        return jsonify(
+            {"service": "budgets-service", "status": "running", "llm": llm_client.provider()}
+        )
 
     return app
 

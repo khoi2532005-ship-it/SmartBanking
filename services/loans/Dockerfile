@@ -3,9 +3,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-build
 WORKDIR /src
 
 # Copy the SmartBanking.Service project for restore and publish
-COPY src/SmartBanking.Service/SmartBanking.Service/ ./src/SmartBanking.Service/SmartBanking.Service/
-RUN dotnet restore src/SmartBanking.Service/SmartBanking.Service/SmartBanking.Service.csproj
-RUN dotnet publish src/SmartBanking.Service/SmartBanking.Service/SmartBanking.Service.csproj -c Release -r linux-x64 --self-contained true -o /publish
+COPY services/transactions/ ./services/transactions/
+RUN dotnet restore services/transactions/SmartBanking.Service/SmartBanking.Service.csproj
+RUN dotnet publish services/transactions/SmartBanking.Service/SmartBanking.Service.csproj -c Release -r linux-x64 --self-contained true -o /publish
 
 # Final image: start from python base and include published .NET app
 FROM python:3.12-slim
@@ -21,10 +21,10 @@ RUN apt-get update \
 COPY --from=dotnet-build /publish /opt/smartbanking
 
 # Copy Python application files
-COPY loans-and-credit/database/requirements.txt database-requirements.txt
-COPY loans-and-credit/backend/ backend/
-COPY loans-and-credit/database/ database/
-COPY loans-and-credit/frontend/ frontend/
+COPY services/loans/database/requirements.txt database-requirements.txt
+COPY services/loans/backend/ backend/
+COPY services/loans/database/ database/
+COPY services/loans/frontend/ frontend/
 COPY prompts/ prompts/
 
 # Install Python dependencies

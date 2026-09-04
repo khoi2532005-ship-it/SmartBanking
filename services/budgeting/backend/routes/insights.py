@@ -1,4 +1,4 @@
-"""AI-Mode JSON API: Frontend -> Backend/API -> Ollama -> LLM."""
+"""AI-Mode JSON API: Frontend -> Backend/API -> Gemini (LLM)."""
 
 from flask import Blueprint, jsonify, request
 

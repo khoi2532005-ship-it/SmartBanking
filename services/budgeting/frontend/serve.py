@@ -8,7 +8,7 @@ It serves two directories under one origin, matching the container layout:
     /            -> shared/frontend   (index.html, css/, js/)
     /tabs/...    -> this feature's tabs/
 
-Run:  python budgeting-and-insights/frontend/serve.py
+Run:  python services/budgeting/frontend/serve.py
 Then: http://localhost:8030/tabs/budgets.html
 """
 

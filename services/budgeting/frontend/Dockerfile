@@ -1,6 +1,6 @@
 # Budgets frontend microservice - static HTMX UI served by nginx.
 # Build context: repository root (the shared theme and home page are needed)
-#   docker build -f budgeting-and-insights/frontend/Dockerfile -t budgets-frontend:1.0 .
+#   docker build -f services/budgeting/frontend/Dockerfile -t budgets-frontend:1.0 .
 FROM nginx:alpine
 
 # Shared home page, CSS theme and vendored htmx go at the web root, so
@@ -8,6 +8,6 @@ FROM nginx:alpine
 COPY shared/frontend/ /usr/share/nginx/html/
 
 # This feature's tabs.
-COPY budgeting-and-insights/frontend/tabs/ /usr/share/nginx/html/tabs/
+COPY services/budgeting/frontend/tabs/ /usr/share/nginx/html/tabs/
 
 EXPOSE 80

@@ -4,12 +4,15 @@
 # built, validated and demonstrated independently, and so CI has something
 # concrete to smoke-test (.github/workflows/student-4.yml).
 #
-# TO MERGE INTO THE TEAM docker-compose.yml: copy the four service blocks
-# below plus the ollama-models volume. The ollama service is shared by all
-# five features, so include it only once.
+# TO MERGE INTO THE TEAM docker-compose.yml: copy the three budgets-* blocks
+# below. AI-Mode uses the Gemini API by default and reads GEMINI_API_KEY from
+# the .env file next to this compose file. The optional ollama block is behind
+# the `local-llm` profile for offline demos and is shared by all five
+# features, so include it only once.
 #
 #   docker compose -f docker-compose.budgets.yml build
 #   docker compose -f docker-compose.budgets.yml up -d
+#   docker compose -f docker-compose.budgets.yml --profile local-llm up -d   # local model instead
 #   docker compose -f docker-compose.budgets.yml down -v
 
 services:
@@ -20,7 +23,7 @@ services:
   budgets-db-api:
     build:
       context: .
-      dockerfile: budgeting-and-insights/database/Dockerfile
+      dockerfile: services/budgeting/database/Dockerfile
     image: budgets-db-api:1.0
     container_name: budgets-db-api
     ports:
@@ -42,7 +45,7 @@ services:
   budgets-api:
     build:
       context: .
-      dockerfile: budgeting-and-insights/backend/Dockerfile
+      dockerfile: services/budgeting/backend/Dockerfile
     image: budgets-api:1.0
     container_name: budgets-api
     ports:
@@ -53,8 +56,14 @@ services:
       TRANSACTIONS_SERVICE_URL: http://transactions-api:5005
       # auto = use the Transactions API when it is up, mock data when it is not.
       USE_MOCK_TRANSACTIONS: auto
-      OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: qwen2.5:0.5b
+      # AI-Mode: Gemini through its OpenAI-compatible endpoint (team default).
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      # Only used with `--profile local-llm` and LLM_PROVIDER=ollama.
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
     depends_on:
       budgets-db-api:
         condition: service_healthy
@@ -66,7 +75,7 @@ services:
   budgets-frontend:
     build:
       context: .
-      dockerfile: budgeting-and-insights/frontend/Dockerfile
+      dockerfile: services/budgeting/frontend/Dockerfile
     image: budgets-frontend:1.0
     container_name: budgets-frontend
     ports:
@@ -76,9 +85,11 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------
-  # Shared AI runtime - include ONCE in the team compose file
+  # Optional local AI runtime - `--profile local-llm`. Include ONCE in the
+  # team compose file.
   # ---------------------------------------------------------------------
   ollama:
+    profiles: ["local-llm"]
     image: ollama/ollama:latest
     container_name: ollama
     ports:

@@ -8,16 +8,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'budgeting-and-insights/**'
-      - 'prompts/budgets/**'
+      - 'services/budgeting/**'
+      - 'prompts/budgeting/**'
       - 'shared/frontend/**'
       - 'docker-compose.budgets.yml'
       - '.github/workflows/student-4.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'budgeting-and-insights/**'
-      - 'prompts/budgets/**'
+      - 'services/budgeting/**'
+      - 'prompts/budgeting/**'
       - 'shared/frontend/**'
       - 'docker-compose.budgets.yml'
       - '.github/workflows/student-4.yml'
@@ -59,13 +59,13 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r budgeting-and-insights/backend/requirements.txt
+        run: pip install -r services/budgeting/backend/requirements.txt
 
       - name: Seed the database
-        run: python budgeting-and-insights/database/init_db.py
+        run: python services/budgeting/database/init_db.py
 
       - name: Run budget logic checks
-        working-directory: budgeting-and-insights/backend
+        working-directory: services/budgeting/backend
         run: python -m tests.test_budget_logic
 
   # =====================================================================
