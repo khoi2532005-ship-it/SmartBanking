@@ -77,5 +77,14 @@
     </section>
 </main>
 
+<script>
+// The cards link to sibling services by port. Rewrite "localhost" to the
+// host the browser actually used, so the links keep working when this page
+// is served from the demo VM rather than a developer machine.
+for (const a of document.querySelectorAll('a[href*="//localhost:"]')) {
+    a.href = a.href.replace("//localhost:", `//${window.location.hostname}:`);
+}
+</script>
+
 </body>
 </html>

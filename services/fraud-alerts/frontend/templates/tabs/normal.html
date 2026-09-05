@@ -88,7 +88,7 @@
 </main>
 
 <script>
-const API = "http://localhost:5003";
+const API = `http://${window.location.hostname}:5003`;
 let currentAlerts = [];
 
 async function api(path, options = {}) {
