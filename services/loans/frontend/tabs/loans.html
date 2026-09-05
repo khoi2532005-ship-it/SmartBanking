@@ -142,7 +142,14 @@ function show(panelId, content) {
 }
 
 function errorBox(error) {
-    return `<p>Request failed.</p><pre>${error}</pre>`;
+    return `<p>Request failed.</p><pre>${errorMessage(error)}</pre>`;
+}
+
+function errorMessage(error, status = "") {
+    if (typeof error === "string") return error;
+    if (error && typeof error.message === "string") return error.message;
+    if (error && typeof error.error === "string") return error.error;
+    return status ? `Request failed (${status}).` : "Request failed.";
 }
 
 function loansTable(loans) {
@@ -240,7 +247,7 @@ async function decision(action) {
                     ? `${result.body.repayments_created} repayments created, first due ${result.body.first_due_date}, monthly $${result.body.monthly_payment}.`
                     : "") + "</p>");
             viewDetails();
-        } else show("detail-result", `<p>Error: ${JSON.stringify(result.body)}</p>`);
+        } else show("detail-result", `<p>Error: ${errorMessage(result.body, result.status)}</p>`);
     } catch (error) { show("detail-result", errorBox(error)); }
 }
 
