@@ -106,6 +106,7 @@ services:
       - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
       - ./shared/frontend/css:/usr/share/nginx/html/css:ro
       - ./shared/frontend/js:/usr/share/nginx/html/js:ro
+      - ./services/loans/frontend/js:/usr/share/nginx/html/loans-js:ro
       - ./services/loans/frontend/tabs:/usr/share/nginx/html/tabs:ro
     ports:
       - "3002:80"
