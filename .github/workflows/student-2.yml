@@ -93,7 +93,7 @@ jobs:
         run: |
           cat > "$GITHUB_WORKSPACE/reports/report.json" << EOF
           {
-            "workflow_name": "lab5-ci",
+            "workflow_name": "student-2-loans-ci",
             "run_id": "${{ github.run_id }}",
             "commit_sha": "${{ github.sha }}",
             "branch": "${{ github.ref_name }}",
@@ -104,9 +104,9 @@ jobs:
       - name: Generate report.md
         run: |
           cat > "$GITHUB_WORKSPACE/reports/report.md" << EOF
-          ## Lab 05 Workflow Report
+          ## Student 2 Loans Workflow Report
 
-          - Workflow: lab5-ci
+          - Workflow: student-2-loans-ci
           - Run ID: ${{ github.run_id }}
           - Commit SHA: ${{ github.sha }}
           - Branch: ${{ github.ref_name }}
