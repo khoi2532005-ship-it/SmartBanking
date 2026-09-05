@@ -12,11 +12,11 @@ on:
   pull_request:
     branches: [main]
     paths:
-    - 'services/loans/**'
-    - 'prompts/loans/**'
-    - 'shared/frontend/**'
-    - 'docker-compose.yml'
-    - '.github/workflows/student-2.yml'
+      - 'services/loans/**'
+      - 'prompts/loans/**'
+      - 'shared/frontend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/student-2.yml'
   workflow_dispatch:
     
 jobs:
