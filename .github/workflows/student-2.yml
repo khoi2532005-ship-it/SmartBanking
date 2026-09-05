@@ -70,7 +70,7 @@ jobs:
           }
 
           check_url "http://localhost:3002/"
-          check_url "http://localhost:5002/"
+          check_url "http://localhost:5002/api/health"
           check_url "http://localhost:5012/"
 
       - name: Stop services
