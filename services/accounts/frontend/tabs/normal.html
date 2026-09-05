@@ -122,7 +122,7 @@
 </main>
 
 <script>
-const API = "http://localhost:5001";
+const API = `http://${window.location.hostname}:5001`;
 
 async function api(path, options = {}) {
     options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});

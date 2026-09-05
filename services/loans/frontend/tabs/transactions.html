@@ -21,7 +21,7 @@
   <script>
     document.getElementById('btn').addEventListener('click', async () => {
       const account = document.getElementById('account').value.trim();
-      let url = 'http://localhost:5260/api/transactions';
+      let url = `http://${window.location.hostname}:5260/api/transactions`;
       if (account) url += '?account_id=' + encodeURIComponent(account);
 
       document.getElementById('out').textContent = 'Loading...';
