@@ -7,7 +7,9 @@
     <link rel="stylesheet" href="/css/styles.css">
     <style>
         pre { white-space: pre-wrap; font-size: 0.8rem; }
-        h2 { padding-top: 1rem; }
+        .row { margin-bottom: 1rem; }
+        .panel { margin-bottom: 1rem; }
+        #approve-btn { margin-left: auto; }
     </style>
 </head>
 <body>
@@ -60,16 +62,17 @@
             <button type="submit">Search Loans</button>
         </form>
         <div id="loans-result" class="panel is-hidden"></div>
-
+    </section>
+    <section class="card">
         <h2>Loan Details &amp; Repayment Schedule</h2>
         <form id="detail-form" class="row">
             <div><label for="detail_id">Loan ID</label>
                 <input id="detail_id" type="number" min="1" placeholder="1"></div>
             <button type="submit">View Details</button>
             <button type="button" id="eligibility-btn">Check Eligibility</button>
-            <button type="button" id="approve-btn">Approve</button>
-            <button type="button" id="reject-btn">Reject</button>
-            <button type="button" id="delete-btn">Delete</button>
+            <button type="button" class="btn-secondary" id="approve-btn" class="is-hidden" hidden>Approve</button>
+            <button type="button" class="btn-secondary"id="reject-btn" class="is-hidden" hidden>Reject</button>
+            <button type="button" class="btn-danger" id="delete-btn" class="is-hidden" hidden>Delete</button>
         </form>
         <div id="detail-result" class="panel is-hidden"></div>
 
@@ -97,16 +100,18 @@
     <!-- AI Mode -->
     <section class="card">
         <h2>AI Explanations for a Loan</h2>
+        <p>Enter a loan ID to get plain-language explanations of its eligibility checks, approval or rejection decision, and repayment schedule.</p>
         <form id="loan-ai-form" class="row">
             <div><label for="ai_loan_id">Loan ID</label>
                 <input id="ai_loan_id" type="number" min="1" placeholder="4"></div>
-            <button type="button" id="explain-eligibility-btn">Explain Eligibility</button>
-            <button type="button" id="explain-decision-btn">Explain Decision</button>
-            <button type="button" id="explain-repayments-btn">Explain Repayments</button>
+            <button type="button" class="btn-ai" id="explain-eligibility-btn">Explain Eligibility</button>
+            <button type="button" class="btn-ai" id="explain-decision-btn">Explain Decision</button>
+            <button type="button" class="btn-ai" id="explain-repayments-btn">Explain Repayments</button>
         </form>
         <div id="explanation-result" class="panel is-hidden"></div>
 
         <h2>Compare Repayment Options &amp; Get a Recommendation</h2>
+        <p>Compare monthly payments and total interest across different loan terms, using an existing loan or the amount, rate, and income you provide.</p>
         <form id="compare-form" class="row">
             <div><label for="cmp_loan_id">Existing Loan ID (optional)</label>
                 <input id="cmp_loan_id" type="number" min="1" placeholder="1"></div>
@@ -118,13 +123,9 @@
                 <input id="cmp_income" type="number" min="0" step="0.01" placeholder="4200"></div>
             <div><label for="cmp_terms">Terms (comma separated)</label>
                 <input id="cmp_terms" type="text" placeholder="12,24,36,48,60"></div>
-            <button type="submit">Compare Options</button>
+            <button type="submit" class="btn-ai">Compare Options</button>
         </form>
         <div id="compare-result" class="panel is-hidden"></div>
-
-        <p style="font-size: 0.8rem;">
-            (<code>Gemini 3.5 Flash Lite</code>). Make sure Gemini is running.
-        </p>
     </section>
 </main>
 

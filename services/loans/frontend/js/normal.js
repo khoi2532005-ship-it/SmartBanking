@@ -92,11 +92,21 @@ document.getElementById("search-form").addEventListener("submit", async (event) 
 
 // View loan details and manage decisions
 const detailIdInput = document.getElementById("detail_id");
+const decisionButtons = ["approve-btn", "reject-btn", "delete-btn"]
+    .map((id) => document.getElementById(id));
+
+function showDecisionButtons() {
+    decisionButtons.forEach((button) => {
+        button.hidden = false;
+        button.classList.remove("is-hidden");
+    });
+}
 
 async function viewDetails() {
     try {
         const result = await api(`/api/loans/${detailIdInput.value}`);
         if (!result.ok) return show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        showDecisionButtons();
         const l = result.body;
         show("detail-result",
             `<p><b>Loan #${l.loan_id}</b> - ${l.loan_type} - <b>${l.status}</b><br>
