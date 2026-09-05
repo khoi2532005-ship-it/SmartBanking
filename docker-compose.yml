@@ -114,6 +114,25 @@ services:
     networks: [smartbank]
 
   # ---------------------------------------------------------------------
+  # Transactions (Aidan) - one image: db 5015, api 5005, web 3005
+  # ---------------------------------------------------------------------
+  transactions:
+    build:
+      context: .
+      dockerfile: services/transactions/Dockerfile
+    image: smartbank-transactions:0.1
+    container_name: transactions
+    ports:
+      - "3005:3005"
+      - "5005:5005"
+      - "5015:5015"
+    environment:
+      <<: *llm-env
+      FLASK_OPEN_CHROME: "0"
+    restart: unless-stopped
+    networks: [smartbank]
+
+  # ---------------------------------------------------------------------
   # Fraud Alerts (Khoi) - three services: db 5013, api 5003, web 3003
   # ---------------------------------------------------------------------
   fraud-database-service:

@@ -7,7 +7,7 @@
 ```
 services/
   accounts/       Accounts & Customers  (William)  frontend + backend + database
-  transactions/   Transactions          (Aidan)    ASP.NET solution
+  transactions/   Transactions          (Aidan)    frontend + backend + database
   fraud-alerts/   Fraud Alerts          (Khoi)     frontend + backend + database
   budgeting/      Budgeting & Insights  (Bao)      frontend + backend + database
   loans/          Loans & Credit        (David)    frontend + backend + database
@@ -27,8 +27,8 @@ docker compose ps
 ```
 
 Open http://localhost:3000 for the shared home page. Feature frontends: accounts 3001,
-loans and transactions 3002, fraud alerts 3003, budgeting 3004. Backends on 5001-5005
-(transactions API on 5260), database services on 5011-5015.
+loans 3002, transactions 3005, fraud alerts 3003, budgeting 3004. Backends on 5001-5005,
+database services on 5011-5015.
 
 Fallback local LLM: `docker compose --profile local-llm up -d` and set
 `LLM_PROVIDER=ollama` in `.env`.

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Transactions</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    pre { background:#f4f4f4; padding:10px; white-space: pre-wrap; }
+    .row { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
+    .row > * { display:flex; flex-direction:column; }
+    button { padding: 6px 12px; }
+    input, select { padding: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Transactions</h1>
+  <p>This page calls the Transactions API and displays the results.</p>
+
+  <div class="row">
+    <div>
+      <label for="account">Account ID</label>
+      <input id="account" type="number" min="1" placeholder="1001" />
+    </div>
+    <div>
+      <label for="customer">Customer ID</label>
+      <input id="customer" type="number" min="1" placeholder="1" />
+    </div>
+    <div>
+      <label for="type">Type</label>
+      <select id="type">
+        <option value="">Any</option>
+        <option value="Deposit">Deposit</option>
+        <option value="Withdrawal">Withdrawal</option>
+        <option value="Transfer">Transfer</option>
+      </select>
+    </div>
+    <button id="btn">Fetch transactions</button>
+  </div>
+
+  <h2>Result</h2>
+  <pre id="out">(no data)</pre>
+
+  <script>
+    const API = `http://${window.location.hostname}:5005`;
+
+    document.getElementById('btn').addEventListener('click', async () => {
+      const account = document.getElementById('account').value.trim();
+      const customer = document.getElementById('customer').value.trim();
+      const type = document.getElementById('type').value;
+      const params = new URLSearchParams();
+      if (account) params.set('account_id', account);
+      if (customer) params.set('customer_id', customer);
+      if (type) params.set('type', type);
+
+      const url = `${API}/api/transactions${params.toString() ? `?${params}` : ''}`;
+      document.getElementById('out').textContent = 'Loading...';
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        const data = await res.json();
+        document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('out').textContent = 'Error: ' + err;
+      }
+    });
+  </script>
+</body>
+</html>
