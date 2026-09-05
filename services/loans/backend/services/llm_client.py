@@ -7,7 +7,7 @@ _BASE_URL = os.getenv(
     "https://generativelanguage.googleapis.com/v1beta/openai/",
 )
 _API_KEY = os.getenv("GEMINI_API_KEY", "")
-_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 _client = None
 

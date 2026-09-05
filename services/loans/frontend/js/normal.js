@@ -1,96 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Loans Dashboard</title>
-    <link rel="stylesheet" href="/css/styles.css">
-    <style>
-        body { margin: 0; min-height: auto; background: transparent; }
-        .app-shell { max-width: none; padding: 0; }
-        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
-        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
-        th { background: #f0f3f7; }
-        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .row > div { display: flex; flex-direction: column; }
-        pre { white-space: pre-wrap; font-size: 0.8rem; }
-    </style>
-</head>
-<body>
-<main class="app-shell">
-    <section class="card">
-        <h2>Submit Loan Application</h2>
-        <form id="apply-form" class="row">
-            <div><label for="customer_id">Customer ID</label>
-                <input id="customer_id" name="customer_id" type="number" min="1" placeholder="101" required></div>
-            <div><label for="loan_type">Loan Type</label>
-                <select id="loan_type" name="loan_type">
-                    <option>PERSONAL</option><option>AUTO</option><option>EDUCATION</option>
-                    <option>HOME</option><option>BUSINESS</option>
-                </select></div>
-            <div><label for="requested_amount">Requested Amount</label>
-                <input id="requested_amount" name="requested_amount" type="number" min="100" step="0.01" placeholder="15000"></div>
-            <div><label for="term_months">Term (months)</label>
-                <input id="term_months" name="term_months" type="number" min="6" placeholder="36"></div>
-            <div><label for="monthly_income">Monthly Income</label>
-                <input id="monthly_income" name="monthly_income" type="number" min="0" step="0.01" placeholder="4200"></div>
-            <div style="flex-basis: 100%;"><label for="loan_purpose">Purpose</label>
-                <input id="loan_purpose" name="loan_purpose" type="text" placeholder="Debt consolidation"></div>
-            <button type="submit">Submit Application</button>
-        </form>
-        <div id="apply-result" class="panel is-hidden"></div>
-
-        <h2>Search &amp; Filter Loan Applications</h2>
-        <form id="search-form" class="row">
-            <div><label for="q">Free text</label>
-                <input id="q" name="q" type="text" placeholder="id, customer, purpose..."></div>
-            <div><label for="f_status">Status</label>
-                <select id="f_status"><option value="">Any</option>
-                    <option>PENDING</option><option>APPROVED</option>
-                    <option>REJECTED</option><option>CANCELLED</option></select></div>
-            <div><label for="f_loan_type">Type</label>
-                <select id="f_loan_type"><option value="">Any</option>
-                    <option>PERSONAL</option><option>AUTO</option><option>EDUCATION</option>
-                    <option>HOME</option><option>BUSINESS</option></select></div>
-            <button type="submit">Search Loans</button>
-        </form>
-        <div id="loans-result" class="panel is-hidden"></div>
-
-        <h2>Loan Details &amp; Repayment Schedule</h2>
-        <form id="detail-form" class="row">
-            <div><label for="detail_id">Loan ID</label>
-                <input id="detail_id" type="number" min="1" placeholder="1"></div>
-            <button type="submit">View Details</button>
-            <button type="button" id="eligibility-btn">Check Eligibility</button>
-            <button type="button" id="approve-btn">Approve</button>
-            <button type="button" id="reject-btn">Reject</button>
-            <button type="button" id="delete-btn">Delete</button>
-        </form>
-        <div id="detail-result" class="panel is-hidden"></div>
-
-        <h2>Update Repayment</h2>
-        <form id="repay-form" class="row">
-            <div><label for="repay_id">Repayment ID</label>
-                <input id="repay_id" type="number" min="1" placeholder="3"></div>
-            <div><label for="amount_paid">Amount Paid</label>
-                <input id="amount_paid" type="number" min="0" step="0.01" placeholder="474.53"></div>
-            <div><label for="payment_status">Status</label>
-                <select id="payment_status"><option value="">Auto</option>
-                    <option>UPCOMING</option><option>PARTIAL</option><option>PAID</option></select></div>
-            <button type="submit">Update Payment</button>
-        </form>
-        <div id="repay-result" class="panel is-hidden"></div>
-
-        <h2>All Repayments / Upcoming</h2>
-        <form class="row">
-            <button type="button" id="all-repayments-btn">All Repayments</button>
-            <button type="button" id="upcoming-btn">Upcoming (30 days)</button>
-        </form>
-        <div id="repayments-result" class="panel is-hidden"></div>
-    </section>
-</main>
-
-<script>
-const API = `http://${window.location.hostname}:5002`;
+const API = "http://localhost:5002";
 
 async function api(path, options = {}) {
     options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
@@ -106,7 +14,14 @@ function show(panelId, content) {
 }
 
 function errorBox(error) {
-    return `<p>Request failed.</p><pre>${error}</pre>`;
+    return `<p>Request failed.</p><pre>${errorMessage(error)}</pre>`;
+}
+
+function errorMessage(error, status = "") {
+    if (typeof error === "string") return error;
+    if (error && typeof error.message === "string") return error.message;
+    if (error && typeof error.error === "string") return error.error;
+    return status ? `Request failed (${status}).` : "Request failed.";
 }
 
 function loansTable(loans) {
@@ -139,6 +54,7 @@ function repaymentsTable(repayments) {
         <th>Interest</th><th>Paid</th><th>Status</th></tr>${rows}</table>`;
 }
 
+// Submit application
 document.getElementById("apply-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.target;
@@ -160,6 +76,7 @@ document.getElementById("apply-form").addEventListener("submit", async (event) =
     } catch (error) { show("apply-result", errorBox(error)); }
 });
 
+// Search loans
 document.getElementById("search-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const params = new URLSearchParams();
@@ -173,12 +90,23 @@ document.getElementById("search-form").addEventListener("submit", async (event) 
     } catch (error) { show("loans-result", errorBox(error)); }
 });
 
+// View loan details and manage decisions
 const detailIdInput = document.getElementById("detail_id");
+const decisionButtons = ["approve-btn", "reject-btn", "delete-btn"]
+    .map((id) => document.getElementById(id));
+
+function showDecisionButtons() {
+    decisionButtons.forEach((button) => {
+        button.hidden = false;
+        button.classList.remove("is-hidden");
+    });
+}
 
 async function viewDetails() {
     try {
         const result = await api(`/api/loans/${detailIdInput.value}`);
         if (!result.ok) return show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        showDecisionButtons();
         const l = result.body;
         show("detail-result",
             `<p><b>Loan #${l.loan_id}</b> - ${l.loan_type} - <b>${l.status}</b><br>
@@ -204,7 +132,7 @@ async function decision(action) {
                     ? `${result.body.repayments_created} repayments created, first due ${result.body.first_due_date}, monthly $${result.body.monthly_payment}.`
                     : "") + "</p>");
             viewDetails();
-        } else show("detail-result", `<p>Error: ${JSON.stringify(result.body)}</p>`);
+        } else show("detail-result", `<p>Error: ${errorMessage(result.body, result.status)}</p>`);
     } catch (error) { show("detail-result", errorBox(error)); }
 }
 
@@ -230,6 +158,7 @@ document.getElementById("delete-btn").addEventListener("click", async () => {
     } catch (error) { show("detail-result", errorBox(error)); }
 });
 
+// Repayment management
 document.getElementById("repay-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const payload = {};
@@ -250,6 +179,7 @@ document.getElementById("repay-form").addEventListener("submit", async (event) =
     } catch (error) { show("repay-result", errorBox(error)); }
 });
 
+// Repayment table views
 document.getElementById("all-repayments-btn").addEventListener("click", async () => {
     try {
         const result = await api("/api/repayments");
@@ -265,6 +195,3 @@ document.getElementById("upcoming-btn").addEventListener("click", async () => {
                   : show("repayments-result", `<p>Error: ${result.body.error || result.status}</p>`);
     } catch (error) { show("repayments-result", errorBox(error)); }
 });
-</script>
-</body>
-</html>
