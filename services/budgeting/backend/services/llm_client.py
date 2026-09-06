@@ -14,6 +14,7 @@ two can be merged into shared/python/smartbank_common later.
 """
 
 import os
+import sys
 
 from openai import OpenAI
 
@@ -40,7 +41,7 @@ def _provider_config(name):
             "https://generativelanguage.googleapis.com/v1beta/openai/",
         ),
         "api_key": os.getenv("GEMINI_API_KEY", ""),
-        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "model": os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
     }
 
 
@@ -69,8 +70,14 @@ def _get_client():
     return _client
 
 
-def create_chat_completion(messages, max_tokens=400, temperature=0.2, model=None):
+def create_chat_completion(messages, max_tokens=4000, temperature=0.2, model=None):
     """Send a chat completion and return the text of the first choice.
+
+    Gemini 3.x models reason before answering, and those hidden reasoning
+    tokens count against max_tokens. Two things keep the visible reply from
+    being truncated: a generous max_tokens ceiling (only tokens actually
+    used are billed) and asking for low reasoning effort, which is plenty
+    for short plain-English explanations. Ollama ignores reasoning_effort.
 
     Raises RuntimeError when the provider is unreachable, rejects the request,
     or returns an empty message, so callers can map any failure to one
@@ -79,20 +86,36 @@ def create_chat_completion(messages, max_tokens=400, temperature=0.2, model=None
     config = _provider_config(provider())
     client = _get_client()
 
+    request = {
+        "model": model or config["model"],
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if provider() == "gemini":
+        request["reasoning_effort"] = os.getenv("GEMINI_REASONING_EFFORT", "low")
+
     try:
-        response = client.chat.completions.create(
-            model=model or config["model"],
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        response = client.chat.completions.create(**request)
     except Exception as exc:  # network, auth, rate limit, bad model
         raise RuntimeError(
             f"{provider()} request failed ({exc.__class__.__name__}): {exc}"
         ) from exc
 
-    text = (response.choices[0].message.content or "").strip()
+    choice = response.choices[0]
+    text = (choice.message.content or "").strip()
     if not text:
         raise RuntimeError(f"{provider()} returned an empty response")
+
+    if choice.finish_reason == "length":
+        # Visible text was cut off. Surface it in the logs rather than
+        # silently returning half a sentence to the user.
+        usage = getattr(response, "usage", None)
+        print(
+            f"[llm_client] WARNING: {provider()} hit max_tokens={max_tokens} "
+            f"(completion_tokens={getattr(usage, 'completion_tokens', '?')}); "
+            "reply is truncated",
+            file=sys.stderr,
+        )
 
     return text

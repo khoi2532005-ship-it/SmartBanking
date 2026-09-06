@@ -57,7 +57,7 @@ cp .env.example .env      # then set GEMINI_API_KEY=...
 ```
 
 Configured with `LLM_PROVIDER` (default `gemini`), `GEMINI_API_KEY`,
-`GEMINI_BASE_URL` and `GEMINI_MODEL` (default `gemini-2.5-flash`).
+`GEMINI_BASE_URL` and `GEMINI_MODEL` (default `gemini-3.5-flash-lite`).
 `LLM_PROVIDER=ollama` switches to a local model when the `local-llm`
 compose profile is running.
 
