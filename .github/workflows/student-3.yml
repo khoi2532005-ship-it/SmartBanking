@@ -1,10 +1,5 @@
 name: student-3-fraud-ci
 
-# Student 3 - Duc Minh Khoi Tran - Fraud Alerts / Notifications
-# Builds and validates the fraud frontend, backend/API and database
-# microservices, plus the shared agentic loop. Validation only: nothing is
-# deployed.
-
 on:
   push:
     branches: [main]
