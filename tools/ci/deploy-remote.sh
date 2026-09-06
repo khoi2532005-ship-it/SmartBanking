@@ -34,11 +34,12 @@ probe accounts-api         http://localhost:5001/api/health
 probe loans-api            http://localhost:5002/api/health
 probe fraud-api            http://localhost:5003/api/health
 probe budgeting-api        http://localhost:5004/api/health
-probe transactions-api     http://localhost:5260/api/transactions
+probe transactions-api     http://localhost:5005/api/health
 probe accounts-web         http://localhost:3001/
 probe loans-web            http://localhost:3002/tabs/loans.html
 probe fraud-web            http://localhost:3003/tabs/normal.html
 probe budgeting-web        http://localhost:3004/tabs/budgets.html
+probe transactions-web     http://localhost:3005/tabs/transactions.html
 
 echo "== services"
 docker compose ps

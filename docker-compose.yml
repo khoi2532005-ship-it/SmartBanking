@@ -10,12 +10,12 @@
 # Put GEMINI_API_KEY in a .env file next to this file (see .env.example).
 #
 # Ports (host):  home 3000 | accounts 3001/5001/5011 | loans 3002/5002/5012 |
-#                transactions API 5260 | fraud 3003/5003/5013 | budgeting 3004/5004/5014
+#                transactions 3005/5005/5015 | fraud 3003/5003/5013 | budgeting 3004/5004/5014
 #
 # Release 0 notes
-# - Accounts and Loans ship as one image each that runs their tiers as processes;
-#   the Transactions (.NET) API runs inside the Loans image on 5260.
-# - Loans and Fraud have no frontend Dockerfile yet, so their tab pages are served
+# - Accounts, Loans and Transactions each ship as one image that runs their
+#   tiers as processes.
+# - Fraud has no frontend Dockerfile yet, so its tab pages are served
 #   by stock nginx over bind mounts. Fraud's backend and database run from the
 #   python image over bind mounts until Khoi adds Dockerfiles. Swap these for
 #   `build:` blocks as each owner adds them; ports and names stay the same.
@@ -72,8 +72,7 @@ services:
     networks: [smartbank]
 
   # ---------------------------------------------------------------------
-  # Loans & Credit (David) + Transactions API (Aidan, .NET on 5260)
-  # one image: loans db 5012, loans api 5002, transactions api 5260
+  # Loans & Credit (David) - one image: loans db 5012, loans api 5002
   # ---------------------------------------------------------------------
   loans:
     build:
@@ -84,15 +83,10 @@ services:
     ports:
       - "5002:5002"
       - "5012:5012"
-      - "5260:5260"
     environment:
       <<: *llm-env
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       FLASK_OPEN_CHROME: "0"
-      # The .NET app runs on a python:slim base with no ICU library; without this
-      # it aborts at startup (exit 134).
-      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
-      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
     depends_on:
       accounts:
         condition: service_started
@@ -169,14 +163,14 @@ services:
       <<: *llm-env
       FRAUD_DB_URL: http://fraud-database-service:5013
       ACCOUNTS_SERVICE_URL: http://accounts:5001
-      TRANSACTIONS_SERVICE_URL: http://loans:5260
+      TRANSACTIONS_SERVICE_URL: http://transactions:5005
       TRANSACTIONS_SOURCE: ${TRANSACTIONS_SOURCE:-seed}
     depends_on:
       fraud-database-service:
         condition: service_healthy
       accounts:
         condition: service_started
-      loans:
+      transactions:
         condition: service_started
     restart: unless-stopped
     networks: [smartbank]
@@ -229,12 +223,12 @@ services:
       <<: *llm-env
       BUDGET_DB_URL: http://budgeting-database-service:5014
       ACCOUNTS_SERVICE_URL: http://accounts:5001
-      TRANSACTIONS_SERVICE_URL: http://loans:5260
+      TRANSACTIONS_SERVICE_URL: http://transactions:5005
       USE_MOCK_TRANSACTIONS: auto
     depends_on:
       budgeting-database-service:
         condition: service_healthy
-      loans:
+      transactions:
         condition: service_started
     restart: unless-stopped
     networks: [smartbank]
