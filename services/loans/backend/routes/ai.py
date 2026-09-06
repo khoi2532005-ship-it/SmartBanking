@@ -8,7 +8,7 @@ from services.loan_logic import evaluate_eligibility, monthly_payment
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
 
-PROMPT_DIR = "service/loans"
+PROMPT_DIR = "loans"
 
 
 def _ask(system_file, task_file, context, max_tokens=1500):

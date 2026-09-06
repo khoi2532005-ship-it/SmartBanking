@@ -36,7 +36,7 @@ probe fraud-api            http://localhost:5003/api/health
 probe budgeting-api        http://localhost:5004/api/health
 probe transactions-api     http://localhost:5260/api/transactions
 probe accounts-web         http://localhost:3001/
-probe loans-web            http://localhost:3002/tabs/normal.html
+probe loans-web            http://localhost:3002/tabs/loans.html
 probe fraud-web            http://localhost:3003/tabs/normal.html
 probe budgeting-web        http://localhost:3004/tabs/budgets.html
 
