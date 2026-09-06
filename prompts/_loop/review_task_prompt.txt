@@ -1,0 +1,15 @@
+Review the answer below against the evidence it was given.
+
+Reply in exactly three lines, in this format:
+
+Risk: <one sentence - a claim in the answer the evidence does not support, or "none">
+Correction: <one sentence - what to change, or "no correction required">
+Retest: <one sentence - what to re-check after a change, or "repeat validation after future changes">
+
+If the answer is fully supported by the evidence, use:
+
+Risk: No evidence-backed risk identified.
+Correction: No correction required.
+Retest: Repeat validation after future changes.
+
+Do not explain your reasoning. Do not exceed three lines.

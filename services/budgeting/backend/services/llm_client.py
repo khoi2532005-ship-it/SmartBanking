@@ -41,7 +41,7 @@ def _provider_config(name):
             "https://generativelanguage.googleapis.com/v1beta/openai/",
         ),
         "api_key": os.getenv("GEMINI_API_KEY", ""),
-        "model": os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+        "model": os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"),
     }
 
 

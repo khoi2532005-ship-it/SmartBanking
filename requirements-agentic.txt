@@ -1,0 +1,13 @@
+# Dependencies for the shared agentic loop (agentic_loop.py).
+# The loop runs on the host, not in a container - it drives the running
+# services from outside the way a marker would at the showcase.
+#
+#   pip install -r requirements-agentic.txt
+
+openai>=1.40
+requests>=2.32
+python-dotenv>=1.0
+
+# Engine tests (tests/test_agentic_loop.py). They stub the LLM and need no
+# running services, so CI can run them on every push.
+pytest>=8.0

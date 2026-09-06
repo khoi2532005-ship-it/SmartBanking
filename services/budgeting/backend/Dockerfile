@@ -18,7 +18,7 @@ ENV BUDGET_DB_URL=http://budgets-db-api:5014 \
     USE_MOCK_TRANSACTIONS=auto \
     LLM_PROVIDER=gemini \
     GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ \
-    GEMINI_MODEL=gemini-3.5-flash-lite
+    GEMINI_MODEL=gemini-flash-lite-latest
 
 EXPOSE 5004
 
