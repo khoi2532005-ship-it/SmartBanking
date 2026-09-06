@@ -13,7 +13,10 @@ services/
   loans/          Loans & Credit        (David)    frontend + backend + database
 shared/frontend/  Unified index.html, shared CSS theme, htmx
 prompts/          Prompt files per feature (prompts/<feature>/) and agentic-loop prompts
-docs/             Project spec (smartbank-spec.md), feature registrations (features.md)
+agentic/          Shared agentic-loop engine; one mode per feature in agentic/modes/
+tests/            Engine tests (no services or API key needed)
+docs/             Feature registrations (features.md), loop guide (agentic-loop.md),
+                  run evidence (evidence/)
 agentic_loop.py   Plan -> Act -> Observe -> Adapt loop (run from the repo root)
 docker-compose.budgets.yml   Standalone stack for the budgeting feature
 ```
@@ -34,3 +37,27 @@ Fallback local LLM: `docker compose --profile local-llm up -d` and set
 `LLM_PROVIDER=ollama` in `.env`.
 
 Stop everything: `docker compose down -v`
+
+## Run the agentic loop
+
+The shared `Plan -> Act -> Observe -> Adapt` workflow for the whole application
+(project spec 4.3). Each feature is a mode on one menu, so every student demos
+their own slice of the same loop.
+
+```bash
+pip install -r requirements-agentic.txt
+python agentic_loop.py                 # menu - use this to demo
+python agentic_loop.py --mode fraud    # one feature
+python agentic_loop.py --all --quiet   # CI; exit code only
+```
+
+Runs append evidence to `docs/evidence/` for the technical report.
+
+**Adding your feature:** copy `agentic/modes/_template.py`, implement four
+methods, register it in `agentic/modes/__init__.py`. Full guide in
+[docs/agentic-loop.md](docs/agentic-loop.md); `agentic/modes/fraud.py` is a
+worked example.
+
+```bash
+python -m pytest tests/ -q             # engine tests, no services needed
+```
