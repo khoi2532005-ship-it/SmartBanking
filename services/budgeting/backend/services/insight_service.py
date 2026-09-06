@@ -22,7 +22,7 @@ def current_period():
     return today.month, today.year
 
 
-def _ask(task_file, context, max_tokens=500):
+def _ask(task_file, context, max_tokens=3000):
     messages = [
         {"role": "system", "content": load_prompt(f"{PROMPT_DIR}/insight_system.txt")},
         {
@@ -97,7 +97,7 @@ def monthly_insight(customer_id, month, year):
     )
 
     try:
-        insight_text = _ask("insight_task.txt", context, max_tokens=600)
+        insight_text = _ask("insight_task.txt", context, max_tokens=4000)
     except Exception as exc:
         return {"error": f"AI request failed: {exc}"}, 503
 
@@ -159,7 +159,7 @@ def explain_budget(budget_id):
     )
 
     try:
-        insight_text = _ask("explain_task.txt", context, max_tokens=450)
+        insight_text = _ask("explain_task.txt", context, max_tokens=3000)
     except Exception as exc:
         return {"error": f"AI request failed: {exc}"}, 503
 
