@@ -22,6 +22,7 @@ TRANSACTIONS_SERVICE_URL = os.getenv(
 )
 USE_MOCK_TRANSACTIONS = os.getenv("USE_MOCK_TRANSACTIONS", "auto").strip().lower()
 TIMEOUT = 5
+CONNECT_TIMEOUT = 2
 
 # Candidate paths, because the Transactions API contract is not final yet.
 CANDIDATE_PATHS = ("/api/transactions", "/transactions")
@@ -192,11 +193,27 @@ def _fetch_live(customer_id, month, year):
     for path in CANDIDATE_PATHS:
         try:
             response = requests.get(
-                f"{TRANSACTIONS_SERVICE_URL}{path}", params=params, timeout=TIMEOUT
+                f"{TRANSACTIONS_SERVICE_URL}{path}",
+                params=params,
+                # (connect, read): fail fast when the host is down, but allow a
+                # slow query to finish once connected.
+                timeout=(CONNECT_TIMEOUT, TIMEOUT),
             )
-            if response.status_code == 404:
-                last_error = f"404 from {path}"
-                continue
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            # The host is unreachable: trying another path on the same host
+            # only doubles the wait (each refused connect costs seconds on
+            # Windows), so give up immediately and let the caller fall back.
+            raise RuntimeError(f"Transactions service unavailable: {exc}") from exc
+        except requests.RequestException as exc:
+            last_error = exc
+            continue
+
+        if response.status_code == 404:
+            # Wrong path, right host - the only case worth trying the next path.
+            last_error = f"404 from {path}"
+            continue
+
+        try:
             response.raise_for_status()
             return _normalise(response.json())
         except (requests.RequestException, ValueError) as exc:

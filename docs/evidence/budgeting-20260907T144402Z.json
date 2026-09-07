@@ -1,0 +1,211 @@
+{
+  "mode": "budgeting",
+  "timestamp": "20260907T144402Z",
+  "plan": {
+    "goal": "Verify the spending insight is grounded in the customer's real budget-versus-actual figures for the period",
+    "checks": [
+      "budgeting-service responds on /api/budgets/summary",
+      "at least one budget exists for customer 1 in 09/2026",
+      "actual spending was retrieved (live Transactions API, or mock marked degraded)",
+      "the AI insight states the total spent as a dollar figure",
+      "the AI insight names every over-budget category, or says none are over"
+    ],
+    "stop_condition": "An insight passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "7 budgets for customer 1 in 09/2026; spent $2,169.97 of $2,160.00; 3 over budget (Dining Out, Shopping, Transport); spending source: mock",
+    "degraded": true,
+    "note": "spending came from mock transactions (Transactions API unreachable) - the insight is grounded in fallback data",
+    "facts": {
+      "customer_id": 1,
+      "month": 9,
+      "year": 2026,
+      "totals": {
+        "budget_count": 7,
+        "over_budget_count": 3,
+        "percent_used": 100.5,
+        "total_limit": 2160.0,
+        "total_remaining": -9.97,
+        "total_spent": 2169.97
+      },
+      "budgets": [
+        {
+          "budget_id": 2,
+          "category": "Dining Out",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 300.0,
+          "over_budget": true,
+          "over_by": 112.0,
+          "percent_used": 137.3,
+          "remaining": -112.0,
+          "spent": 412.0,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 4,
+          "category": "Entertainment",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 150.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 60.0,
+          "remaining": 60.0,
+          "spent": 90.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 1,
+          "category": "Groceries",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 800.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 80.6,
+          "remaining": 155.0,
+          "spent": 645.0,
+          "status": "NEAR_LIMIT",
+          "year": 2026
+        },
+        {
+          "budget_id": 6,
+          "category": "Shopping",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 400.0,
+          "over_budget": true,
+          "over_by": 105.0,
+          "percent_used": 126.2,
+          "remaining": -105.0,
+          "spent": 505.0,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 7,
+          "category": "Subscriptions",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 60.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 99.9,
+          "remaining": 0.03,
+          "spent": 59.97,
+          "status": "NEAR_LIMIT",
+          "year": 2026
+        },
+        {
+          "budget_id": 3,
+          "category": "Transport",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 200.0,
+          "over_budget": true,
+          "over_by": 18.0,
+          "percent_used": 109.0,
+          "remaining": -18.0,
+          "spent": 218.0,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 5,
+          "category": "Utilities",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 250.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 96.0,
+          "remaining": 10.0,
+          "spent": 240.0,
+          "status": "NEAR_LIMIT",
+          "year": 2026
+        }
+      ],
+      "over_budget": [
+        {
+          "budget_id": 2,
+          "category": "Dining Out",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 300.0,
+          "over_budget": true,
+          "over_by": 112.0,
+          "percent_used": 137.3,
+          "remaining": -112.0,
+          "spent": 412.0,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 6,
+          "category": "Shopping",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 400.0,
+          "over_budget": true,
+          "over_by": 105.0,
+          "percent_used": 126.2,
+          "remaining": -105.0,
+          "spent": 505.0,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 3,
+          "category": "Transport",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 200.0,
+          "over_budget": true,
+          "over_by": 18.0,
+          "percent_used": 109.0,
+          "remaining": -18.0,
+          "spent": 218.0,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        }
+      ],
+      "focus": {
+        "budget_id": 2,
+        "category": "Dining Out",
+        "customer_id": 1,
+        "month": 9,
+        "monthly_limit": 300.0,
+        "over_budget": true,
+        "over_by": 112.0,
+        "percent_used": 137.3,
+        "remaining": -112.0,
+        "spent": 412.0,
+        "status": "OVER_BUDGET",
+        "year": 2026
+      },
+      "unbudgeted": [],
+      "spending_source": "mock"
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "For the month of 09/2026, you spent $2,169.97 against a total of $2,160.00 budgeted, putting you slightly over overall. \n\nThree categories went over your limits. Dining Out is over by $112.00, Shopping is over by $105.00, and Transport is over by $18.00. \n\nAdditionally, Groceries, Subscriptions, and Utilities are near their limits, so you will want to watch those closely for the remainder of the month. \n\nTo help pull your spending back, a good concrete step is to reduce your Dining Out expenses for the rest of the month to offset that $112.00 overage.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The answer claims Groceries, Subscriptions, and Utilities are near their limits, which is not supported by the evidence.\nCorrection: Remove the claim about Groceries, Subscriptions, and Utilities being near their limits.\nRetest: Verify the response only references the facts provided in the evidence regarding the 7 budgets, spending totals, and over-budget categories.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}

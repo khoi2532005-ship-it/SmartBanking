@@ -1,0 +1,10 @@
+SmartBank Budgeting & Spending Insights feature.
+
+A customer sets one monthly limit per spending category (for example Groceries, Dining Out, Transport). Each month the feature compares the limit against the customer's actual spending in that category and assigns a status:
+- on track: under 80% of the limit used.
+- near its limit: between 80% and 100% used.
+- over budget: spending has exceeded the limit; the overspend amount is given.
+
+Actual spending is read over HTTP from the separate Transactions feature. The evidence states the spending data source: "transactions-api" means live transaction records; "mock" means the Transactions service was unavailable and fallback sample data was used - treat the figures as given either way.
+
+"Spending with no budget set" lists categories the customer spent in but never budgeted for. These are worth mentioning as a suggestion, not a failure.

@@ -11,6 +11,7 @@ day one without carrying dead code that nobody runs.
 from __future__ import annotations
 
 from agentic.core import Mode
+from agentic.modes.budgeting import BudgetingMode
 from agentic.modes.fraud import FraudMode
 
 # Implemented modes, in menu order.
@@ -18,6 +19,7 @@ MODES: dict[str, Mode] = {
     mode.key: mode
     for mode in (
         FraudMode(),
+        BudgetingMode(),
     )
 }
 
@@ -26,7 +28,6 @@ MODES: dict[str, Mode] = {
 PENDING: dict[str, tuple[str, str]] = {
     "accounts": ("Accounts & Customers", "William"),
     "transactions": ("Transactions", "Aidan"),
-    "budgeting": ("Budgeting & Insights", "Bao"),
     "loans": ("Loans & Credit", "David"),
 }
 
