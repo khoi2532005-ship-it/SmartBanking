@@ -90,6 +90,11 @@ transactions = [
     (3, 1002, -120.00, "AUD", "Transfer", "Rent", "August rent", "2024-08-03", None),
     (4, 1003, 500.00, "AUD", "Deposit", "Income", "Refund", "2024-08-05", None),
     (5, 1003, -80.00, "AUD", "Withdrawal", "Dining", "Dinner with team", "2024-08-06", None),
+    (6, 1001, -15.75, "AUD", "Withdrawal", "Dining", "Coffee shop", "2024-08-07", None),
+    (7, 1002, -60.00, "AUD", "Withdrawal", "Groceries", "Weekly groceries", "2024-08-08", None),
+    (8, 1001, -200.00, "AUD", "Transfer", "Utilities", "Electric bill", "2024-08-09", None),
+    (9, 1003, -30.00, "AUD", "Withdrawal", "Transportation", "Train tickets", "2024-08-10", None),
+    (10, 1002, 75.00, "AUD", "Deposit", "Income", "Side gig", "2024-08-11", None),
 ]
 cursor.executemany(
     """
