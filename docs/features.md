@@ -464,3 +464,110 @@ Export transaction history as CSV or report
 
 View spending trends by category over time 
 
+
+Backend/API Functions 
+
+API Functions 
+
+Create new transaction (deposit, withdrawal, transfer) 
+
+Retrieve all transactions for a customer 
+
+Retrieve individual transaction details 
+
+Retrieve transactions filtered by date, amount, category, type 
+
+Expose transaction data to other features (used by Fraud Alerts and Budgeting features) via dedicated API endpoints 
+
+Update transaction details (notes, category) 
+
+Delete transaction record 
+
+Retrieve spending summary by category for a given period 
+
+ 
+
+CRUD Functions 
+
+Create: Create new transactions (deposits, withdrawals, transfers) and store transaction records 
+
+Read: View all customer transactions, search and filter by various criteria, retrieve transaction details 
+
+Update: Modify transaction information (notes, category override) 
+
+Delete: Remove transaction records where permitted 
+
+ 
+
+AI Functions 
+
+Automatically categorize transactions into predefined categories (groceries, rent, utilities, entertainment, transportation, healthcare, dining, shopping, etc.) based on merchant name, transaction description, and amount 
+
+Analyze transaction patterns and flag unusual spending (e.g., transactions significantly higher than historical average for that category, transactions at unusual times or locations, repeated small transactions that may indicate testing fraud) 
+
+Detect potential duplicate transactions or fraudulent patterns 
+
+ 
+
+Database Tables 
+
+Transactions 
+
+Transaction ID 
+
+Customer ID 
+
+Account ID 
+
+Transaction type (deposit, withdrawal, transfer) 
+
+Sender details (name, account ID, bank code) 
+
+Recipient details (name, account ID, bank code) 
+
+Amount 
+
+DateTime sent 
+
+DateTime processed 
+
+Process state (pending, completed, failed) 
+
+Notes 
+
+Generated category 
+
+Flagged as unusual (boolean) 
+
+Created date 
+
+Updated date 
+
+Transaction Categories 
+
+Category ID 
+
+Category name 
+
+Description 
+
+Keywords (merchant names or descriptions that map to this category) 
+
+Default (boolean - whether this is a default category or custom) 
+
+Spending Patterns 
+
+Pattern ID 
+
+Customer ID 
+
+Category 
+
+Average transaction amount 
+
+Frequency (transactions per month) 
+
+Typical datetime range 
+
+Last updated date 
+
