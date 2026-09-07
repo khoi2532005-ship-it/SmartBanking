@@ -1,0 +1,5 @@
+Given a transaction and its context (amount, recipient, account age), explain
+in plain English why this transaction might be unusual or noteworthy. Keep the
+explanation brief (2-4 sentences) and factual.
+
+Transaction: {{transaction}}
