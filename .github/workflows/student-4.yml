@@ -11,7 +11,7 @@ on:
       - 'services/budgeting/**'
       - 'prompts/budgeting/**'
       - 'shared/frontend/**'
-      - 'docker-compose.budgets.yml'
+      - 'docker-compose.yml'
       - '.github/workflows/student-4.yml'
   pull_request:
     branches: [main]
@@ -19,12 +19,15 @@ on:
       - 'services/budgeting/**'
       - 'prompts/budgeting/**'
       - 'shared/frontend/**'
-      - 'docker-compose.budgets.yml'
+      - 'docker-compose.yml'
       - '.github/workflows/student-4.yml'
   workflow_dispatch:
 
 env:
-  COMPOSE_FILE: docker-compose.budgets.yml
+  COMPOSE_FILE: docker-compose.yml
+  # Only this feature's services are built and started (--no-deps), so a
+  # teammate's broken image cannot turn this workflow red.
+  SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
 
 jobs:
 
@@ -42,7 +45,7 @@ jobs:
         run: docker compose version
 
       - name: Build all budgets service images
-        run: docker compose -f "$COMPOSE_FILE" build budgets-db-api budgets-api budgets-frontend
+        run: docker compose -f "$COMPOSE_FILE" build $SERVICES
 
   # =====================================================================
   # 2. Unit gate - budget-versus-actual maths
@@ -80,7 +83,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Start the budgets stack
-        run: docker compose -f "$COMPOSE_FILE" up -d budgets-db-api budgets-api budgets-frontend
+        run: docker compose -f "$COMPOSE_FILE" up -d --no-deps $SERVICES
 
       - name: Probe required endpoints
         run: |
@@ -157,7 +160,7 @@ jobs:
             "workflow_name": "student-4-budgets-ci",
             "student": "Student 4 - Cong Bao Nguyen",
             "feature": "Budgeting & Spending Insights",
-            "services": ["budgets-frontend", "budgets-api", "budgets-db-api"],
+            "services": ["budgeting-frontend-service", "budgeting-service", "budgeting-database-service"],
             "ports": [3004, 5004, 5014],
             "commit_sha": "${GITHUB_SHA}",
             "run_id": "${GITHUB_RUN_ID}",
@@ -193,11 +196,11 @@ jobs:
 
           | Service | Endpoint |
           |---|---|
-          | budgets-db-api | \`GET http://localhost:5014/\` |
-          | budgets-api | \`GET http://localhost:5004/api/health\` |
-          | budgets-api | \`GET http://localhost:5004/api/budgets\` |
-          | budgets-api | \`GET http://localhost:5004/api/budgets/summary\` |
-          | budgets-frontend | \`GET http://localhost:3004/tabs/budgets.html\` |
+          | budgeting-database-service | \`GET http://localhost:5014/\` |
+          | budgeting-service | \`GET http://localhost:5004/api/health\` |
+          | budgeting-service | \`GET http://localhost:5004/api/budgets\` |
+          | budgeting-service | \`GET http://localhost:5004/api/budgets/summary\` |
+          | budgeting-frontend-service | \`GET http://localhost:3004/tabs/budgets.html\` |
           MD
 
           echo "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \

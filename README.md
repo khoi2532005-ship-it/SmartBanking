@@ -18,7 +18,6 @@ tests/            Engine tests (no services or API key needed)
 docs/             Feature registrations (features.md), loop guide (agentic-loop.md),
                   run evidence (evidence/)
 agentic_loop.py   Plan -> Act -> Observe -> Adapt loop (run from the repo root)
-docker-compose.budgets.yml   Standalone stack for the budgeting feature
 ```
 
 ## Run the whole app
