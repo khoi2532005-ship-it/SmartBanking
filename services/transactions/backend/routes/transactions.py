@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from services import database_api
+from services.llm_client import create_chat_completion
 
 
 transactions_bp = Blueprint("transactions", __name__)
@@ -53,6 +54,32 @@ def create_transaction():
         "description": data.get("description"),
         "date": str(data["date"]).strip(),
     }
+
+    # Use the AI model to categorise the transaction from its description.
+    # If the model fails for any reason, fall back to any provided category.
+    try:
+        desc = (payload.get("description") or "").strip()
+        messages = [
+            {"role": "system", "content": "You are a transaction categorizer."
+             " Return a single concise category name from the provided list."},
+            {
+                "role": "user",
+                "content": (
+                    "Categorise this transaction into one of: groceries, rent, utilities,"
+                    " entertainment, transportation, healthcare, dining, shopping, income,"
+                    " transfer, other. Return only the category name.\n\n"
+                    f"Transaction description: {desc}"
+                ),
+            },
+        ]
+        ai_text = create_chat_completion(messages, max_tokens=20, temperature=0.0)
+        if isinstance(ai_text, str) and ai_text.strip():
+            # take first line and normalise
+            category = ai_text.splitlines()[0].strip()
+            payload["category"] = category
+    except Exception:
+        # don't block transaction creation on LLM errors
+        pass
 
     try:
         result = database_api.create_transaction(payload)

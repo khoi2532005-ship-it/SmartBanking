@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="SmartBanking.Database.Service/SmartBanking.Database.Service.csproj" />
-  <Project Path="SmartBanking.Service/SmartBanking.Service.csproj" />
-  <Project Path="SmartBanking.Transactions.Service/SmartBanking.Transactions.Service.csproj" />
-</Solution>

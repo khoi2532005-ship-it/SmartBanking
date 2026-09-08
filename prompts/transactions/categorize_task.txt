@@ -1,0 +1,5 @@
+Categorise the transaction described below into one of the categories listed
+in the system prompt. Be concise and return only the category name on a single
+line.
+
+Transaction description: {{description}}
