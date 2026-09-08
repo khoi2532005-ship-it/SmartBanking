@@ -1,0 +1,14 @@
+# Keeps the build context small and reproducible. Every Dockerfile in this
+# repo builds from the repository root, so anything not excluded here is sent
+# to the Docker daemon on every build.
+.git/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Per-run agentic loop transcripts - evidence, not application code.
+docs/evidence/
+
+# Local secrets never belong in an image.
+.env
