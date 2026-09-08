@@ -28,15 +28,15 @@
         -->
         <nav class="feature-nav" aria-label="Features"
              hx-target="#feature-view" hx-swap="innerHTML" hx-indicator="#nav-spinner">
-            <button class="nav-item" data-feature="accounts"
+            <button class="nav-item" data-feature="accounts" data-href="http://localhost:3001/"
                     hx-get="/features/accounts.html" hx-push-url="/?feature=accounts">Accounts</button>
-            <button class="nav-item" data-feature="loans"
+            <button class="nav-item" data-feature="loans" data-href="http://localhost:3002/tabs/loans.html"
                     hx-get="/features/loans.html" hx-push-url="/?feature=loans">Loans</button>
-            <button class="nav-item" data-feature="fraud"
+            <button class="nav-item" data-feature="fraud" data-href="http://localhost:3003/tabs/normal.html"
                     hx-get="/features/fraud.html" hx-push-url="/?feature=fraud">Fraud Alerts</button>
-            <button class="nav-item" data-feature="budgeting"
+            <button class="nav-item" data-feature="budgeting" data-href="http://localhost:3004/tabs/budgets.html"
                     hx-get="/features/budgeting.html" hx-push-url="/?feature=budgeting">Budgeting</button>
-            <button class="nav-item" data-feature="transactions"
+            <button class="nav-item" data-feature="transactions" data-href="http://localhost:3005/"
                     hx-get="/features/transactions.html" hx-push-url="/?feature=transactions">Transactions</button>
             <span id="nav-spinner" class="htmx-indicator spinner">loading&hellip;</span>
         </nav>
@@ -99,13 +99,37 @@ window.addEventListener("popstate", () => {
     htmx.ajax("GET", `/features/${feature}.html`, { target: "#feature-view", swap: "innerHTML" });
 });
 
-// A fragment that fails to load should say so, not leave a blank page.
+// Graceful degradation. This index.html is also mounted as the root page of
+// some feature containers that serve css/ and js/ but not the features/
+// fragments. If a fragment is missing there, fall back to a plain navigation
+// to the feature's own URL, and render the landing grid inline so the page is
+// never blank. Nothing here runs when the fragments are served normally.
+const FEATURES = [
+    ["accounts",     "Accounts &amp; Customers",          "Student 1 &middot; William Por",        "http://localhost:3001/"],
+    ["loans",        "Loans &amp; Credit",                "Student 2 &middot; David Lee",          "http://localhost:3002/tabs/loans.html"],
+    ["fraud",        "Fraud Alerts",                      "Student 3 &middot; Duc Minh Khoi Tran", "http://localhost:3003/tabs/normal.html"],
+    ["budgeting",    "Budgeting &amp; Spending Insights", "Student 4 &middot; Cong Bao Nguyen",    "http://localhost:3004/tabs/budgets.html"],
+    ["transactions", "Transactions",                      "Student 5 &middot; Aidan Lei",          "http://localhost:3005/"],
+];
+
+function inlineHome() {
+    const cards = FEATURES.map(([key, title, owner, url]) =>
+        `<a class="feature-card" href="${url}"><h3>${title}</h3><span class="owner">${owner}</span></a>`
+    ).join("");
+    return `<section class="card"><h2>SmartBank</h2>
+        <p class="tagline">Choose a feature to open it.</p></section>
+        <div class="feature-grid">${cards}</div>`;
+}
+
 document.body.addEventListener("htmx:responseError", (event) => {
-    if (event.detail.target.id === "feature-view") {
-        event.detail.target.innerHTML =
-            '<p class="alert alert-error">That feature page could not be loaded (HTTP ' +
-            event.detail.xhr.status + ").</p>";
+    if (event.detail.target.id !== "feature-view") return;
+    const href = event.detail.elt && event.detail.elt.dataset && event.detail.elt.dataset.href;
+    if (href) {                      // a feature fragment is missing here: go to the feature directly
+        window.location.assign(href.replace("//localhost:", `//${window.location.hostname}:`));
+        return;
     }
+    event.detail.target.innerHTML = inlineHome();   // the landing fragment is missing: draw it inline
+    rewriteHosts(event.detail.target);
 });
 </script>
 
