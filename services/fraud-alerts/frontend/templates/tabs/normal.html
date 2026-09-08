@@ -21,10 +21,17 @@
         .sev-medium { background: #d68910; }
         .sev-low { background: #7f8c8d; }
         button { cursor: pointer; }
+        /* Tab strip linking the Normal and AI Mode views. */
+        .tab-strip { margin: 0 0 1rem; }
+        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
     </style>
 </head>
 <body>
 <main class="app-shell">
+    <nav class="feature-nav tab-strip" aria-label="Fraud Alerts views">
+        <a class="nav-item is-active" href="/tabs/normal.html" aria-current="page">Normal</a>
+        <a class="nav-item" href="/tabs/ai-mode.html">AI Mode</a>
+    </nav>
     <section class="card">
         <h2>Alert Rules</h2>
         <form id="rule-form" class="row">

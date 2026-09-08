@@ -13,10 +13,17 @@
         .is-hidden { display: none; }
         .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
         .panel.degraded { background: #fdf2e9; border-color: #d68910; }
+        /* Tab strip linking the Normal and AI Mode views. */
+        .tab-strip { margin: 0 0 1rem; }
+        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
     </style>
 </head>
 <body>
 <main class="app-shell">
+    <nav class="feature-nav tab-strip" aria-label="Fraud Alerts views">
+        <a class="nav-item" href="/tabs/normal.html">Normal</a>
+        <a class="nav-item is-active" href="/tabs/ai-mode.html" aria-current="page">AI Mode</a>
+    </nav>
     <section class="card">
         <h2>Explain a Flagged Transaction</h2>
         <form id="explain-form" class="row">
