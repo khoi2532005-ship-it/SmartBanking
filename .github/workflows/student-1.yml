@@ -1,0 +1,173 @@
+name: Accounts & Customers CI
+
+# Scope: this pipeline only builds and smoke-checks the Accounts & Customers
+# slice (the "normal" CRUD paths). AI-Mode endpoints under /api/ai/* are
+# intentionally NOT exercised here because they need a live LLM_PROVIDER
+# (Ollama running on a self-hosted runner, or a GEMINI_API_KEY secret on a
+# hosted runner) - those are validated manually during the demo instead.
+#
+# Job chain mirrors the course pattern: build-images -> smoke-check -> evidence-pack.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "accounts-and-customers/**"
+      - "prompts/accounts/**"
+      - ".github/workflows/accounts-and-customers-ci.yml"
+  pull_request:
+    paths:
+      - "accounts-and-customers/**"
+      - "prompts/accounts/**"
+
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build accounts-and-customers image
+        run: docker build -f accounts-and-customers/Dockerfile -t accounts-and-customers:ci .
+
+      - name: Save image so later jobs don't rebuild it
+        run: docker save accounts-and-customers:ci -o accounts-and-customers.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: accounts-and-customers-image
+          path: accounts-and-customers.tar
+          retention-days: 1
+
+  smoke-check:
+    needs: build-images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: accounts-and-customers-image
+
+      - name: Load image
+        run: docker load -i accounts-and-customers.tar
+
+      - name: Start container
+        run: |
+          docker run -d --name accounts-ci \
+            -p 5001:5001 -p 5011:5011 -p 3001:3001 \
+            accounts-and-customers:ci
+
+      - name: Wait for backend health (retry loop)
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:5001/api/health >/dev/null; then
+              echo "backend healthy after $i attempt(s)"
+              exit 0
+            fi
+            echo "waiting for backend... ($i/20)"
+            sleep 2
+          done
+          echo "backend never became healthy"
+          docker logs accounts-ci
+          exit 1
+
+      - name: Functional smoke checks (CRUD read paths)
+        run: |
+          set -e
+          mkdir -p evidence
+          curl -sf http://localhost:5011/customers | tee evidence/db-customers.json
+          curl -sf http://localhost:5011/accounts   | tee evidence/db-accounts.json
+          curl -sf http://localhost:5001/api/customers | tee evidence/api-customers.json
+          curl -sf http://localhost:5001/api/accounts  | tee evidence/api-accounts.json
+
+      - name: NFR check - >=19/20 requests to /api/customers under 500ms
+        run: |
+          set -e
+          PASS=0
+          TOTAL=20
+          : > evidence/nfr-requests.txt
+          for i in $(seq 1 "$TOTAL"); do
+            SECS=$(curl -s -o /dev/null -w "%{time_total}" http://localhost:5001/api/customers)
+            MS=$(awk -v s="$SECS" 'BEGIN { printf "%d", s * 1000 }')
+            echo "request $i: ${MS}ms" | tee -a evidence/nfr-requests.txt
+            if [ "$MS" -le 500 ]; then PASS=$((PASS + 1)); fi
+          done
+          echo "under_500ms=$PASS/$TOTAL" | tee evidence/nfr-summary.txt
+          if [ "$PASS" -lt 19 ]; then
+            echo "NFR FAILED: only $PASS/$TOTAL requests were <=500ms"
+            exit 1
+          fi
+          echo "NFR PASSED: $PASS/$TOTAL requests were <=500ms"
+
+      - name: Collect container logs
+        if: always()
+        run: docker logs accounts-ci > evidence/container.log 2>&1 || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f accounts-ci || true
+
+      - name: Upload smoke-check evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-check-evidence
+          path: evidence
+
+  evidence-pack:
+    needs: smoke-check
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download smoke-check evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: smoke-check-evidence
+          path: evidence
+
+      - name: Assemble report.md and report.json
+        run: |
+          {
+            echo "# Accounts & Customers - CI Evidence Pack"
+            echo
+            echo "- Run: ${{ github.run_id }} (attempt ${{ github.run_attempt }})"
+            echo "- Commit: ${{ github.sha }}"
+            echo "- Triggered by: ${{ github.event_name }} (${{ github.actor }})"
+            echo "- smoke-check job result: ${{ needs.smoke-check.result }}"
+            echo
+            echo "## NFR summary (>=19/20 requests to /api/customers under 500ms)"
+            echo '```'
+            cat evidence/nfr-summary.txt 2>/dev/null || echo "no nfr-summary.txt found"
+            echo '```'
+            echo
+            echo "## Endpoints checked"
+            echo "- GET /customers and /accounts on the database-service (port 5011)"
+            echo "- GET /api/customers and /api/accounts on the backend (port 5001)"
+            echo "- GET /api/health on the backend (port 5001)"
+            echo
+            echo "> AI-Mode endpoints (/api/ai/customers/<id>/summary, /risk-profile, /history)"
+            echo "> are out of scope for this pipeline - they require a live LLM_PROVIDER and"
+            echo "> are checked manually during the demo instead."
+          } > evidence/report.md
+
+          {
+            echo "{"
+            echo "  \"feature\": \"accounts-and-customers\","
+            echo "  \"run_id\": \"${{ github.run_id }}\","
+            echo "  \"run_attempt\": \"${{ github.run_attempt }}\","
+            echo "  \"commit\": \"${{ github.sha }}\","
+            echo "  \"triggered_by\": \"${{ github.event_name }}\","
+            echo "  \"smoke_check_result\": \"${{ needs.smoke-check.result }}\""
+            echo "}"
+          } > evidence/report.json
+
+          echo "[View this run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" > evidence/run-view.md
+
+      - name: Upload evidence pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: accounts-and-customers-evidence-pack
+          path: evidence
+          retention-days: 14
