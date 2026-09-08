@@ -52,6 +52,20 @@
          hx-swap="innerHTML">
         <p class="empty">Loading SmartBank&hellip;</p>
     </div>
+    <script>
+    // Deep links and refresh: /?feature=budgeting must load that feature, not
+    // home. This runs inline during parsing, BEFORE any DOMContentLoaded
+    // handler - htmx registers its own in <head> and fires the "load" trigger
+    // from it, so rewriting hx-get from a DOMContentLoaded handler here would be
+    // too late (the request for home.html would already be in flight).
+    (function () {
+        const feature = new URLSearchParams(window.location.search).get("feature");
+        if (feature && /^[a-z-]+$/.test(feature)) {
+            document.getElementById("feature-view")
+                    .setAttribute("hx-get", "/features/" + feature + ".html");
+        }
+    })();
+    </script>
 </main>
 
 <script>
@@ -81,15 +95,6 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
     const view = event.detail.target.querySelector("[data-feature]");
     markActive(view ? view.dataset.feature : "");
     window.scrollTo({ top: 0 });
-});
-
-// Deep links and refresh: /?feature=budgeting loads that feature instead of home.
-document.addEventListener("DOMContentLoaded", () => {
-    const feature = new URLSearchParams(window.location.search).get("feature");
-    const view = document.getElementById("feature-view");
-    if (feature && /^[a-z-]+$/.test(feature)) {
-        view.setAttribute("hx-get", `/features/${feature}.html`);
-    }
 });
 
 // Browser back/forward: htmx restores from its history cache, but the first
