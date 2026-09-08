@@ -37,10 +37,11 @@ services:
   # Shared home page (unified index.html + CSS theme + htmx)
   # ---------------------------------------------------------------------
   home:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: shared/frontend/Dockerfile
+    image: smartbank-home:0.1
     container_name: smartbank-home
-    volumes:
-      - ./shared/frontend:/usr/share/nginx/html:ro
     ports:
       - "3000:80"
     restart: unless-stopped

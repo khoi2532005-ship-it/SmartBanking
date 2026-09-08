@@ -5,85 +5,108 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SmartBank</title>
     <link rel="stylesheet" href="/css/styles.css">
+    <!-- Vendored so the showcase does not depend on network access. -->
+    <script src="/js/htmx.min.js"></script>
 </head>
 <body>
 
 <header class="app-header">
-    <div class="app-shell">
-        <a class="brand" href="/">
+    <div class="app-shell shell-bar">
+        <a class="brand" href="/"
+           hx-get="/features/home.html" hx-target="#feature-view" hx-swap="innerHTML"
+           hx-push-url="/">
             <span class="brand-mark">SB</span>
             SmartBank
         </a>
+
+        <!--
+          Single entry point: every feature is one htmx request away. Each nav
+          item fetches a small same-origin fragment (/features/<key>.html) that
+          embeds that student's frontend microservice, and swaps it into
+          #feature-view without a full page load. hx-push-url keeps the
+          browser back button and refresh working.
+        -->
+        <nav class="feature-nav" aria-label="Features"
+             hx-target="#feature-view" hx-swap="innerHTML" hx-indicator="#nav-spinner">
+            <button class="nav-item" data-feature="accounts"
+                    hx-get="/features/accounts.html" hx-push-url="/?feature=accounts">Accounts</button>
+            <button class="nav-item" data-feature="loans"
+                    hx-get="/features/loans.html" hx-push-url="/?feature=loans">Loans</button>
+            <button class="nav-item" data-feature="fraud"
+                    hx-get="/features/fraud.html" hx-push-url="/?feature=fraud">Fraud Alerts</button>
+            <button class="nav-item" data-feature="budgeting"
+                    hx-get="/features/budgeting.html" hx-push-url="/?feature=budgeting">Budgeting</button>
+            <button class="nav-item" data-feature="transactions"
+                    hx-get="/features/transactions.html" hx-push-url="/?feature=transactions">Transactions</button>
+            <span id="nav-spinner" class="htmx-indicator spinner">loading&hellip;</span>
+        </nav>
     </div>
 </header>
 
 <main class="app-shell">
-    <section class="card">
-        <h2>Personal finance and banking assistant</h2>
-        <p class="tagline">
-            Five integrated microservice features with an Ollama LLM layer on top.
-            Choose a feature to begin.
-        </p>
-    </section>
-
-    <div class="feature-grid">
-        <a class="feature-card" href="http://localhost:3001/">
-            <span class="feature-icon">&#128100;</span>
-            <h3>Accounts &amp; Customers</h3>
-            <p>Manage customer profiles and bank accounts, with AI account
-               summaries and risk profiles.</p>
-            <span class="owner">Student 1 &middot; William Por</span>
-        </a>
-
-        <a class="feature-card" href="http://localhost:3002/tabs/loans.html">
-            <span class="feature-icon">&#128181;</span>
-            <h3>Loans &amp; Credit</h3>
-            <p>Loan applications and repayment schedules, with AI explanations of
-               eligibility decisions.</p>
-            <span class="owner">Student 2 &middot; David Lee</span>
-        </a>
-
-        <a class="feature-card" href="http://localhost:3003/tabs/normal.html">
-            <span class="feature-icon">&#128680;</span>
-            <h3>Fraud Alerts</h3>
-            <p>Detection rules over transaction activity, with plain-English AI
-               explanations of each alert.</p>
-            <span class="owner">Student 3 &middot; Duc Minh Khoi Tran</span>
-        </a>
-
-        <a class="feature-card" href="http://localhost:3004/tabs/budgets.html">
-            <span class="feature-icon">&#128202;</span>
-            <h3>Budgeting &amp; Spending Insights</h3>
-            <p>Monthly budgets per category, tracked against real spending, with
-               AI advice on what to adjust.</p>
-            <span class="owner">Student 4 &middot; Cong Bao Nguyen</span>
-        </a>
-
-        <a class="feature-card" href="http://localhost:3005/">
-            <span class="feature-icon">&#128179;</span>
-            <h3>Transactions</h3>
-            <p>Deposits, withdrawals and transfers, with AI categorisation and
-               unusual-spend flags.</p>
-            <span class="owner">Student 5 &middot; Aidan Lei</span>
-        </a>
+    <!-- The landing content is loaded by htmx too, so the home page itself
+         exercises the same request/swap path as every feature. -->
+    <div id="feature-view"
+         hx-get="/features/home.html"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <p class="empty">Loading SmartBank&hellip;</p>
     </div>
-
-    <section class="card">
-        <h2>Shared AI services</h2>
-        <p class="muted">
-            Every feature reaches the LLM through the same Ollama runtime, and
-            reads other features' data only over their published HTTP APIs.
-        </p>
-    </section>
 </main>
 
 <script>
-// The cards link to sibling services by port. Rewrite "localhost" to the
-// host the browser actually used, so the links keep working when this page
-// is served from the demo VM rather than a developer machine.
-for (const a of document.querySelectorAll('a[href*="//localhost:"]')) {
-    a.href = a.href.replace("//localhost:", `//${window.location.hostname}:`);
+// Sibling services are addressed by port. Rewrite "localhost" to whatever host
+// the browser actually used, so the shell keeps working when it is served from
+// the demo VM instead of a developer machine. Runs on every htmx swap because
+// the fragments carry the links.
+function rewriteHosts(root) {
+    const host = window.location.hostname;
+    if (host === "localhost") return;
+    root.querySelectorAll('[href*="//localhost:"], [src*="//localhost:"]').forEach((el) => {
+        const attr = el.hasAttribute("src") ? "src" : "href";
+        el.setAttribute(attr, el.getAttribute(attr).replace("//localhost:", `//${host}:`));
+    });
 }
+
+// Highlight the nav item for whichever feature is on screen.
+function markActive(feature) {
+    document.querySelectorAll(".nav-item").forEach((b) => {
+        b.classList.toggle("is-active", b.dataset.feature === feature);
+    });
+}
+
+document.body.addEventListener("htmx:afterSwap", (event) => {
+    if (event.detail.target.id !== "feature-view") return;
+    rewriteHosts(event.detail.target);
+    const view = event.detail.target.querySelector("[data-feature]");
+    markActive(view ? view.dataset.feature : "");
+    window.scrollTo({ top: 0 });
+});
+
+// Deep links and refresh: /?feature=budgeting loads that feature instead of home.
+document.addEventListener("DOMContentLoaded", () => {
+    const feature = new URLSearchParams(window.location.search).get("feature");
+    const view = document.getElementById("feature-view");
+    if (feature && /^[a-z-]+$/.test(feature)) {
+        view.setAttribute("hx-get", `/features/${feature}.html`);
+    }
+});
+
+// Browser back/forward: htmx restores from its history cache, but the first
+// entry (the load-triggered one) has no cached fragment, so re-request it.
+window.addEventListener("popstate", () => {
+    const feature = new URLSearchParams(window.location.search).get("feature") || "home";
+    htmx.ajax("GET", `/features/${feature}.html`, { target: "#feature-view", swap: "innerHTML" });
+});
+
+// A fragment that fails to load should say so, not leave a blank page.
+document.body.addEventListener("htmx:responseError", (event) => {
+    if (event.detail.target.id === "feature-view") {
+        event.detail.target.innerHTML =
+            '<p class="alert alert-error">That feature page could not be loaded (HTTP ' +
+            event.detail.xhr.status + ").</p>";
+    }
+});
 </script>
 
 </body>
