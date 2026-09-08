@@ -29,22 +29,23 @@ on:
 
 env:
   COMPOSE_FILE: docker-compose.yml
+  SERVICES: fraud-database-service fraud-service fraud-frontend-service
 
 jobs:
 
   # =====================================================================
-  # 1. Config gate - the compose definition is valid and images resolve
+  # 1. Build gate - every fraud image must build from its own Dockerfile
   #
-  # Fraud has no Dockerfiles yet: its three services run from stock
-  # python/nginx images over bind mounts (see the header of
-  # docker-compose.yml). There is nothing to `docker compose build`, so this
-  # gate validates the definition and pre-pulls instead. Turn it into a real
-  # build gate once the Dockerfiles land.
+  # Spec 6.3 requires the frontend, backend and database to be containerised,
+  # so this gate compiles all three images with the repository root as build
+  # context. Unlike a `config` + `pull` check it fails on a broken Dockerfile,
+  # an unresolvable pin in requirements.txt, or a database that will not seed -
+  # `RUN python init_db.py` executes here.
   # =====================================================================
-  compose-validation:
-    name: Compose validation
+  build-images:
+    name: Build images
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -54,10 +55,8 @@ jobs:
       - name: Validate the compose definition
         run: docker compose -f "$COMPOSE_FILE" config --quiet
 
-      - name: Pre-pull fraud service images
-        run: |
-          docker compose -f "$COMPOSE_FILE" pull --quiet \
-            fraud-database-service fraud-service fraud-frontend-service
+      - name: Build the fraud service images
+        run: docker compose -f "$COMPOSE_FILE" build $SERVICES
 
   # =====================================================================
   # 2. Unit gate - the shared agentic loop engine
@@ -111,7 +110,7 @@ jobs:
   smoke-check:
     name: Smoke check
     runs-on: ubuntu-latest
-    needs: [compose-validation, unit-checks]
+    needs: [build-images, unit-checks]
     timeout-minutes: 15
     # Promoted to job level so the agentic-loop step's `if:` can test it -
     # a step's own `env:` block is not visible to that step's `if:`.
@@ -273,7 +272,7 @@ jobs:
 
           ## Gates
 
-          - Compose: definition validated, three service images resolved
+          - Build: three images built from their Dockerfiles; compose definition validated
           - Unit: agentic loop engine tests passed; loop prompt files non-empty
           - Smoke: ports 5013, 5003 and 3003 returned HTTP 200
           - Seed: alert_rules and alerts each hold 10+ records

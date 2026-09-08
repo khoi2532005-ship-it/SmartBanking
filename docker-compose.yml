@@ -15,10 +15,9 @@
 # Release 0 notes
 # - Accounts, Loans and Transactions each ship as one image that runs their
 #   tiers as processes.
-# - Fraud has no frontend Dockerfile yet, so its tab pages are served
-#   by stock nginx over bind mounts. Fraud's backend and database run from the
-#   python image over bind mounts until Khoi adds Dockerfiles. Swap these for
-#   `build:` blocks as each owner adds them; ports and names stay the same.
+# - Fraud and Budgeting each ship three images - database, backend/API and
+#   frontend - built from their own Dockerfiles, all with the repo root as
+#   build context.
 
 x-llm-env: &llm-env
   LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
@@ -130,18 +129,18 @@ services:
     networks: [smartbank]
 
   # ---------------------------------------------------------------------
-  # Fraud Alerts (Khoi) - three services: db 5013, api 5003, web 3003
+  # Fraud Alerts (Khoi) - three images: db 5013, api 5003, web 3003
   # ---------------------------------------------------------------------
   fraud-database-service:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: services/fraud-alerts/database/Dockerfile
+    image: smartbank-fraud-db:0.1
     container_name: fraud-database-service
-    working_dir: /app
-    volumes:
-      - ./services/fraud-alerts/database:/app
-      - fraud-data:/app/data
-    command: ["sh", "-c", "pip install --no-cache-dir -q --root-user-action=ignore --disable-pip-version-check -r requirements.txt && { [ -f data/fraud.db ] || python init_db.py; } && exec python app.py"]
     ports:
       - "5013:5013"
+    volumes:
+      - fraud-data:/app/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5013/')"]
       interval: 10s
@@ -152,13 +151,11 @@ services:
     networks: [smartbank]
 
   fraud-service:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: services/fraud-alerts/backend/Dockerfile
+    image: smartbank-fraud-api:0.1
     container_name: fraud-service
-    working_dir: /app
-    volumes:
-      - ./services/fraud-alerts/backend:/app
-      - ./prompts:/prompts:ro
-    command: ["sh", "-c", "pip install --no-cache-dir -q --root-user-action=ignore --disable-pip-version-check -r requirements.txt && exec python app.py"]
     ports:
       - "5003:5003"
     environment:
@@ -178,14 +175,11 @@ services:
     networks: [smartbank]
 
   fraud-frontend-service:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: services/fraud-alerts/frontend/Dockerfile
+    image: smartbank-fraud-web:0.1
     container_name: fraud-frontend-service
-    volumes:
-      - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
-      - ./shared/frontend/css:/usr/share/nginx/html/css:ro
-      - ./shared/frontend/js:/usr/share/nginx/html/js:ro
-      - ./shared/frontend/features:/usr/share/nginx/html/features:ro
-      - ./services/fraud-alerts/frontend/templates/tabs:/usr/share/nginx/html/tabs:ro
     ports:
       - "3003:80"
     depends_on: [fraud-service]
