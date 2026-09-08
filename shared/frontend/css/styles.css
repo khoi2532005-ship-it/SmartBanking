@@ -292,3 +292,70 @@ td.num { white-space: nowrap; }
 .feature-card .owner { font-size: 0.78rem; color: var(--ink-faint);
                        margin-top: 0.6rem; display: block; }
 .feature-icon { font-size: 1.4rem; }
+
+/* ------------------------------------------------- home page shell (htmx) */
+
+.shell-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.feature-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.nav-item {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid transparent;
+    padding: 0.4rem 0.75rem;
+    font-weight: 600;
+}
+.nav-item:hover { background: var(--brand-tint); color: var(--brand-dark);
+                  border-color: transparent; }
+.nav-item.is-active { background: var(--brand); color: #fff; }
+
+/* Feature cards are buttons now (htmx-driven), so reset button chrome. */
+button.feature-card {
+    text-align: left;
+    font: inherit;
+    font-weight: normal;
+    cursor: pointer;
+    width: 100%;
+}
+button.feature-card:hover { background: var(--surface); }
+button.feature-card h3 { font-weight: 650; }
+
+.feature-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+.feature-head h2 { margin: 0 0 0.2rem; font-size: 1.15rem; }
+.feature-head p { margin: 0; }
+.feature-head-actions { display: flex; align-items: center; gap: 0.75rem; }
+.feature-head .owner { font-size: 0.82rem; color: var(--ink-faint); }
+
+.feature-frame {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+.feature-frame iframe {
+    display: block;
+    width: 100%;
+    height: calc(100vh - 190px);
+    min-height: 560px;
+    border: 0;
+}

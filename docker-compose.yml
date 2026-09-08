@@ -37,10 +37,11 @@ services:
   # Shared home page (unified index.html + CSS theme + htmx)
   # ---------------------------------------------------------------------
   home:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: shared/frontend/Dockerfile
+    image: smartbank-home:0.1
     container_name: smartbank-home
-    volumes:
-      - ./shared/frontend:/usr/share/nginx/html:ro
     ports:
       - "3000:80"
     restart: unless-stopped
@@ -100,6 +101,7 @@ services:
       - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
       - ./shared/frontend/css:/usr/share/nginx/html/css:ro
       - ./shared/frontend/js:/usr/share/nginx/html/js:ro
+      - ./shared/frontend/features:/usr/share/nginx/html/features:ro
       - ./services/loans/frontend/js:/usr/share/nginx/html/loans-js:ro
       - ./services/loans/frontend/tabs:/usr/share/nginx/html/tabs:ro
     ports:
@@ -182,6 +184,7 @@ services:
       - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
       - ./shared/frontend/css:/usr/share/nginx/html/css:ro
       - ./shared/frontend/js:/usr/share/nginx/html/js:ro
+      - ./shared/frontend/features:/usr/share/nginx/html/features:ro
       - ./services/fraud-alerts/frontend/templates/tabs:/usr/share/nginx/html/tabs:ro
     ports:
       - "3003:80"

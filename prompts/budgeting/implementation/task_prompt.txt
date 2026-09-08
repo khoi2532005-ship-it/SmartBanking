@@ -1,0 +1,6 @@
+Using only the evidence below, write the customer's spending insight for this period. You must:
+1. State the total spent and the total budgeted as dollar figures, and whether the customer is over or under overall.
+2. Name every category that is over budget, with how much each one is over by. If no category is over budget, say so explicitly.
+3. Mention any category that is near its limit as something to watch.
+4. Give one concrete, specific suggestion the customer can act on this month - either how to pull an over-budget category back, or whether a limit itself should be adjusted.
+Keep it between 90 and 160 words.

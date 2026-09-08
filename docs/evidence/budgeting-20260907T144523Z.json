@@ -1,0 +1,169 @@
+{
+  "mode": "budgeting",
+  "timestamp": "20260907T144523Z",
+  "plan": {
+    "goal": "Verify the spending insight is grounded in the customer's real budget-versus-actual figures for the period",
+    "checks": [
+      "budgeting-service responds on /api/budgets/summary",
+      "at least one budget exists for customer 1 in 09/2026",
+      "actual spending was retrieved (live Transactions API, or mock marked degraded)",
+      "the AI insight states the total spent as a dollar figure",
+      "the AI insight names every over-budget category, or says none are over"
+    ],
+    "stop_condition": "An insight passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "7 budgets for customer 1 in 09/2026; spent $0.00 of $2,160.00; 0 over budget; spending source: transactions-api",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "customer_id": 1,
+      "month": 9,
+      "year": 2026,
+      "totals": {
+        "budget_count": 7,
+        "over_budget_count": 0,
+        "percent_used": 0.0,
+        "total_limit": 2160.0,
+        "total_remaining": 2160.0,
+        "total_spent": 0.0
+      },
+      "budgets": [
+        {
+          "budget_id": 2,
+          "category": "Dining Out",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 300.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 0.0,
+          "remaining": 300.0,
+          "spent": 0.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 4,
+          "category": "Entertainment",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 150.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 0.0,
+          "remaining": 150.0,
+          "spent": 0.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 1,
+          "category": "Groceries",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 800.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 0.0,
+          "remaining": 800.0,
+          "spent": 0.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 6,
+          "category": "Shopping",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 400.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 0.0,
+          "remaining": 400.0,
+          "spent": 0.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 7,
+          "category": "Subscriptions",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 60.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 0.0,
+          "remaining": 60.0,
+          "spent": 0.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 3,
+          "category": "Transport",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 200.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 0.0,
+          "remaining": 200.0,
+          "spent": 0.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 5,
+          "category": "Utilities",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 250.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 0.0,
+          "remaining": 250.0,
+          "spent": 0.0,
+          "status": "ON_TRACK",
+          "year": 2026
+        }
+      ],
+      "over_budget": [],
+      "near_limit": [],
+      "focus": {
+        "budget_id": 2,
+        "category": "Dining Out",
+        "customer_id": 1,
+        "month": 9,
+        "monthly_limit": 300.0,
+        "over_budget": false,
+        "over_by": 0.0,
+        "percent_used": 0.0,
+        "remaining": 300.0,
+        "spent": 0.0,
+        "status": "ON_TRACK",
+        "year": 2026
+      },
+      "unbudgeted": [],
+      "spending_source": "transactions-api"
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "For September 2026, you have spent $0.00 of your $2,160.00 total budgeted amount, leaving you well under overall. Live transaction records show that no category is over budget. Furthermore, no category is currently near its limit, so you have plenty of room across all of your planned expenses. \n\nLooking at your individual limits, everything is completely on track right now. Since you have not recorded any spending yet this month across Dining Out, Entertainment, Groceries, Shopping, Subscriptions, Transport, and Utilities, you might want to review your limits or wait for your upcoming transactions to sync. Keep an eye on your Groceries budget of $800.00 as your main expense category for the month.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The answer introduces specific category names (Dining Out, Entertainment, Groceries, Shopping, Subscriptions, Transport, and Utilities) and a specific Groceries budget of $800.00 that are not present in the evidence.\nCorrection: Remove the mentions of specific categories and the $800.00 Groceries budget, as they are not supported by the evidence.\nRetest: Verify that the revised answer only discusses overall spending and budget totals without inventing unlisted categories or amounts.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}

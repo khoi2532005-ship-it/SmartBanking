@@ -41,9 +41,9 @@ Then open **http://localhost:3004/tabs/budgets.html**
 ## Running it with Docker Compose
 
 ```bash
-docker compose -f docker-compose.budgets.yml build
-docker compose -f docker-compose.budgets.yml up -d
-docker compose -f docker-compose.budgets.yml down -v
+docker compose build budgeting-database-service budgeting-service budgeting-frontend-service
+docker compose up -d budgeting-database-service budgeting-service budgeting-frontend-service
+docker compose down -v
 ```
 
 ## AI-Mode

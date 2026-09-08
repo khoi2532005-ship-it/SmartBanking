@@ -1,0 +1,9 @@
+# Maps every identity a team member has committed under to one canonical
+# name, so `git shortlog -sn` and `git log` count contributions correctly
+# for the technical report. GitHub's own contributor graph does not read
+# this file - link your extra email addresses in GitHub Settings > Emails.
+
+Cong Bao Nguyen <cong.b.nguyen-1@student.uts.edu.au> Bao Bao <cong.b.nguyen-1@student.uts.edu.au>
+Cong Bao Nguyen <cong.b.nguyen-1@student.uts.edu.au> CongNguyen46 <cong.b.nguyen-1@student.uts.edu.au>
+Cong Bao Nguyen <cong.b.nguyen-1@student.uts.edu.au> bao040605 <congbao0406@gmail.com>
+Cong Bao Nguyen <cong.b.nguyen-1@student.uts.edu.au> Bảo Bảo <baobao@MacBook-Air-cua-Bao.local>
