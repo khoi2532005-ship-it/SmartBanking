@@ -1,3 +1,29 @@
+const API = `http://${window.location.hostname}:5002`;
+
+async function api(path, options = {}) {
+    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+    const response = await fetch(`${API}${path}`, options);
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+}
+
+function show(panelId, content) {
+    const panel = document.getElementById(panelId);
+    panel.classList.remove("is-hidden");
+    panel.innerHTML = content;
+}
+
+function errorBox(error) {
+    return `<p>Request failed.</p><pre>${errorMessage(error)}</pre>`;
+}
+
+function errorMessage(error, status = "") {
+    if (typeof error === "string") return error;
+    if (error && typeof error.message === "string") return error.message;
+    if (error && typeof error.error === "string") return error.error;
+    return status ? `Request failed (${status}).` : "Request failed.";
+}
+
 function explain(kind) {
     const loanId = document.getElementById("ai_loan_id").value;
     show("explanation-result", "<p>Thinking...</p>");

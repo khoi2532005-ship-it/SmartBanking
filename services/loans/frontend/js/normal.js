@@ -1,4 +1,4 @@
-const API = "http://localhost:5002";
+const API = `http://${window.location.hostname}:5002`;
 
 async function api(path, options = {}) {
     options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
