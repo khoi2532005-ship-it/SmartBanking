@@ -1,0 +1,30 @@
+{
+  "mode": "loans",
+  "timestamp": "20260909T131749Z",
+  "plan": {
+    "goal": "Verify the loan decision explanation is grounded in the real loan application and its eligibility assessment",
+    "checks": [
+      "loan-service responds on /api/loans and /api/loans/<id>/eligibility",
+      "at least one decided (APPROVED or REJECTED) loan exists to explain",
+      "the eligibility assessment was retrieved with its checks",
+      "the AI explanation states the loan type and the requested dollar amount",
+      "the AI explanation names the eligibility checks that passed, and any that failed"
+    ],
+    "stop_condition": "An explanation passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": false,
+    "summary": "3 loans found but none decided. Create and decide one first: POST /api/loans then POST /api/loans/<id>/decision (APPROVE or REJECT).",
+    "degraded": false,
+    "note": "",
+    "facts": {}
+  },
+  "attempts": [],
+  "review": {
+    "model": "",
+    "text": "",
+    "error": ""
+  },
+  "passed": false,
+  "adapted": false
+}

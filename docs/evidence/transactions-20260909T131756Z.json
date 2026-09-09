@@ -1,0 +1,146 @@
+{
+  "mode": "transactions",
+  "timestamp": "20260909T131756Z",
+  "plan": {
+    "goal": "Verify the recent transaction summary is grounded in the customer's real activity and category mix",
+    "checks": [
+      "transactions-service responds on /api/transactions",
+      "at least one transaction exists for customer 1",
+      "the AI summary names the main spending categories and a concrete pattern",
+      "the answer includes actual dollar figures from the evidence"
+    ],
+    "stop_condition": "An explanation passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "8 recent transactions for customer 1; top categories: Dining Out ($275.00), Shopping ($260.00), Transport ($140.00); spend $844.09 vs income $0.00",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "customer_id": 1,
+      "records": [
+        {
+          "account_id": 1001,
+          "amount": -26.0,
+          "category": "Entertainment",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-24",
+          "description": "Board game cafe",
+          "transaction_id": 31,
+          "type": "Withdrawal"
+        },
+        {
+          "account_id": 1001,
+          "amount": -75.0,
+          "category": "Utilities",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-23",
+          "description": "Water bill",
+          "transaction_id": 30,
+          "type": "Withdrawal"
+        },
+        {
+          "account_id": 1001,
+          "amount": -140.0,
+          "category": "Transport",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-22",
+          "description": "Fuel + parking",
+          "transaction_id": 29,
+          "type": "Withdrawal"
+        },
+        {
+          "account_id": 1001,
+          "amount": -260.0,
+          "category": "Shopping",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-21",
+          "description": "New jacket",
+          "transaction_id": 28,
+          "type": "Withdrawal"
+        },
+        {
+          "account_id": 1001,
+          "amount": -95.0,
+          "category": "Dining Out",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-20",
+          "description": "Uber Eats",
+          "transaction_id": 27,
+          "type": "Withdrawal"
+        },
+        {
+          "account_id": 1001,
+          "amount": -180.0,
+          "category": "Dining Out",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-19",
+          "description": "Restaurant weekend",
+          "transaction_id": 26,
+          "type": "Withdrawal"
+        },
+        {
+          "account_id": 1001,
+          "amount": -55.1,
+          "category": "Groceries",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-18",
+          "description": "Household staples",
+          "transaction_id": 25,
+          "type": "Withdrawal"
+        },
+        {
+          "account_id": 1001,
+          "amount": -12.99,
+          "category": "Subscriptions",
+          "currency": "AUD",
+          "customer_id": 1,
+          "date": "2026-09-16",
+          "description": "Cloud storage",
+          "transaction_id": 24,
+          "type": "Withdrawal"
+        }
+      ],
+      "top_categories": [
+        [
+          "Dining Out",
+          275.0
+        ],
+        [
+          "Shopping",
+          260.0
+        ],
+        [
+          "Transport",
+          140.0
+        ]
+      ],
+      "total_out": 844.09,
+      "total_in": 0
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "For this period, total incoming funds were $0.00, while total outgoing funds reached $844.09. \n\nThe dominant spending categories are Dining Out at $275.00 and Shopping at $260.00, followed by Transport at $140.00. Outgoings clearly drive the pattern, with the customer spending heavily on lifestyle and discretionary categories rather than essentials like Groceries ($55.10) or Utilities ($75.00). \n\nAs a concrete takeaway, the customer might consider reducing discretionary expenses like dining out and shopping to better manage their outgoing funds since there is currently no incoming money recorded.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The answer mentions spending on Groceries ($55.10) and Utilities ($75.00), which are not present in the provided evidence.\nCorrection: Remove references to Groceries and Utilities spending since they are not supported by the evidence.\nRetest: Verify that the answer only references the spending categories and amounts explicitly stated in the evidence.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}
