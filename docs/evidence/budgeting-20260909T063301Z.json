@@ -1,0 +1,227 @@
+{
+  "mode": "budgeting",
+  "timestamp": "20260909T063301Z",
+  "plan": {
+    "goal": "Verify the spending insight is grounded in the customer's real budget-versus-actual figures for the period",
+    "checks": [
+      "budgeting-service responds on /api/budgets/summary",
+      "at least one budget exists for customer 1 in 09/2026",
+      "actual spending was retrieved (live Transactions API, or mock marked degraded)",
+      "the AI insight states the total spent as a dollar figure",
+      "the AI insight names every over-budget category, or says none are over"
+    ],
+    "stop_condition": "An insight passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "7 budgets for customer 1 in 09/2026; spent $1,486.78 of $2,160.00; 2 over budget (Dining Out, Shopping); 2 near limit (Transport, Utilities); spending source: transactions-api",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "customer_id": 1,
+      "month": 9,
+      "year": 2026,
+      "totals": {
+        "budget_count": 7,
+        "over_budget_count": 2,
+        "percent_used": 68.8,
+        "total_limit": 2160.0,
+        "total_remaining": 673.22,
+        "total_spent": 1486.78
+      },
+      "budgets": [
+        {
+          "budget_id": 2,
+          "category": "Dining Out",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 300.0,
+          "over_budget": true,
+          "over_by": 25.2,
+          "percent_used": 108.4,
+          "remaining": -25.2,
+          "spent": 325.2,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 4,
+          "category": "Entertainment",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 150.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 64.5,
+          "remaining": 53.25,
+          "spent": 96.75,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 1,
+          "category": "Groceries",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 800.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 23.1,
+          "remaining": 615.2,
+          "spent": 184.8,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 6,
+          "category": "Shopping",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 400.0,
+          "over_budget": true,
+          "over_by": 74.9,
+          "percent_used": 118.7,
+          "remaining": -74.9,
+          "spent": 474.9,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 7,
+          "category": "Subscriptions",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 60.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 46.6,
+          "remaining": 32.02,
+          "spent": 27.98,
+          "status": "ON_TRACK",
+          "year": 2026
+        },
+        {
+          "budget_id": 3,
+          "category": "Transport",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 200.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 87.4,
+          "remaining": 25.25,
+          "spent": 174.75,
+          "status": "NEAR_LIMIT",
+          "year": 2026
+        },
+        {
+          "budget_id": 5,
+          "category": "Utilities",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 250.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 81.0,
+          "remaining": 47.6,
+          "spent": 202.4,
+          "status": "NEAR_LIMIT",
+          "year": 2026
+        }
+      ],
+      "over_budget": [
+        {
+          "budget_id": 2,
+          "category": "Dining Out",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 300.0,
+          "over_budget": true,
+          "over_by": 25.2,
+          "percent_used": 108.4,
+          "remaining": -25.2,
+          "spent": 325.2,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        },
+        {
+          "budget_id": 6,
+          "category": "Shopping",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 400.0,
+          "over_budget": true,
+          "over_by": 74.9,
+          "percent_used": 118.7,
+          "remaining": -74.9,
+          "spent": 474.9,
+          "status": "OVER_BUDGET",
+          "year": 2026
+        }
+      ],
+      "near_limit": [
+        {
+          "budget_id": 3,
+          "category": "Transport",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 200.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 87.4,
+          "remaining": 25.25,
+          "spent": 174.75,
+          "status": "NEAR_LIMIT",
+          "year": 2026
+        },
+        {
+          "budget_id": 5,
+          "category": "Utilities",
+          "customer_id": 1,
+          "month": 9,
+          "monthly_limit": 250.0,
+          "over_budget": false,
+          "over_by": 0.0,
+          "percent_used": 81.0,
+          "remaining": 47.6,
+          "spent": 202.4,
+          "status": "NEAR_LIMIT",
+          "year": 2026
+        }
+      ],
+      "focus": {
+        "budget_id": 6,
+        "category": "Shopping",
+        "customer_id": 1,
+        "month": 9,
+        "monthly_limit": 400.0,
+        "over_budget": true,
+        "over_by": 74.9,
+        "percent_used": 118.7,
+        "remaining": -74.9,
+        "spent": 474.9,
+        "status": "OVER_BUDGET",
+        "year": 2026
+      },
+      "unbudgeted": [],
+      "spending_source": "transactions-api"
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Welcome to your SmartBank monthly budget review for 09/2026. Overall, you are doing well by spending $1,486.78 of your $2,160.00 budgeted amount, leaving you under overall. \n\nHowever, two categories are over budget. Dining Out is over by $25.20, and Shopping is over by $74.90. \n\nAdditionally, Transport and Utilities are near their limits, so you will want to watch those closely for the rest of the month. \n\nTo help pull your spending back into balance, a great concrete step to take this month is to reduce your Dining Out expenses to offset that $25.20 overspend. Your other categories like Groceries, Entertainment, and Subscriptions are currently on track, which gives you a strong foundation to finish the month successfully.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The answer introduces specific overspend amounts ($25.20, $74.90) and unmentioned budget categories (Groceries, Entertainment, Subscriptions) that are not in the evidence.\nCorrection: Remove the specific dollar amounts for overspend and references to categories not present in the evidence.\nRetest: Verify the response relies solely on the provided budget counts, totals, and category statuses.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}

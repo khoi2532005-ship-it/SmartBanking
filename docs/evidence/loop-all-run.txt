@@ -1,0 +1,70 @@
+
+========================================================================
+  SmartBank - Shared Agentic Loop
+  model: gemini / gemini-flash-lite-latest
+========================================================================
+  [Fraud Alerts] PLAN     Verify fraud alert explanations are grounded in the triggering rule and transaction
+  [Fraud Alerts]            - fraud-service responds on /api/rules and /api/alerts
+  [Fraud Alerts]            - at least one enabled rule exists
+  [Fraud Alerts]            - at least one alert exists to explain
+  [Fraud Alerts]            - the AI explanation names the triggered rule and the transaction amount
+  [Fraud Alerts] ACT      collecting evidence
+  [Fraud Alerts] OBSERVE  8 enabled rules, 12 alerts; explaining alert 12 (rule 'Rapid Transactions', $275.0)
+  [Fraud Alerts] ACT      asking gemini / gemini-flash-lite-latest (attempt 1)
+  [Fraud Alerts] OBSERVE  answer accepted
+  [Fraud Alerts] REVIEW   second opinion from the review model
+
+  --- fraud result -----------------------------------------------
+  Evidence: 8 enabled rules, 12 alerts; explaining alert 12 (rule 'Rapid Transactions', $275.0)
+
+  Attempt 1 output:
+    Your $275.00 transaction at FastFood Express on August 31, 2026, at 7:10 PM in the dining category was flagged because it triggered the Rapid Transactions (velocity) rule. This specific security control detects when an unusually high frequency of transactions occurs within a short time window for the same customer. While this activity generated a high severity alert based on the system thresholds, it could potentially be a legitimate series of purchases that simply requires your confirmation to verify everything is correct.
+  OBSERVE: PASS
+
+  REVIEW (gemini / gemini-flash-lite-latest):
+    Risk: The evidence does not support the transaction date, time, merchant name, dining category, severity level, or confirmation request details.
+    Correction: Remove details about the date, time, merchant name, category, severity, and confirmation request that are not in the evidence.
+    Retest: Verify that the explanation only references the enabled rules, alert count, alert 12, rule name 'Rapid Transactions', and the $275.0 amount.
+
+  RESULT: PASS
+  evidence: docs\evidence\fraud-20260909T063256Z.json
+  [Budgeting & Insights] PLAN     Verify the spending insight is grounded in the customer's real budget-versus-actual figures for the period
+  [Budgeting & Insights]            - budgeting-service responds on /api/budgets/summary
+  [Budgeting & Insights]            - at least one budget exists for customer 1 in 09/2026
+  [Budgeting & Insights]            - actual spending was retrieved (live Transactions API, or mock marked degraded)
+  [Budgeting & Insights]            - the AI insight states the total spent as a dollar figure
+  [Budgeting & Insights]            - the AI insight names every over-budget category, or says none are over
+  [Budgeting & Insights] ACT      collecting evidence
+  [Budgeting & Insights] OBSERVE  7 budgets for customer 1 in 09/2026; spent $1,486.78 of $2,160.00; 2 over budget (Dining Out, Shopping); 2 near limit (Transport, Utilities); spending source: transactions-api
+  [Budgeting & Insights] ACT      asking gemini / gemini-flash-lite-latest (attempt 1)
+  [Budgeting & Insights] OBSERVE  answer accepted
+  [Budgeting & Insights] REVIEW   second opinion from the review model
+
+  --- budgeting result -------------------------------------------
+  Evidence: 7 budgets for customer 1 in 09/2026; spent $1,486.78 of $2,160.00; 2 over budget (Dining Out, Shopping); 2 near limit (Transport, Utilities); spending source: transactions-api
+
+  Attempt 1 output:
+    Welcome to your SmartBank monthly budget review for 09/2026. Overall, you are doing well by spending $1,486.78 of your $2,160.00 budgeted amount, leaving you under overall. 
+    
+    However, two categories are over budget. Dining Out is over by $25.20, and Shopping is over by $74.90. 
+    
+    Additionally, Transport and Utilities are near their limits, so you will want to watch those closely for the rest of the month. 
+    
+    To help pull your spending back into balance, a great concrete step to take this month is to reduce your Dining Out expenses to offset that $25.20 overspend. Your other categories like Groceries, Entertainment, and Subscriptions are currently on track, which gives you a strong foundation to finish the month successfully.
+  OBSERVE: PASS
+
+  REVIEW (gemini / gemini-flash-lite-latest):
+    Risk: The answer introduces specific overspend amounts ($25.20, $74.90) and unmentioned budget categories (Groceries, Entertainment, Subscriptions) that are not in the evidence.
+    Correction: Remove the specific dollar amounts for overspend and references to categories not present in the evidence.
+    Retest: Verify the response relies solely on the provided budget counts, totals, and category statuses.
+
+  RESULT: PASS
+  evidence: docs\evidence\budgeting-20260909T063301Z.json
+
+========================================================================
+  SUMMARY
+========================================================================
+  Feature         Evidence    Result    Attempts
+  fraud           ok          PASS      1
+  budgeting       ok          PASS      1
+

@@ -13,11 +13,11 @@
 #                transactions 3005/5005/5015 | fraud 3003/5003/5013 | budgeting 3004/5004/5014
 #
 # Release 0 notes
-# - Accounts, Loans and Transactions each ship as one image that runs their
+# - Accounts and Transactions each ship as one image that runs their
 #   tiers as processes.
-# - Fraud and Budgeting each ship three images - database, backend/API and
-#   frontend - built from their own Dockerfiles, all with the repo root as
-#   build context.
+# - Loans, Fraud and Budgeting each ship three images - database, backend/API
+#   and frontend - built from their own Dockerfiles, all with the repo root
+#   as build context.
 
 x-llm-env: &llm-env
   LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
@@ -72,40 +72,56 @@ services:
     networks: [smartbank]
 
   # ---------------------------------------------------------------------
-  # Loans & Credit (David) - one image: loans db 5012, loans api 5002
+  # Loans & Credit (David) - three images: db 5012, api 5002, web 3002
   # ---------------------------------------------------------------------
-  loans:
+  loans-database-service:
     build:
       context: .
-      dockerfile: services/loans/Dockerfile
-    image: smartbank-loans:0.1
-    container_name: loans
+      dockerfile: services/loans/database/Dockerfile
+    image: smartbank-loans-db:0.1
+    container_name: loans-database-service
+    ports:
+      - "5012:5012"
+    volumes:
+      - loans-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5012/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    networks: [smartbank]
+
+  loans-service:
+    build:
+      context: .
+      dockerfile: services/loans/backend/Dockerfile
+    image: smartbank-loans-api:0.1
+    container_name: loans-service
     ports:
       - "5002:5002"
-      - "5012:5012"
     environment:
       <<: *llm-env
+      DATABASE_SERVICE_URL: http://loans-database-service:5012
       ACCOUNTS_SERVICE_URL: http://accounts:5001
-      FLASK_OPEN_CHROME: "0"
     depends_on:
+      loans-database-service:
+        condition: service_healthy
       accounts:
         condition: service_started
     restart: unless-stopped
     networks: [smartbank]
 
   loans-frontend-service:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: services/loans/frontend/Dockerfile
+    image: smartbank-loans-web:0.1
     container_name: loans-frontend-service
-    volumes:
-      - ./shared/frontend/index.html:/usr/share/nginx/html/index.html:ro
-      - ./shared/frontend/css:/usr/share/nginx/html/css:ro
-      - ./shared/frontend/js:/usr/share/nginx/html/js:ro
-      - ./shared/frontend/features:/usr/share/nginx/html/features:ro
-      - ./services/loans/frontend/js:/usr/share/nginx/html/loans-js:ro
-      - ./services/loans/frontend/tabs:/usr/share/nginx/html/tabs:ro
     ports:
       - "3002:80"
-    depends_on: [loans]
+    depends_on: [loans-service]
     restart: unless-stopped
     networks: [smartbank]
 
@@ -264,4 +280,5 @@ networks:
 volumes:
   budgets-data:
   fraud-data:
+  loans-data:
   ollama-models:

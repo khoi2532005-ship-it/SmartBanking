@@ -1,0 +1,11 @@
+SmartBank Loans feature.
+
+Loan types SmartBank offers with their amount ranges: PERSONAL ($1,000-$50,000), AUTO ($5,000-$80,000), EDUCATION ($1,000-$60,000), HOME ($50,000-$500,000), BUSINESS ($10,000-$150,000). Each loan is normally repaid to 40% or less of the customer's monthly income.
+
+Eligibility is evaluated by a set of checks:
+- loan_type_supported: the requested loan type is one SmartBank offers.
+- amount_within_limits: the requested amount falls inside the type's allowed range.
+- purpose_provided: the application states a loan purpose.
+- affordability: the estimated monthly payment is at most 40% of monthly income (skipped, and treated as passing, when income is not provided).
+
+An application is eligible only when every check passes. A loan becomes APPROVED after approval and REJECTED if rejected. The evidence gives the loan application, its status, and the eligibility assessment with each check and whether it passed.

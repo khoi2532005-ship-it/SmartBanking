@@ -1,0 +1,66 @@
+{
+  "mode": "fraud",
+  "timestamp": "20260909T063256Z",
+  "plan": {
+    "goal": "Verify fraud alert explanations are grounded in the triggering rule and transaction",
+    "checks": [
+      "fraud-service responds on /api/rules and /api/alerts",
+      "at least one enabled rule exists",
+      "at least one alert exists to explain",
+      "the AI explanation names the triggered rule and the transaction amount"
+    ],
+    "stop_condition": "An explanation passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "8 enabled rules, 12 alerts; explaining alert 12 (rule 'Rapid Transactions', $275.0)",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "alert": {
+        "ai_explanation": "Multiple transactions were the customer's family members using a shared account; verified legitimate.",
+        "alert_id": 12,
+        "created_at": "2026-08-31T19:10:05",
+        "customer_id": 2,
+        "explanation_generated_at": "2026-08-31T19:15:00",
+        "rule_id": 5,
+        "severity": "high",
+        "status": "dismissed",
+        "transaction_amount": 275.0,
+        "transaction_category": "dining",
+        "transaction_datetime": "2026-08-31T19:10:00",
+        "transaction_id": 112,
+        "transaction_recipient": "FastFood Express"
+      },
+      "rule": {
+        "created_at": "2026-08-01T09:00:00",
+        "enabled": 1,
+        "rule_id": 5,
+        "rule_name": "Rapid Transactions",
+        "rule_type": "velocity",
+        "severity": "high",
+        "threshold_secondary": 10.0,
+        "threshold_value": 5.0
+      },
+      "rule_count": 8,
+      "alert_count": 12
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Your $275.00 transaction at FastFood Express on August 31, 2026, at 7:10 PM in the dining category was flagged because it triggered the Rapid Transactions (velocity) rule. This specific security control detects when an unusually high frequency of transactions occurs within a short time window for the same customer. While this activity generated a high severity alert based on the system thresholds, it could potentially be a legitimate series of purchases that simply requires your confirmation to verify everything is correct.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The evidence does not support the transaction date, time, merchant name, dining category, severity level, or confirmation request details.\nCorrection: Remove details about the date, time, merchant name, category, severity, and confirmation request that are not in the evidence.\nRetest: Verify that the explanation only references the enabled rules, alert count, alert 12, rule name 'Rapid Transactions', and the $275.0 amount.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}
