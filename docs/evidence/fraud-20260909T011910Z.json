@@ -1,0 +1,66 @@
+{
+  "mode": "fraud",
+  "timestamp": "20260909T011910Z",
+  "plan": {
+    "goal": "Verify fraud alert explanations are grounded in the triggering rule and transaction",
+    "checks": [
+      "fraud-service responds on /api/rules and /api/alerts",
+      "at least one enabled rule exists",
+      "at least one alert exists to explain",
+      "the AI explanation names the triggered rule and the transaction amount"
+    ],
+    "stop_condition": "An explanation passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "8 enabled rules, 12 alerts; explaining alert 12 (rule 'Rapid Transactions', $275.0)",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "alert": {
+        "ai_explanation": "Multiple transactions were the customer's family members using a shared account; verified legitimate.",
+        "alert_id": 12,
+        "created_at": "2026-08-31T19:10:05",
+        "customer_id": 2,
+        "explanation_generated_at": "2026-08-31T19:15:00",
+        "rule_id": 5,
+        "severity": "high",
+        "status": "dismissed",
+        "transaction_amount": 275.0,
+        "transaction_category": "dining",
+        "transaction_datetime": "2026-08-31T19:10:00",
+        "transaction_id": 112,
+        "transaction_recipient": "FastFood Express"
+      },
+      "rule": {
+        "created_at": "2026-08-01T09:00:00",
+        "enabled": 1,
+        "rule_id": 5,
+        "rule_name": "Rapid Transactions",
+        "rule_type": "velocity",
+        "severity": "high",
+        "threshold_secondary": 10.0,
+        "threshold_value": 5.0
+      },
+      "rule_count": 8,
+      "alert_count": 12
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Your transaction of $275.00 at FastFood Express on August 31, 2026, at 7:10 PM in the dining category was flagged because it triggered the Rapid Transactions (velocity) rule. This specific rule detects when a high frequency of transactions occurs within a short timeframe, specifically noting that the activity reached a threshold of 5.0 out of 10.0. While this high volume of activity triggered our automated security system to review the account, it may simply reflect a series of purchases made close together during a busy outing. Because this could be a completely legitimate event, the alert is provided here for you or our security analysts to review and confirm. Please verify whether these recent dining charges match your actual activity so we can ensure your account remains secure and properly monitored.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The answer includes specific merchant name, date, time, category, and threshold details (FastFood Express, August 31, 2026, 7:10 PM, dining, threshold of 5.0 out of 10.0) that are not present in the evidence.\nCorrection: Remove the fabricated merchant name, date, time, category, and threshold metrics, and stick strictly to the provided evidence.\nRetest: Verify that the revised answer only references the rules, alerts, and specific transaction amount provided in the evidence.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}
