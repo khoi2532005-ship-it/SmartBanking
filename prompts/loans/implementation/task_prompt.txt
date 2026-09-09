@@ -1,0 +1,5 @@
+Using only the evidence below, explain in plain English why this loan application was approved or rejected. You must:
+1. State the loan type and the requested dollar amount.
+2. State whether the application was APPROVED or REJECTED.
+3. Name the eligibility checks that passed, and for a rejection name the specific check(s) that failed and why.
+Keep it between 90 and 160 words.
