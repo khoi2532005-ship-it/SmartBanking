@@ -1,0 +1,9 @@
+Write a brief summary of the customer’s recent spending pattern.
+
+Requirements:
+1. State the total incoming and total outgoing amounts from the evidence.
+2. Name the dominant spending category or categories based on the recent transaction totals.
+3. Explain the main pattern in plain language, such as whether the customer is spending more on essentials, lifestyle, or discretionary categories.
+4. Mention one concrete action or takeaway the customer might consider.
+
+Keep it between 70 and 140 words.

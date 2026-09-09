@@ -13,6 +13,7 @@ from __future__ import annotations
 from agentic.core import Mode
 from agentic.modes.budgeting import BudgetingMode
 from agentic.modes.fraud import FraudMode
+from agentic.modes.transactions import TransactionsMode
 
 # Implemented modes, in menu order.
 MODES: dict[str, Mode] = {
@@ -20,6 +21,7 @@ MODES: dict[str, Mode] = {
     for mode in (
         FraudMode(),
         BudgetingMode(),
+        TransactionsMode(),
     )
 }
 
@@ -27,7 +29,6 @@ MODES: dict[str, Mode] = {
 # import it above, add it to MODES, and delete the line here.
 PENDING: dict[str, tuple[str, str]] = {
     "accounts": ("Accounts & Customers", "William"),
-    "transactions": ("Transactions", "Aidan"),
     "loans": ("Loans & Credit", "David"),
 }
 
