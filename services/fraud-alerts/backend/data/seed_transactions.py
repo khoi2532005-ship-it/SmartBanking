@@ -52,12 +52,12 @@ TRANSACTIONS = [
         "amount": 150.00, "date": "2026-09-01T03:20:00", "category": "dining",
     },
     {
-        "transaction_id": 210, "customer_id": 9, "account_id": 9, "type": "transfer",
+        "transaction_id": 210, "customer_id": 8, "account_id": 8, "type": "transfer",
         "description": "Familiar Store",
         "amount": 200.00, "date": "2026-09-01T09:00:00", "category": "shopping",
     },
     {
-        "transaction_id": 211, "customer_id": 9, "account_id": 9, "type": "transfer",
+        "transaction_id": 211, "customer_id": 8, "account_id": 8, "type": "transfer",
         "description": "Crypto Exchange XYZ",
         "amount": 3500.00, "date": "2026-09-01T13:00:00", "category": "transfer",
     },
