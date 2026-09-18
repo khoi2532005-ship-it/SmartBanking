@@ -22,13 +22,13 @@ def _check_velocity(transactions, rule):
 
     hits = []
     for txns in by_customer.values():
-        txns = sorted(txns, key=lambda t: _parse_dt(t["datetime_sent"]))
+        txns = sorted(txns, key=lambda t: _parse_dt(t["date"]))
         for txn in txns:
-            window_start = _parse_dt(txn["datetime_sent"])
+            window_start = _parse_dt(txn["date"])
             window_end = window_start + timedelta(minutes=window_minutes)
-            in_window = [t for t in txns if window_start <= _parse_dt(t["datetime_sent"]) <= window_end]
+            in_window = [t for t in txns if window_start <= _parse_dt(t["date"]) <= window_end]
             if len(in_window) > n:
-                hits.append(max(in_window, key=lambda t: _parse_dt(t["datetime_sent"])))
+                hits.append(max(in_window, key=lambda t: _parse_dt(t["date"])))
                 break  # one hit per customer per rule is enough to demonstrate detection
     return hits
 
@@ -36,7 +36,7 @@ def _check_velocity(transactions, rule):
 def _check_unusual_time(transactions, rule):
     start_hour = int(rule["threshold_value"])
     end_hour = int(rule["threshold_secondary"]) if rule.get("threshold_secondary") is not None else 23
-    return [txn for txn in transactions if start_hour <= _parse_dt(txn["datetime_sent"]).hour <= end_hour]
+    return [txn for txn in transactions if start_hour <= _parse_dt(txn["date"]).hour <= end_hour]
 
 
 def _check_new_recipient_high_value(transactions, rule):
@@ -51,10 +51,10 @@ def _check_new_recipient_high_value(transactions, rule):
 
     hits = []
     for txns in by_customer.values():
-        txns = sorted(txns, key=lambda t: _parse_dt(t["datetime_sent"]))
+        txns = sorted(txns, key=lambda t: _parse_dt(t["date"]))
         seen_recipients = set()
         for txn in txns:
-            recipient = txn.get("recipient_name")
+            recipient = txn.get("description")
             if not recipient:
                 continue
             is_new = recipient not in seen_recipients

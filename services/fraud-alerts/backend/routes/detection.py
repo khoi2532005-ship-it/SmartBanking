@@ -47,9 +47,9 @@ def run_detection():
             "customer_id": txn["customer_id"],
             "transaction_id": txn["transaction_id"],
             "transaction_amount": txn["amount"],
-            "transaction_recipient": txn.get("recipient_name"),
-            "transaction_datetime": txn.get("datetime_sent"),
-            "transaction_category": txn.get("generated_category"),
+            "transaction_recipient": txn.get("description"),
+            "transaction_datetime": txn.get("date"),
+            "transaction_category": txn.get("category"),
             "severity": rule["severity"],
             "status": "new",
         }
