@@ -9,42 +9,6 @@ os.makedirs(DATA_DIR, exist_ok=True)
 conn = sqlite3.connect(DATABASE_NAME)
 cursor = conn.cursor()
 
-# Customers table
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS customers (
-        customer_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        first_name TEXT NOT NULL,
-        last_name TEXT NOT NULL,
-        email TEXT,
-        phone TEXT,
-        date_of_birth TEXT,
-        address TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT
-    )
-""")
-cursor.execute("DELETE FROM customers")
-customers = [
-    (1, "Aidan", "Lei", "aidan@example.com", "+61400000000", "1995-01-01", "1 Main St", None, None),
-    (2, "William", "Por", "will@example.com", "+61400000001", "1990-05-12", "2 High St", None, None),
-    (3, "Maya", "Nguyen", "maya@example.com", "+61400000002", "1997-07-11", "9 River Rd", None, None),
-    (4, "Olivia", "Chen", "olivia@example.com", "+61400000003", "1988-03-22", "14 Harbour Ave", None, None),
-    (5, "Daniel", "Patel", "daniel@example.com", "+61400000004", "1992-11-09", "27 Oak Terrace", None, None),
-    (6, "Emma", "Garcia", "emma@example.com", "+61400000005", "1994-02-18", "8 Sunset Blvd", None, None),
-    (7, "Ethan", "Kim", "ethan@example.com", "+61400000006", "1987-08-07", "31 Pine Lane", None, None),
-    (8, "Sophia", "Fischer", "sophia@example.com", "+61400000007", "1996-06-30", "5 Meadow Walk", None, None),
-    (9, "Lucas", "Brown", "lucas@example.com", "+61400000008", "1991-09-12", "19 Riverstone Dr", None, None),
-    (10, "Chloe", "Davis", "chloe@example.com", "+61400000009", "1993-12-04", "7 Linden Way", None, None),
-]
-cursor.executemany(
-    """
-    INSERT INTO customers (
-        customer_id, first_name, last_name, email, phone, date_of_birth, address, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """,
-    customers,
-)
-
 # Accounts table
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS accounts (
@@ -56,8 +20,7 @@ cursor.execute("""
         currency TEXT NOT NULL DEFAULT 'AUD',
         status TEXT NOT NULL DEFAULT 'Active',
         created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT,
-        FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE
+        updated_at TEXT
     )
 """)
 cursor.execute("DELETE FROM accounts")

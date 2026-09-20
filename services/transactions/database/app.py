@@ -1,9 +1,12 @@
 import os
 import sqlite3
 
+import requests
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
+
+ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://localhost:5001")
 
 
 @app.errorhandler(Exception)
@@ -43,12 +46,13 @@ def health():
 
 @app.get("/customers")
 def get_customers():
-    conn = get_db_connection()
-    customers = conn.execute(
-        "SELECT customer_id, first_name, last_name, email, phone, date_of_birth, address FROM customers"
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in customers])
+    try:
+        response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/customers", timeout=5)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except Exception as exc:
+        app.logger.exception("Failed to fetch customers from accounts service", exc_info=exc)
+        return jsonify({"error": f"accounts service unavailable: {exc}"}), 503
 
 
 @app.get("/accounts")
