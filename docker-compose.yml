@@ -140,6 +140,7 @@ services:
       - "5015:5015"
     environment:
       <<: *llm-env
+      ACCOUNTS_SERVICE_URL: http://accounts:5001
       FLASK_OPEN_CHROME: "0"
     restart: unless-stopped
     networks: [smartbank]

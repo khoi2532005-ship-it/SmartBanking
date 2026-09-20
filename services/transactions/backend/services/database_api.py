@@ -4,6 +4,7 @@ import requests
 
 
 DATABASE_SERVICE_URL = os.getenv("DATABASE_SERVICE_URL", "http://localhost:5015")
+ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://localhost:5001")
 TIMEOUT = 5
 
 
@@ -13,7 +14,7 @@ def _params(query):
 
 def search_customers(filters=None):
     response = requests.get(
-        f"{DATABASE_SERVICE_URL}/customers",
+        f"{ACCOUNTS_SERVICE_URL}/api/customers",
         params=_params(filters),
         timeout=TIMEOUT,
     )
