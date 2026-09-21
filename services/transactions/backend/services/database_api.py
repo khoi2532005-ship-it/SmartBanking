@@ -24,12 +24,16 @@ def search_customers(filters=None):
 
 def search_accounts(filters=None):
     response = requests.get(
-        f"{DATABASE_SERVICE_URL}/accounts",
+        f"{ACCOUNTS_SERVICE_URL}/api/accounts",
         params=_params(filters),
         timeout=TIMEOUT,
     )
     response.raise_for_status()
     return response.json()
+
+
+def get_account_response(account_id):
+    return requests.get(f"{ACCOUNTS_SERVICE_URL}/api/accounts/{account_id}", timeout=TIMEOUT)
 
 
 def search_transactions(filters=None):

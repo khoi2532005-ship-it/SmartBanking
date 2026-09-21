@@ -9,42 +9,6 @@ os.makedirs(DATA_DIR, exist_ok=True)
 conn = sqlite3.connect(DATABASE_NAME)
 cursor = conn.cursor()
 
-# Accounts table
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS accounts (
-        account_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        customer_id INTEGER NOT NULL,
-        account_number TEXT NOT NULL,
-        account_type TEXT NOT NULL,
-        balance REAL NOT NULL DEFAULT 0,
-        currency TEXT NOT NULL DEFAULT 'AUD',
-        status TEXT NOT NULL DEFAULT 'Active',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT
-    )
-""")
-cursor.execute("DELETE FROM accounts")
-accounts = [
-    (1001, 1, "ACC1001001", "Checking", 1250.00, "AUD", "Active", None, None),
-    (1002, 2, "ACC1002002", "Savings", 2800.00, "AUD", "Active", None, None),
-    (1003, 3, "ACC1003003", "Credit", -420.25, "AUD", "Active", None, None),
-    (1004, 4, "ACC1004004", "Checking", 7600.00, "AUD", "Active", None, None),
-    (1005, 5, "ACC1005005", "Savings", 4200.00, "AUD", "Active", None, None),
-    (1006, 6, "ACC1006006", "Checking", 910.50, "AUD", "Active", None, None),
-    (1007, 7, "ACC1007007", "Savings", 6500.00, "AUD", "Active", None, None),
-    (1008, 8, "ACC1008008", "Credit", -210.00, "AUD", "Active", None, None),
-    (1009, 9, "ACC1009009", "Checking", 1820.75, "AUD", "Active", None, None),
-    (1010, 10, "ACC1010010", "Savings", 3050.25, "AUD", "Active", None, None),
-]
-cursor.executemany(
-    """
-    INSERT INTO accounts (
-        account_id, customer_id, account_number, account_type, balance, currency, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """,
-    accounts,
-)
-
 # Transactions table
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS transactions (
@@ -56,8 +20,7 @@ cursor.execute("""
         category TEXT,
         description TEXT,
         date TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (account_id) REFERENCES accounts(account_id) ON DELETE CASCADE
+        created_at TEXT DEFAULT (datetime('now'))
     )
 """)
 cursor.execute("DELETE FROM transactions")

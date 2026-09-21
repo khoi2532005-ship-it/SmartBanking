@@ -57,12 +57,17 @@ def get_customers():
 
 @app.get("/accounts")
 def get_accounts():
-    conn = get_db_connection()
-    accounts = conn.execute(
-        "SELECT account_id, customer_id, account_number, account_type, balance, currency, status FROM accounts"
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in accounts])
+    try:
+        response = requests.get(
+            f"{ACCOUNTS_SERVICE_URL}/api/accounts",
+            params=request.args.to_dict(flat=True),
+            timeout=5,
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+    except Exception as exc:
+        app.logger.exception("Failed to fetch accounts from accounts service", exc_info=exc)
+        return jsonify({"error": f"accounts service unavailable: {exc}"}), 503
 
 
 @app.post("/transactions")
@@ -76,15 +81,16 @@ def create_transaction():
         if field not in data or data.get(field) in (None, ""):
             return jsonify({"error": f"{field} required"}), 400
 
-    conn = get_db_connection()
-    account = conn.execute(
-        "SELECT account_id FROM accounts WHERE account_id = ?",
-        (data["account_id"],),
-    ).fetchone()
-    if account is None:
-        conn.close()
-        return jsonify({"error": "Account not found"}), 404
+    try:
+        response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/accounts/{data['account_id']}", timeout=5)
+        if response.status_code == 404:
+            return jsonify({"error": "Account not found"}), 404
+        response.raise_for_status()
+    except Exception as exc:
+        app.logger.exception("Failed to validate account with accounts service", exc_info=exc)
+        return jsonify({"error": f"accounts service unavailable: {exc}"}), 503
 
+    conn = get_db_connection()
     cursor = conn.execute(
         """
         INSERT INTO transactions (
@@ -117,54 +123,69 @@ def get_transactions():
 
     account_id = request.args.get("account_id")
     if account_id:
-        conditions.append("t.account_id = ?")
+        conditions.append("account_id = ?")
         params.append(account_id)
 
     customer_id = request.args.get("customer_id")
     if customer_id:
-        conditions.append("a.customer_id = ?")
-        params.append(customer_id)
+        try:
+            accounts_response = requests.get(
+                f"{ACCOUNTS_SERVICE_URL}/api/accounts",
+                params={"customer_id": customer_id},
+                timeout=5,
+            )
+            accounts_response.raise_for_status()
+            account_list = accounts_response.json() or []
+            account_ids = [int(item["account_id"]) for item in account_list if item.get("account_id") is not None]
+            if not account_ids:
+                conn.close()
+                return jsonify([])
+            placeholders = ", ".join("?" for _ in account_ids)
+            conditions.append(f"account_id IN ({placeholders})")
+            params.extend(account_ids)
+        except Exception as exc:
+            conn.close()
+            app.logger.exception("Failed to resolve account ids from accounts service", exc_info=exc)
+            return jsonify({"error": f"accounts service unavailable: {exc}"}), 503
 
     ttype = request.args.get("type")
     if ttype:
-        conditions.append("LOWER(t.type) = LOWER(?)")
+        conditions.append("LOWER(type) = LOWER(?)")
         params.append(ttype)
 
     category = request.args.get("category")
     if category:
-        conditions.append("LOWER(t.category) = LOWER(?)")
+        conditions.append("LOWER(category) = LOWER(?)")
         params.append(category)
 
     min_amount = request.args.get("min_amount")
     if min_amount:
-        conditions.append("t.amount >= ?")
+        conditions.append("amount >= ?")
         params.append(min_amount)
 
     max_amount = request.args.get("max_amount")
     if max_amount:
-        conditions.append("t.amount <= ?")
+        conditions.append("amount <= ?")
         params.append(max_amount)
 
     date_from = request.args.get("date_from")
     if date_from:
-        conditions.append("t.date >= ?")
+        conditions.append("date >= ?")
         params.append(date_from)
 
     date_to = request.args.get("date_to")
     if date_to:
-        conditions.append("t.date <= ?")
+        conditions.append("date <= ?")
         params.append(date_to)
 
     q = request.args.get("q")
     if q:
-        conditions.append("(t.description LIKE ? OR t.category LIKE ?)")
+        conditions.append("(description LIKE ? OR category LIKE ?)")
         params.extend([f"%{q}%", f"%{q}%"])
 
     query = """
-        SELECT t.transaction_id, t.account_id, t.amount, t.currency, t.type, t.category, t.description, t.date,
-               a.customer_id
-        FROM transactions t
-        LEFT JOIN accounts a ON a.account_id = t.account_id
+        SELECT transaction_id, account_id, amount, currency, type, category, description, date
+        FROM transactions
     """
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
@@ -208,6 +229,18 @@ def update_transaction(transaction_id):
     if tx is None:
         conn.close()
         return jsonify({"error": "Transaction not found"}), 404
+
+    if "account_id" in data:
+        try:
+            response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/accounts/{data['account_id']}", timeout=5)
+            if response.status_code == 404:
+                conn.close()
+                return jsonify({"error": "Account not found"}), 404
+            response.raise_for_status()
+        except Exception as exc:
+            conn.close()
+            app.logger.exception("Failed to validate updated account with accounts service", exc_info=exc)
+            return jsonify({"error": f"accounts service unavailable: {exc}"}), 503
 
     conn.execute(
         """
