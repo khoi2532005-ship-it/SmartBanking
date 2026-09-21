@@ -14,10 +14,12 @@ services/
 shared/frontend/  Unified index.html, shared CSS theme, htmx
 prompts/          Prompt files per feature (prompts/<feature>/) and agentic-loop prompts
 agentic/          Shared agentic-loop engine; one mode per feature in agentic/modes/
+mcp_server/       Shared local MCP server (Release 1); one read-only tool per feature in mcp_server/tools/
 tests/            Engine tests (no services or API key needed)
 docs/             Feature registrations (features.md), loop guide (agentic-loop.md),
                   run evidence (evidence/)
 agentic_loop.py   Plan -> Act -> Observe -> Adapt loop (run from the repo root)
+requirements-*.txt  Host-side dependencies: -agentic (loop), -mcp (MCP server)
 ```
 
 ## Run the whole app
@@ -60,3 +62,35 @@ worked example.
 ```bash
 python -m pytest tests/ -q             # engine tests, no services needed
 ```
+
+## Run the shared MCP server (Release 1)
+
+One local Model Context Protocol server for all five features, built on
+FastMCP from the official `mcp` SDK. Each feature's backend calls it; each
+tool on it calls a feature's existing HTTP API and never touches a database
+file. It runs on the host and is **not** a Compose service.
+
+```bash
+pip install -r requirements-mcp.txt
+python -m mcp_server.server            # http://localhost:8100/mcp  (terminal A)
+python -m mcp_server.validate          # 8-check test record        (terminal B)
+python -m mcp_server.validate --evidence   # also saves docs/evidence/mcp-validation-<ts>.json
+```
+
+Containers reach it at `http://host.docker.internal:8100/mcp`. Port and
+feature URLs come from `.env` (`MCP_PORT`, `*_SERVICE_URL`).
+
+| Tool | Owner | Calls | Inputs |
+|---|---|---|---|
+| `budgeting_summary` | Bao | `GET /api/budgets/summary` | `customer_id`, `month`, `year` |
+| `accounts_count` | William | `GET /api/accounts` | `customer_id?` |
+| `loans_list` | David | `GET /api/loans` | `customer_id`, `status?` |
+| `fraud_alerts_count` | Khoi | `GET /api/alerts` | `customer_id?`, `status?` |
+| `transactions_spending` | Aidan | `GET /api/transactions` | `customer_id`, `month`, `year` |
+
+All tools are read-only, validate ranges before calling the backend, reject
+arguments they do not declare, and return `isError` with a readable reason
+when a feature service is down. The four non-budgeting tools are working
+scaffolds: owners adjust the fields in `mcp_server/tools/<feature>.py` (each
+file starts with its capability brief). Host-side callers can use
+`mcp_server/client.py` (`list_tools`, `call_tool`, `ping`).

@@ -1,0 +1,177 @@
+{
+  "kind": "mcp-terminal-validation",
+  "timestamp": "20260921T120013Z",
+  "server_url": "http://localhost:8100/mcp",
+  "mcp_sdk_version": "1.30.0",
+  "implementation_version": "68b2117",
+  "records": [
+    {
+      "n": 1,
+      "check": "server reachable",
+      "tool": "-",
+      "arguments": {},
+      "expected": "initialize succeeds",
+      "observed": "initialize ok",
+      "passed": true,
+      "skipped": false,
+      "detail": {}
+    },
+    {
+      "n": 2,
+      "check": "tools/list publishes every tool",
+      "tool": "-",
+      "arguments": {},
+      "expected": "5 tools, each with an inputSchema",
+      "observed": "5 tools: budgeting_summary, accounts_count, loans_list, fraud_alerts_count, transactions_spending",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "budgeting_summary": {
+          "required": [
+            "customer_id",
+            "month",
+            "year"
+          ],
+          "properties": [
+            "customer_id",
+            "month",
+            "year"
+          ]
+        },
+        "accounts_count": {
+          "required": [],
+          "properties": [
+            "customer_id"
+          ]
+        },
+        "loans_list": {
+          "required": [
+            "customer_id"
+          ],
+          "properties": [
+            "customer_id",
+            "status"
+          ]
+        },
+        "fraud_alerts_count": {
+          "required": [],
+          "properties": [
+            "customer_id",
+            "status"
+          ]
+        },
+        "transactions_spending": {
+          "required": [
+            "customer_id",
+            "month",
+            "year"
+          ],
+          "properties": [
+            "customer_id",
+            "month",
+            "year"
+          ]
+        }
+      }
+    },
+    {
+      "n": 3,
+      "check": "valid invocation",
+      "tool": "budgeting_summary",
+      "arguments": {
+        "customer_id": 1,
+        "month": 9,
+        "year": 2026
+      },
+      "expected": "isError false; structured result with totals and budgets",
+      "observed": "isError false; budget_count=7, total_spent=2169.97, spending_source=mock",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "structured_keys": [
+          "budget_count",
+          "budgets",
+          "customer_id",
+          "month",
+          "over_budget_categories",
+          "source",
+          "spending_source",
+          "totals",
+          "unbudgeted_spending",
+          "year"
+        ]
+      }
+    },
+    {
+      "n": 4,
+      "check": "domain-invalid input rejected",
+      "tool": "budgeting_summary",
+      "arguments": {
+        "customer_id": 1,
+        "month": 13,
+        "year": 2026
+      },
+      "expected": "isError true mentioning month; backend not called",
+      "observed": "isError True: Error executing tool budgeting_summary: month must be between 1 and 12, got 13",
+      "passed": true,
+      "skipped": false,
+      "detail": {}
+    },
+    {
+      "n": 5,
+      "check": "type-invalid input rejected",
+      "tool": "budgeting_summary",
+      "arguments": {
+        "customer_id": "abc",
+        "month": 9,
+        "year": 2026
+      },
+      "expected": "isError true from schema validation",
+      "observed": "isError True: Error executing tool budgeting_summary: 1 validation error for budgeting_summaryArguments customer_id   Input should be ",
+      "passed": true,
+      "skipped": false,
+      "detail": {}
+    },
+    {
+      "n": 6,
+      "check": "undeclared argument rejected",
+      "tool": "budgeting_summary",
+      "arguments": {
+        "customer_id": 1,
+        "month": 9,
+        "year": 2026,
+        "sql": "SELECT * FROM budgets"
+      },
+      "expected": "isError true: extra inputs not permitted",
+      "observed": "isError True: Error executing tool budgeting_summary: 1 validation error for budgeting_summaryArguments sql   Extra inputs are not per",
+      "passed": true,
+      "skipped": false,
+      "detail": {}
+    },
+    {
+      "n": 7,
+      "check": "unknown tool rejected",
+      "tool": "no_such_tool",
+      "arguments": {},
+      "expected": "JSON-RPC error, or isError true naming the unknown tool; never a result",
+      "observed": "isError True: Unknown tool: no_such_tool",
+      "passed": true,
+      "skipped": false,
+      "detail": {}
+    },
+    {
+      "n": 8,
+      "check": "dependency unavailable -> explicit error",
+      "tool": "loans_list",
+      "arguments": {
+        "customer_id": 1
+      },
+      "expected": "isError true saying the service is unavailable; no fabricated data",
+      "observed": "isError True: Error executing tool loans_list: loans service unavailable: connection refused at http://localhost:5002/api/loans - is t",
+      "passed": true,
+      "skipped": false,
+      "detail": {}
+    }
+  ],
+  "passed": true
+}
