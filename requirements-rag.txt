@@ -1,0 +1,13 @@
+# Dependencies for the shared RAG server (rag_server/).
+# Runs on the host, not in a container - the containerised backends call it
+# at http://host.docker.internal:8200. The generator reuses agentic/llm.py,
+# so the loop's dependencies are needed too (openai, python-dotenv).
+#
+#   pip install -r requirements-rag.txt
+#   python -m rag_server.server
+
+flask>=3.0
+requests>=2.32
+python-dotenv>=1.0
+openai>=1.40
+chromadb>=1.0

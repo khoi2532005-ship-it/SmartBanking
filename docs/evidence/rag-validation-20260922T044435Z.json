@@ -1,0 +1,243 @@
+{
+  "kind": "rag-terminal-validation",
+  "timestamp": "20260922T044435Z",
+  "server_url": "http://localhost:8200",
+  "implementation_version": "7510c39",
+  "parameters": {
+    "k": 5,
+    "chunk_words": 80,
+    "embedding_dim": 256,
+    "relevance_threshold": 0.35
+  },
+  "benchmark": [
+    {
+      "query": "What does the NEAR_LIMIT budget status mean?",
+      "sources": [
+        "budgeting-feature"
+      ],
+      "keyword": "NEAR_LIMIT"
+    },
+    {
+      "query": "Which port does the budgeting backend API run on?",
+      "sources": [
+        "budgeting-feature",
+        "smartbank-overview"
+      ],
+      "keyword": "5004"
+    },
+    {
+      "query": "What tools does the shared MCP server expose?",
+      "sources": [
+        "mcp-server"
+      ],
+      "keyword": "budgeting_summary"
+    },
+    {
+      "query": "What are the stages of the shared agentic loop?",
+      "sources": [
+        "agentic-loop"
+      ],
+      "keyword": "Adapt"
+    },
+    {
+      "query": "How does the Fraud Alerts feature get transaction data?",
+      "sources": [
+        "fraud-alerts-feature"
+      ],
+      "keyword": "Transactions API"
+    },
+    {
+      "query": "Which customer IDs does the Accounts seed data define?",
+      "sources": [
+        "accounts-feature"
+      ],
+      "keyword": "customers 1 to 8"
+    }
+  ],
+  "off_topic": [
+    "What is the capital of France?",
+    "Who won the 2022 FIFA World Cup?"
+  ],
+  "records": [
+    {
+      "n": 1,
+      "check": "server reachable, index populated",
+      "expected": "/health 200 with chunks > 0",
+      "observed": "64 chunks, 9 sources, mode=hybrid, model=gemini / gemini-flash-lite-latest",
+      "passed": true,
+      "detail": {
+        "chunks": 64,
+        "embedding_dim": 256,
+        "k": 5,
+        "relevance_threshold": 0.35,
+        "retrieval_mode": "hybrid",
+        "sources": 9,
+        "vector_error": null
+      }
+    },
+    {
+      "n": 2,
+      "check": "retrieval quality (Precision@5, Recall@5)",
+      "expected": "every benchmark query has >= 1 relevant chunk in its top 5; mean R@5 >= 0.6 (P@5 is reported, not gated: most queries have only 1-2 relevant chunks in the corpus)",
+      "observed": "mean P@5=0.27, mean R@5=0.94; every query hit",
+      "passed": true,
+      "detail": {
+        "mean_precision_at_5": 0.267,
+        "mean_recall_at_5": 0.945,
+        "per_query": [
+          {
+            "query": "What does the NEAR_LIMIT budget status mean?",
+            "precision_at_5": 0.2,
+            "recall_at_5": 1.0,
+            "relevant_in_top5": 1,
+            "total_relevant": 1,
+            "top_chunk": "budgeting-feature#003",
+            "top_relevance": 0.6748,
+            "mode": "hybrid"
+          },
+          {
+            "query": "Which port does the budgeting backend API run on?",
+            "precision_at_5": 0.4,
+            "recall_at_5": 1.0,
+            "relevant_in_top5": 2,
+            "total_relevant": 2,
+            "top_chunk": "transactions-feature#006",
+            "top_relevance": 0.5029,
+            "mode": "hybrid"
+          },
+          {
+            "query": "What tools does the shared MCP server expose?",
+            "precision_at_5": 0.2,
+            "recall_at_5": 1.0,
+            "relevant_in_top5": 1,
+            "total_relevant": 1,
+            "top_chunk": "mcp-server#002",
+            "top_relevance": 0.667,
+            "mode": "hybrid"
+          },
+          {
+            "query": "What are the stages of the shared agentic loop?",
+            "precision_at_5": 0.4,
+            "recall_at_5": 0.67,
+            "relevant_in_top5": 2,
+            "total_relevant": 3,
+            "top_chunk": "rag-server#002",
+            "top_relevance": 0.5867,
+            "mode": "hybrid"
+          },
+          {
+            "query": "How does the Fraud Alerts feature get transaction data?",
+            "precision_at_5": 0.2,
+            "recall_at_5": 1.0,
+            "relevant_in_top5": 1,
+            "total_relevant": 1,
+            "top_chunk": "transactions-feature#001",
+            "top_relevance": 0.841,
+            "mode": "hybrid"
+          },
+          {
+            "query": "Which customer IDs does the Accounts seed data define?",
+            "precision_at_5": 0.2,
+            "recall_at_5": 1.0,
+            "relevant_in_top5": 1,
+            "total_relevant": 1,
+            "top_chunk": "accounts-feature#002",
+            "top_relevance": 0.7677,
+            "mode": "hybrid"
+          }
+        ]
+      }
+    },
+    {
+      "n": 3,
+      "check": "grounded answer with citations and confidence",
+      "expected": "200; non-empty answer; >= 1 citation; confidence in High/Medium/Low; insufficient_context false",
+      "observed": "confidence=Medium, citations=['budgeting-feature#003'], insufficient=False, answer='The NEAR_LIMIT budget status means that between 80 and 100 percent of the budget limit is used [budgeting-feat'",
+      "passed": true,
+      "detail": {
+        "answer": "The NEAR_LIMIT budget status means that between 80 and 100 percent of the budget limit is used [budgeting-feature#003]. Spending an amount that is exactly equal to the limit is also classified as NEAR_LIMIT rather than over budget [budgeting-feature#003].",
+        "citations": [
+          {
+            "authority_tier": 1,
+            "chunk_id": "budgeting-feature#003",
+            "heading": "Budget status rule",
+            "source_id": "budgeting-feature",
+            "title": "Budgeting and Spending Insights feature"
+          }
+        ],
+        "confidence_category": "Medium",
+        "retrieval_summary": {
+          "k": 5,
+          "relevance_threshold": 0.35,
+          "relevant_count": 2,
+          "retrieval_mode": "hybrid",
+          "retrieved_count": 5,
+          "top_chunk": "budgeting-feature#003"
+        },
+        "generation": {
+          "llm_called": true,
+          "model": "gemini / gemini-flash-lite-latest",
+          "note": ""
+        }
+      }
+    },
+    {
+      "n": 4,
+      "check": "claims supported by cited chunks",
+      "expected": "each citation is a retrieved chunk; the expected fact appears in a cited chunk",
+      "observed": "1 citations, 0 not in retrieved set, expected fact 'NEAR_LIMIT' in cited chunk: True",
+      "passed": true,
+      "detail": {
+        "cited": [
+          "budgeting-feature#003"
+        ],
+        "unknown": [],
+        "keyword": "NEAR_LIMIT"
+      }
+    },
+    {
+      "n": 5,
+      "check": "off-topic query -> insufficient context",
+      "expected": "insufficient_context true; no citations; confidence Unknown; llm_called false",
+      "observed": "'What is the capital of France?': insufficient=True, llm_called=False; 'Who won the 2022 FIFA World Cup?': insufficient=True, llm_called=False",
+      "passed": true,
+      "detail": {
+        "results": [
+          {
+            "query": "What is the capital of France?",
+            "status": 200,
+            "insufficient_context": true,
+            "citations": 0,
+            "confidence_category": "Unknown",
+            "llm_called": false,
+            "relevant_count": 0
+          },
+          {
+            "query": "Who won the 2022 FIFA World Cup?",
+            "status": 200,
+            "insufficient_context": true,
+            "citations": 0,
+            "confidence_category": "Unknown",
+            "llm_called": false,
+            "relevant_count": 0
+          }
+        ]
+      }
+    },
+    {
+      "n": 6,
+      "check": "controlled refresh",
+      "expected": "/refresh 200; chunk count equals /health afterwards",
+      "observed": "HTTP 200: chunks=64, vector_indexed=64, mode=hybrid; health chunks=64",
+      "passed": true,
+      "detail": {
+        "chunks": 64,
+        "message": "corpus and index rebuilt",
+        "mode": "hybrid",
+        "sources": 9,
+        "vector_indexed": 64
+      }
+    }
+  ],
+  "passed": true
+}
