@@ -14,10 +14,13 @@ services/
 shared/frontend/  Unified index.html, shared CSS theme, htmx
 prompts/          Prompt files per feature (prompts/<feature>/) and agentic-loop prompts
 agentic/          Shared agentic-loop engine; one mode per feature in agentic/modes/
+mcp_server/       Shared local MCP server (Release 1); one read-only tool per feature in mcp_server/tools/
+rag_server/       Shared local RAG server (Release 1); approved corpus in rag_server/corpus/, prompts in prompts/_rag/
 tests/            Engine tests (no services or API key needed)
 docs/             Feature registrations (features.md), loop guide (agentic-loop.md),
                   run evidence (evidence/)
 agentic_loop.py   Plan -> Act -> Observe -> Adapt loop (run from the repo root)
+requirements-*.txt  Host-side dependencies: -agentic (loop), -mcp (MCP server), -rag (RAG server)
 ```
 
 ## Run the whole app
@@ -60,3 +63,37 @@ worked example.
 ```bash
 python -m pytest tests/ -q             # engine tests, no services needed
 ```
+
+## Run the shared MCP server
+
+One local MCP server for all five features (Release 1). Each tool calls a
+feature's existing API; it runs on the host and is not a Compose service.
+
+```bash
+pip install -r requirements-mcp.txt
+python -m mcp_server.server              # http://localhost:8100/mcp
+python -m mcp_server.validate            # 8-check test record
+python -m mcp_server.validate --evidence # also saves docs/evidence/mcp-validation-<ts>.json
+```
+
+Containers reach it at `http://host.docker.internal:8100/mcp`. One read-only
+tool per feature lives in `mcp_server/tools/<feature>.py`; owners adjust their
+own file.
+
+## Run the shared RAG server
+
+One local RAG server for all five features (Release 1). It answers questions
+from the approved documents in `rag_server/corpus/` with citations and a
+confidence category, through the same LLM settings as AI-Mode. Runs on the
+host, not a Compose service.
+
+```bash
+pip install -r requirements-rag.txt
+python -m rag_server.server              # http://localhost:8200  (builds the index first time)
+python -m rag_server.validate            # P@5 / R@5, grounding, insufficient-context checks
+python -m rag_server.validate --evidence # also saves docs/evidence/rag-validation-<ts>.json
+```
+
+Containers reach it at `http://host.docker.internal:8200`. To add a source,
+drop a `.md` file with a front-matter block in `rag_server/corpus/` and
+`POST /refresh`.

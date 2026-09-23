@@ -13,6 +13,12 @@ on:
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-4.yml'
+      - 'mcp_server/**'
+      - 'rag_server/**'
+      - 'prompts/_rag/**'
+      - 'tests/**'
+      - 'requirements-mcp.txt'
+      - 'requirements-rag.txt'
   pull_request:
     branches: [main]
     paths:
@@ -21,6 +27,12 @@ on:
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-4.yml'
+      - 'mcp_server/**'
+      - 'rag_server/**'
+      - 'prompts/_rag/**'
+      - 'tests/**'
+      - 'requirements-mcp.txt'
+      - 'requirements-rag.txt'
   workflow_dispatch:
 
 env:
@@ -48,7 +60,7 @@ jobs:
         run: docker compose -f "$COMPOSE_FILE" build $SERVICES
 
   # =====================================================================
-  # 2. Unit gate - budget-versus-actual maths
+  # 2. Unit gate - budget-versus-actual maths, plus MCP/RAG pure functions
   # =====================================================================
   unit-checks:
     name: Unit checks
@@ -70,6 +82,15 @@ jobs:
       - name: Run budget logic checks
         working-directory: services/budgeting/backend
         run: python -m tests.test_budget_logic
+
+      # Pure-function tests for the shared MCP and RAG servers. They need no
+      # running server, no ChromaDB and no API key: MCP and RAG stay disabled
+      # in CI, only their maths and contracts are checked.
+      - name: Install shared MCP/RAG test dependencies
+        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
+
+      - name: Run shared MCP and RAG unit tests
+        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py -q
 
   # =====================================================================
   # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200

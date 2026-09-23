@@ -1,0 +1,10 @@
+# Dependencies for the shared MCP server (mcp_server/).
+# Runs on the host, not in a container - the containerised backends call it
+# at http://host.docker.internal:8100/mcp.
+#
+#   pip install -r requirements-mcp.txt
+#   python -m mcp_server.server
+
+mcp>=1.10,<2
+requests>=2.32
+python-dotenv>=1.0
