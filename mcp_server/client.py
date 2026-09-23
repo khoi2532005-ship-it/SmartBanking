@@ -2,9 +2,9 @@
 
 Used by `mcp_server/validate.py` and by the agentic loop's MCP validation
 mode. Both run on the host from the repo root, so they can share this file.
-The budgeting backend has its own copy in
-`services/budgeting/backend/services/mcp_client.py` because its Docker image
-does not include this package.
+The feature backends cannot import this module - their Docker images copy
+only their own service folder - so each backend that calls the MCP server
+carries a small client of its own (budgeting's arrives with its wiring PR).
 
 Speaks real MCP over streamable HTTP: `tools/list` and `tools/call` as
 JSON-RPC, via the official SDK's client. Wrapped in `asyncio.run` so Flask

@@ -199,8 +199,9 @@ def _banner(r: Retriever) -> None:
 
 if __name__ == "__main__":
     retriever = get_retriever()
-    if retriever.mode != "vector":
-        # First start, or the index is stale: build it before serving.
+    if retriever.index_stale():
+        # No vector index yet, or its chunk count differs from the corpus:
+        # rebuild before serving. Otherwise the persistent collection is reused.
         stats = retriever.refresh()
         print(f"  index built: {stats}")
     _banner(retriever)

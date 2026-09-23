@@ -10,12 +10,15 @@ Capability brief
     Non-goals  Does not create or edit transactions; does not categorise.
 
 Aidan: the filter uses your `customer_id`, `date_from` and `date_to` query
-params and the `type`, `category` and `amount` fields your API returns.
-Deposits are excluded from spending. Adjust if your contract changes.
+params (inclusive on both ends, matching `t.date <= ?` in your database
+service) and the `category` and `amount` fields your API returns. Only
+negative amounts - money leaving the account - count as spending, so deposits
+and incoming transfers are excluded by sign. Adjust if your contract changes.
 """
 
 from __future__ import annotations
 
+import calendar
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -36,16 +39,43 @@ ENDPOINT = "/api/transactions"
 
 
 def _month_bounds(month: int, year: int) -> tuple[str, str]:
-    next_month, next_year = (1, year + 1) if month == 12 else (month + 1, year)
-    return f"{year:04d}-{month:02d}-01", f"{next_year:04d}-{next_month:02d}-01"
+    """First and last day of the month, both inclusive.
+
+    The Transactions API filters with `date <= date_to`, so sending the first
+    of the next month would pull that day into this month's total.
+    """
+    last_day = calendar.monthrange(year, month)[1]
+    return f"{year:04d}-{month:02d}-01", f"{year:04d}-{month:02d}-{last_day:02d}"
+
+
+def _aggregate(rows: list[dict[str, Any]]) -> tuple[dict[str, float], int]:
+    """Total per category of money leaving the account, plus how many rows counted.
+
+    Withdrawals and outgoing transfers are stored as negative amounts; deposits
+    and incoming transfers are positive and are not spending, whatever their
+    `type` says. Filtering on sign covers both.
+    """
+    totals: dict[str, float] = {}
+    counted = 0
+    for row in rows:
+        try:
+            amount = float(row.get("amount", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if amount >= 0:
+            continue
+        category = row.get("category") or "Uncategorised"
+        totals[category] = round(totals.get(category, 0.0) - amount, 2)
+        counted += 1
+    return dict(sorted(totals.items())), counted
 
 
 def transactions_spending(customer_id: int, month: int, year: int) -> dict[str, Any]:
     """Total spending per category for one customer in one month.
 
-    Sums withdrawals and transfers (deposits are excluded) from the
-    Transactions API and returns totals by category plus a transaction count.
-    Read-only.
+    Sums money leaving the account (negative amounts: withdrawals and outgoing
+    transfers) from the Transactions API and returns totals by category plus a
+    transaction count. Read-only.
     """
     require_customer_id(customer_id)
     require_month(month)
@@ -62,18 +92,7 @@ def transactions_spending(customer_id: int, month: int, year: int) -> dict[str, 
     if not isinstance(rows, list):
         rows = []
 
-    totals: dict[str, float] = {}
-    counted = 0
-    for row in rows:
-        if str(row.get("type", "")).lower() == "deposit":
-            continue
-        try:
-            amount = abs(float(row.get("amount", 0) or 0))
-        except (TypeError, ValueError):
-            continue
-        category = row.get("category") or "Uncategorised"
-        totals[category] = round(totals.get(category, 0.0) + amount, 2)
-        counted += 1
+    totals, counted = _aggregate(rows)
 
     return {
         "source": source(FEATURE, base, ENDPOINT),
@@ -82,7 +101,7 @@ def transactions_spending(customer_id: int, month: int, year: int) -> dict[str, 
         "year": year,
         "transaction_count": counted,
         "total_spent": round(sum(totals.values()), 2),
-        "totals_by_category": dict(sorted(totals.items())),
+        "totals_by_category": totals,
     }
 
 

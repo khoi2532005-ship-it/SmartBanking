@@ -56,24 +56,45 @@ class Retrieval:
 
 
 class Retriever:
-    def __init__(self) -> None:
+    def __init__(self, chunks: list[Chunk] | None = None, use_vector: bool = True) -> None:
+        """Load the corpus (or use `chunks` directly, for tests) and open the index.
+
+        `use_vector=False` skips ChromaDB entirely, which is how the lexical
+        fallback path is exercised deterministically in tests.
+        """
         self.chunks: list[Chunk] = []
         self._by_id: dict[str, Chunk] = {}
         self._idf: dict[str, float] = {}
         self._max_idf = 1.0
         self._vector: ChromaIndex | None = None
         self.vector_error = ""
-        self._load_or_build()
+        if chunks is not None:
+            self.chunks = list(chunks)
+            self._index_chunks()
+        else:
+            self._load_corpus()
+        if use_vector:
+            self._open_vector()
+        else:
+            self.vector_error = "vector index disabled"
 
     # ---- corpus ------------------------------------------------------------
 
-    def _load_or_build(self) -> None:
+    def _load_corpus(self) -> None:
         try:
             self.chunks = ingest.load()
         except FileNotFoundError:
             self.chunks = ingest.build()
         self._index_chunks()
-        self._open_vector()
+
+    def index_stale(self) -> bool:
+        """True when the vector index is missing or does not match the corpus."""
+        if self._vector is None:
+            return True
+        try:
+            return self._vector.count() != len(self.chunks)
+        except VectorIndexUnavailable:
+            return True
 
     def _index_chunks(self) -> None:
         self._by_id = {c.chunk_id: c for c in self.chunks}
@@ -156,7 +177,11 @@ class Retriever:
 
     def _lexical_rows(self, q_tokens: list[str], k: int) -> list[dict[str, Any]]:
         scored = [(self.relevance(q_tokens, c.embed_text), c) for c in self.chunks]
-        scored.sort(key=lambda pair: (pair[1].authority_tier, -pair[0]))
+        # Relevance first, tier second. Candidate *selection* must not be
+        # tier-first: with no vector half to supply them, a tier-2 chunk that
+        # answers the question would never enter the candidate set (review
+        # finding on the first version of this code).
+        scored.sort(key=lambda pair: (-pair[0], pair[1].authority_tier))
         return [{
             "chunk_id": c.chunk_id, "text": c.text, "distance": None,
             "source_id": c.source_id, "title": c.title,

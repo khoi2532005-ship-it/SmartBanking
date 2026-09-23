@@ -12,6 +12,7 @@ a realistic mock dataset. Behaviour is controlled by USE_MOCK_TRANSACTIONS:
     false            - always use the real API and surface errors
 """
 
+import calendar
 import os
 
 import requests
@@ -222,17 +223,16 @@ def _fetch_live(customer_id, month, year):
 
 
 def _month_bounds(month, year):
+    """First and last day of the month, both inclusive - the Transactions API
+    filters with `date <= date_to`, so the last day must be this month's."""
     if month is None or year is None:
         return {}
     month = int(month)
     year = int(year)
-    if month == 12:
-        next_month, next_year = 1, year + 1
-    else:
-        next_month, next_year = month + 1, year
+    last_day = calendar.monthrange(year, month)[1]
     return {
         "date_from": f"{year:04d}-{month:02d}-01",
-        "date_to": f"{next_year:04d}-{next_month:02d}-01",
+        "date_to": f"{year:04d}-{month:02d}-{last_day:02d}",
         "month": month,
         "year": year,
     }

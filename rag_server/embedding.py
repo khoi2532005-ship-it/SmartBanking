@@ -22,7 +22,7 @@ from rag_server import config
 
 DIM = config.EMBEDDING_DIM
 
-_TOKEN_RE = re.compile(r"[a-z0-9]+(?:[._/_-][a-z0-9]+)*")
+_TOKEN_RE = re.compile(r"[a-z0-9]+(?:[._/-][a-z0-9]+)*")
 
 STOPWORDS = frozenset("""
 a an the and or but if then else of to in on at by for from with without into
