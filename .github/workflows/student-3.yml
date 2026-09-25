@@ -65,8 +65,9 @@ jobs:
   # run on every push. test_adapt_retries_and_recovers is the one that
   # proves the loop actually loops.
   #
-  # TODO: fraud rule-engine tests belong in services/fraud-alerts/tests/
-  # (currently empty). Add them here as a second step once written.
+  # The fraud service tests cover the rule engine, request validation, the
+  # transaction source, the detection route, and the database service run
+  # against a throwaway SQLite file.
   # =====================================================================
   unit-checks:
     name: Unit checks
@@ -80,10 +81,14 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r requirements-agentic.txt
+        # requirements-mcp.txt: the fraud MCP tool's test needs the mcp SDK
+        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt -r services/fraud-alerts/backend/requirements.txt
 
       - name: Run agentic loop engine tests
         run: python -m pytest tests/ -q
+
+      - name: Run fraud service tests
+        run: python -m pytest services/fraud-alerts/tests -q
 
       - name: Verify every prompt file the loop loads is non-empty
         run: |
