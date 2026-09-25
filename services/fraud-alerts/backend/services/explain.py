@@ -1,10 +1,14 @@
+import logging
+
 from services import account_context
 from services.llm_client import create_chat_completion
 from services.prompt_loader import load_prompt
 
+logger = logging.getLogger("fraud.explain")
+
 
 def _build_evidence(alert, rule):
-    account = account_context.fetch_account_context(alert.get("customer_id"))
+    account, problem = account_context.fetch_account_context(alert.get("customer_id"))
     lines = [
         f"Alert ID: {alert.get('alert_id')}",
         f"Rule triggered: {rule.get('rule_name')} ({rule.get('rule_type')})",
@@ -15,7 +19,7 @@ def _build_evidence(alert, rule):
         f"Date/time: {alert.get('transaction_datetime')}",
         f"Category: {alert.get('transaction_category')}",
         f"Severity: {alert.get('severity')}",
-        f"Account context: {account}" if account else "Account context: unavailable (Accounts service unreachable)",
+        f"Account context: {account}" if account else f"Account context: unavailable ({problem})",
     ]
     return "\n".join(lines)
 
@@ -24,15 +28,18 @@ def _looks_usable(explanation, rule, alert):
     if not explanation or not explanation.strip():
         return False
     text = explanation.lower()
-    mentions_rule = (
-        rule.get("rule_type", "").replace("_", " ") in text
-        or rule.get("rule_name", "").lower() in text
-    )
+    rule_type = (rule.get("rule_type") or "").replace("_", " ")
+    rule_name = (rule.get("rule_name") or "").lower()
+    # Both are checked for emptiness: "" is "in" every string, which made an
+    # alert from an unnamed rule pass Observe with any text at all.
+    mentions_rule = (rule_type and rule_type in text) or (rule_name and rule_name in text)
     try:
-        mentions_amount = str(int(float(alert.get("transaction_amount", 0)))) in text
+        amount = int(float(alert.get("transaction_amount", 0)))
+        # the model usually writes $7,500 rather than 7500
+        mentions_amount = str(amount) in text or f"{amount:,}" in text
     except (TypeError, ValueError):
         mentions_amount = False
-    return mentions_rule or mentions_amount
+    return bool(mentions_rule or mentions_amount)
 
 
 def _ask(evidence, extra_instruction=""):
@@ -73,11 +80,14 @@ def generate_explanation(alert, rule):
     try:
         explanation = _ask(evidence)
     except Exception as exc:
+        logger.warning("Act: LLM call for alert %s failed: %s", alert.get("alert_id"), exc)
         return f"AI explanation unavailable ({exc}).", True
 
     if _looks_usable(explanation, rule, alert):
         return explanation.strip(), False
 
+    logger.info("Observe: explanation for alert %s names neither the rule nor the amount - "
+                "Adapt: retrying once with a tightened prompt", alert.get("alert_id"))
     try:
         explanation = _ask(
             evidence,
