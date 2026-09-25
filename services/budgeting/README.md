@@ -121,10 +121,48 @@ build time by `init_db.py`.
 | `GET` | `/api/budgets/insights` | Stored insight history |
 | `DELETE` | `/api/budgets/insights/<id>` | Delete a stored insight |
 
+### Release 1: shared MCP and RAG servers
+
+The frontend reaches the shared local servers only through this backend.
+Both integrations are retained in the image and switched with env flags, so
+CI runs with them disabled.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/agents/status` | Enabled/reachable state of both integrations, registered MCP tools |
+| `GET` | `/api/mcp/tools` | `tools/list` relayed from the shared MCP server |
+| `POST` | `/api/mcp/tool` | Invoke a read-only tool (`budgeting_summary` by default) and return its structured result |
+| `POST` | `/api/rag/query` | Send a question to the shared RAG server, return the grounded answer contract |
+
+`POST /api/mcp/tool` accepts `{"tool", "arguments"}` or, for this feature's
+own tool, just `{"customer_id", "month", "year"}`. Only the five read-only
+tools registered on the shared server may be named. A tool-level `isError`
+comes back as HTTP 422 with the reason; a disabled or unreachable server as
+503 with a message that says how to start it.
+
+`POST /api/rag/query` relays the grounded answer as-is: `answer`,
+`citations[]`, `confidence_category`, `retrieval_summary`,
+`insufficient_context`. An insufficient-context answer is HTTP 200, because
+it is a valid grounded response; the UI renders it as a distinct state.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MCP_ENABLED` | `true` | `false` makes MCP endpoints answer 503 without any network call |
+| `MCP_SERVER_URL` | `http://localhost:8100/mcp` | Compose sets `http://host.docker.internal:8100/mcp` |
+| `RAG_ENABLED` | `true` | `false` makes RAG endpoints answer 503 without any network call |
+| `RAG_SERVER_URL` | `http://localhost:8200` | Compose sets `http://host.docker.internal:8200` |
+
+The MCP client (`backend/services/mcp_client.py`) speaks JSON-RPC 2.0 over
+plain HTTP to the stateless streamable-HTTP server, so the image carries no
+MCP SDK. Checks: `python -m tests.test_agent_clients` from `backend/`.
+
 ### HTMX fragments
 
 `/ui/*` returns HTML fragments for the frontend to swap in. The `/api/*` JSON
-endpoints are the contract other features consume.
+endpoints are the contract other features consume. Release 1 adds
+`GET /ui/mcp/tools`, `POST /ui/mcp/tool` and `POST /ui/rag/query`, which
+render the MCP tool result, and the grounded answer with citations and a
+confidence badge or the insufficient-context state.
 
 ## Budget status
 

@@ -5,12 +5,14 @@ consume. These endpoints exist only to return HTML fragments that HTMX swaps
 into the page, so the frontend needs no client-side rendering logic.
 """
 
+import json
+import re
 from datetime import date
 from html import escape
 
 from flask import Blueprint, request
 
-from services import database_api, insight_service, transactions_client
+from services import database_api, insight_service, mcp_client, rag_client, transactions_client
 from services.budget_logic import build_summary
 
 
@@ -396,3 +398,190 @@ def insight_history():
         for row in insights
     )
     return f'<ul class="insight-history">{items}</ul>'
+
+
+# ---------------------------------------------------------------------------
+# Release 1: shared MCP server (HTMX fragments)
+# ---------------------------------------------------------------------------
+
+STATUS_BADGE = {"OVER_BUDGET": ("over", "Over budget"),
+                "NEAR_LIMIT": ("near", "Near limit"),
+                "ON_TRACK": ("ok", "On track")}
+
+
+def _integration_alert(exc):
+    """The same readable failure for every fragment: disabled, down, or broken."""
+    if isinstance(exc, (mcp_client.MCPDisabled, rag_client.RAGDisabled)):
+        return _alert(f"{exc} - this control is retained but inactive here.", "warn")
+    return _alert(str(exc))
+
+
+@ui_bp.get("/mcp/tools")
+def mcp_tools_fragment():
+    """tools/list through this backend: what the shared server offers."""
+    try:
+        tools = mcp_client.list_tools()
+    except (mcp_client.MCPDisabled, mcp_client.MCPUnreachable, mcp_client.MCPProtocolError) as exc:
+        return _integration_alert(exc)
+
+    items = "".join(
+        f"""
+        <li>
+          <div class="history-head">
+            <span class="chip">{escape(t.name)}</span>
+            <span class="muted">requires: {escape(", ".join(t.input_schema.get("required", [])) or "none")}</span>
+          </div>
+          <p>{escape(t.description.splitlines()[0] if t.description else "")}</p>
+        </li>"""
+        for t in tools
+    )
+    return f"""
+    <p class="muted">{len(tools)} tools registered on the shared MCP server at
+    <code>{escape(mcp_client.server_url())}</code> (via <code>tools/list</code>).</p>
+    <ul class="insight-history">{items}</ul>"""
+
+
+@ui_bp.post("/mcp/tool")
+def mcp_tool_fragment():
+    """Invoke this feature's tool on the shared MCP server and render the structured result."""
+    customer_id = _customer(request.form)
+    month, year = _args_period(request.form)
+
+    try:
+        result = mcp_client.budgeting_summary(customer_id, month, year)
+    except (mcp_client.MCPDisabled, mcp_client.MCPUnreachable, mcp_client.MCPProtocolError) as exc:
+        return _integration_alert(exc)
+
+    if result.is_error:
+        return _alert(f"The MCP tool returned an error: {result.text}", "warn")
+
+    data = result.structured or {}
+    source = data.get("source") or {}
+    totals = data.get("totals") or {}
+
+    rows = ""
+    for line in data.get("budgets") or []:
+        cls, label = STATUS_BADGE.get(line.get("status"), ("ok", str(line.get("status", ""))))
+        rows += f"""
+        <tr>
+          <td><span class="category">{escape(str(line.get("category", "")))}</span></td>
+          <td class="num">{_money(line.get("spent", 0))} <span class="muted">of {_money(line.get("monthly_limit", 0))}</span></td>
+          <td class="num">{line.get("percent_used", 0)}%</td>
+          <td><span class="badge badge-{cls}">{label}</span></td>
+        </tr>"""
+
+    over = data.get("over_budget_categories") or []
+    over_text = ", ".join(escape(str(c)) for c in over) if over else "none"
+
+    return f"""
+    <article class="insight-card">
+      <h3>MCP tool result: <code>budgeting_summary</code></h3>
+      <p class="muted">Structured result returned by the shared MCP server for customer
+      {customer_id}, {month:02d}/{year}. Arguments: <code>{escape(json.dumps(result.arguments))}</code></p>
+      <div class="summary-strip">
+        <div class="stat">
+          <span class="stat-label">Total spent</span>
+          <span class="stat-value">{_money(totals.get("total_spent", 0))}</span>
+          <span class="stat-sub">of {_money(totals.get("total_limit", 0))} budgeted</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Budgets</span>
+          <span class="stat-value">{data.get("budget_count", 0)}</span>
+          <span class="stat-sub">{totals.get("over_budget_count", 0)} over budget</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Over budget</span>
+          <span class="stat-value">{over_text}</span>
+          <span class="stat-sub">spending source: {escape(str(data.get("spending_source", "unknown")))}</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="budget-table">
+          <thead><tr><th>Category</th><th>Spent</th><th>Used</th><th>Status</th></tr></thead>
+          <tbody>{rows}</tbody>
+        </table>
+      </div>
+      <p class="muted insight-meta">Tool boundary: read-only, one customer, one month.
+      Source of record: <code>{escape(str(source.get("feature", "")))}</code>
+      <code>{escape(str(source.get("endpoint", "")))}</code> at
+      <code>{escape(str(source.get("service_url", "")))}</code>, via MCP server
+      <code>{escape(mcp_client.server_url())}</code>.</p>
+    </article>"""
+
+
+# ---------------------------------------------------------------------------
+# Release 1: shared RAG server (HTMX fragments)
+# ---------------------------------------------------------------------------
+
+CONFIDENCE_BADGE = {"High": "ok", "Medium": "near", "Low": "over"}
+_CITATION_MARK = re.compile(r"\[([a-z0-9-]+#\d{3})\]")
+
+
+def _confidence_badge(category):
+    cls = CONFIDENCE_BADGE.get(category)
+    if cls is None:
+        return f'<span class="chip">Confidence: {escape(str(category))}</span>'
+    return f'<span class="badge badge-{cls}">Confidence: {escape(str(category))}</span>'
+
+
+def _answer_html(answer):
+    """Escape the prose, then turn [chunk#001] markers into chips."""
+    safe = escape(str(answer))
+    return _CITATION_MARK.sub(lambda m: f'<span class="chip">{m.group(1)}</span>', safe)
+
+
+@ui_bp.post("/rag/query")
+def rag_query_fragment():
+    question = (request.form.get("query") or "").strip()
+    if not question:
+        return _alert("Type a question about the SmartBank project first.", "warn")
+
+    try:
+        answer = rag_client.query(question)
+    except (rag_client.RAGDisabled, rag_client.RAGUnreachable) as exc:
+        return _integration_alert(exc)
+    except rag_client.RAGError as exc:
+        retrieved = (exc.payload.get("retrieval_summary") or {}).get("retrieved_count")
+        extra = f" {retrieved} chunks were retrieved before the failure." if retrieved is not None else ""
+        return _alert(f"RAG server error (HTTP {exc.status}): {exc}.{extra}")
+
+    summary = answer.get("retrieval_summary") or {}
+    meta = (
+        f"k={summary.get('k')}, retrieved {summary.get('retrieved_count')}, "
+        f"relevant {summary.get('relevant_count')}, mode {escape(str(summary.get('retrieval_mode')))}, "
+        f"top chunk {escape(str(summary.get('top_chunk')))}"
+    )
+    model = (answer.get("generation") or {}).get("model") or "not called"
+
+    # Distinct state: nothing in the approved documents supports an answer.
+    if answer.get("insufficient_context"):
+        return f"""
+        <article class="insight-card rag-insufficient">
+          <h3>Insufficient context</h3>
+          <p class="alert alert-warn">{escape(str(answer.get("answer", "")))}</p>
+          <p class="muted">No chunk passed the relevance threshold for
+          <em>{escape(question)}</em>, so no answer was generated and no citations exist.
+          {_confidence_badge(answer.get("confidence_category", "Unknown"))}</p>
+          <p class="muted insight-meta">Retrieval: {meta}. Model: {escape(str(model))}.</p>
+        </article>"""
+
+    citations = "".join(
+        f"""
+        <li>
+          <div class="history-head">
+            <span class="chip">{escape(str(c.get("chunk_id", "")))}</span>
+            <span class="muted">{escape(str(c.get("title", "")))} &middot; tier {escape(str(c.get("authority_tier", "")))}</span>
+          </div>
+        </li>"""
+        for c in answer.get("citations") or []
+    )
+    return f"""
+    <article class="insight-card rag-answer">
+      <h3>Grounded answer {_confidence_badge(answer.get("confidence_category"))}</h3>
+      <p>{_answer_html(answer.get("answer", ""))}</p>
+      <h4 class="muted">Citations ({len(answer.get("citations") or [])})</h4>
+      <ul class="insight-history">{citations}</ul>
+      <p class="muted insight-meta">Answer generated only from the cited chunks. Retrieval: {meta}.
+      Model: {escape(str(model))}. Confidence is derived from the evidence, not the model.</p>
+    </article>"""
+
