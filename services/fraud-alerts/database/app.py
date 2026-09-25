@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 import sqlite3
 
 app = Flask(__name__)
@@ -26,11 +26,25 @@ _init_sqlite()
 
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE_NAME, timeout=30)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout=30000")
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    """One connection per request, closed by close_db_connection() below even
+    when a statement raises. Before this, a failed write (a NOT NULL or
+    foreign-key violation) left its transaction open on a connection nobody
+    closed, and SQLite's write lock stayed held: every later write failed
+    with "database is locked" until the container restarted."""
+    if "db" not in g:
+        conn = sqlite3.connect(DATABASE_NAME, timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA foreign_keys = ON")
+        g.db = conn
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db_connection(_exc):
+    conn = g.pop("db", None)
+    if conn is not None:
+        conn.close()  # rolls back anything a failed statement left uncommitted
 
 
 @app.get("/")
@@ -180,6 +194,19 @@ def update_rule(rule_id):
 @app.delete("/rules/<int:rule_id>")
 def delete_rule(rule_id):
     conn = get_db_connection()
+
+    # alerts.rule_id is an enforced foreign key: say why a delete is refused
+    # instead of surfacing the raw IntegrityError as a 500.
+    alert_count = conn.execute(
+        "SELECT COUNT(*) FROM alerts WHERE rule_id = ?", (rule_id,)
+    ).fetchone()[0]
+    if alert_count:
+        conn.close()
+        return jsonify({
+            "error": f"Rule {rule_id} has {alert_count} alert(s). Delete those alerts first, "
+                     "or disable the rule instead.",
+            "alert_count": alert_count,
+        }), 409
 
     cursor = conn.execute("DELETE FROM alert_rules WHERE rule_id = ?", (rule_id,))
 
