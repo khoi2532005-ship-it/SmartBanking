@@ -105,6 +105,10 @@ services:
       <<: *llm-env
       DATABASE_SERVICE_URL: http://loans-database-service:5012
       ACCOUNTS_SERVICE_URL: http://accounts:5001
+      MCP_ENABLED: ${MCP_ENABLED:-true}
+      RAG_ENABLED: ${RAG_ENABLED:-true}
+      MCP_SERVER_URL: http://host.docker.internal:8100/mcp
+      RAG_SERVICE_URL: http://host.docker.internal:8200
     depends_on:
       loans-database-service:
         condition: service_healthy
