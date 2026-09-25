@@ -22,21 +22,28 @@ from mcp.server.fastmcp import FastMCP
 
 from mcp_server import config
 from mcp_server.http import get_json
-from mcp_server.tools._contract import require_customer_id, source, upstream
+from mcp_server.tools._contract import ToolError, require_customer_id, source, upstream
 
 TOOL_NAME = "fraud_alerts_count"
 FEATURE = "fraud"
 ENDPOINT = "/api/alerts"
+ALERT_STATUSES = ("new", "reviewed", "dismissed", "confirmed")
 
 
 def fraud_alerts_count(customer_id: int | None = None, status: str | None = None) -> dict[str, Any]:
     """Number of fraud alerts, grouped by severity and status.
 
-    Pass customer_id to count one customer's alerts and/or status (for
-    example new, reviewed, confirmed) to narrow further. Counts only. Read-only.
+    Pass customer_id to count one customer's alerts and/or status (one of
+    new, reviewed, dismissed, confirmed) to narrow further. Counts only. Read-only.
     """
     if customer_id is not None:
         require_customer_id(customer_id)
+    if status is not None:
+        # Rejected here, before the backend: an unknown status would otherwise
+        # come back as a count of 0 that reads like a real answer.
+        status = status.strip().lower()
+        if status not in ALERT_STATUSES:
+            raise ToolError(f"status must be one of {', '.join(ALERT_STATUSES)}, got {status!r}")
 
     base = config.SERVICE_URLS[FEATURE]
     with upstream(FEATURE):

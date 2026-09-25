@@ -11,9 +11,12 @@
         table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
         th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
         th { background: #f0f3f7; cursor: pointer; }
+        /* Long unbroken names and explanations wrap instead of widening the page. */
+        td { overflow-wrap: anywhere; }
+        .table-wrap { overflow-x: auto; }
         .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
         .row > div { display: flex; flex-direction: column; }
-        pre { white-space: pre-wrap; font-size: 0.8rem; }
+        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
         .is-hidden { display: none; }
         .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
         .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
@@ -46,12 +49,13 @@
                 </select></div>
             <div><label for="threshold_value">Threshold</label>
                 <input id="threshold_value" type="number" step="0.01" placeholder="5000" required></div>
-            <div><label for="threshold_secondary">Secondary (velocity mins / unusual_time end hour)</label>
+            <div><label for="threshold_secondary">Secondary (velocity mins / unusual_time end hour, exclusive)</label>
                 <input id="threshold_secondary" type="number" step="0.01" placeholder="optional"></div>
             <div><label for="severity">Severity</label>
                 <select id="severity"><option>low</option><option selected>medium</option><option>high</option></select></div>
             <button type="submit">Add Rule</button>
         </form>
+        <div id="rules-msg" class="panel is-hidden"></div>
         <div id="rules-result"></div>
     </section>
 
@@ -111,43 +115,71 @@ function show(elId, html) {
     el.innerHTML = html;
 }
 
+function hide(elId) {
+    document.getElementById(elId).classList.add("is-hidden");
+}
+
+// Every value from the API goes through esc() before it reaches innerHTML:
+// rule names and recipients are user input and explanations are model
+// output, so any of them can carry markup.
+function esc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (c) => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function errorBox(error) {
-    return `<p>Request failed.</p><pre>${error}</pre>`;
+    return `<p>Request failed - is fraud-service running?</p><pre>${esc(error)}</pre>`;
+}
+
+function errorText(result) {
+    return `<p>Error: ${esc(result.body.error || result.status)}</p>`;
 }
 
 function severityBadge(sev) {
-    return `<span class="badge sev-${sev}">${sev}</span>`;
+    const known = ["low", "medium", "high"].includes(sev) ? sev : "low";
+    return `<span class="badge sev-${known}">${esc(sev)}</span>`;
 }
 
 function rulesTable(rules) {
     if (!Array.isArray(rules) || !rules.length) return "<p>No rules configured.</p>";
     const rows = rules.map((r) => `
         <tr>
-            <td>${r.rule_id}</td><td>${r.rule_name}</td><td>${r.rule_type}</td>
-            <td>${r.threshold_value}${r.threshold_secondary != null ? " / " + r.threshold_secondary : ""}</td>
+            <td>${esc(r.rule_id)}</td><td>${esc(r.rule_name)}</td><td>${esc(r.rule_type)}</td>
+            <td>${esc(r.threshold_value)}${r.threshold_secondary != null ? " / " + esc(r.threshold_secondary) : ""}</td>
             <td>${severityBadge(r.severity)}</td>
             <td>${r.enabled ? "Yes" : "No"}</td>
             <td>
-                <button type="button" onclick="toggleRule(${r.rule_id}, ${r.enabled ? 0 : 1})">${r.enabled ? "Disable" : "Enable"}</button>
-                <button type="button" onclick="deleteRule(${r.rule_id})">Delete</button>
+                <button type="button" onclick="toggleRule(${Number(r.rule_id)}, ${r.enabled ? 0 : 1})">${r.enabled ? "Disable" : "Enable"}</button>
+                <button type="button" onclick="deleteRule(${Number(r.rule_id)})">Delete</button>
             </td>
         </tr>`).join("");
-    return `<table><tr><th>ID</th><th>Name</th><th>Type</th><th>Threshold</th><th>Severity</th><th>Enabled</th><th></th></tr>${rows}</table>`;
+    return `<div class="table-wrap"><table><tr><th>ID</th><th>Name</th><th>Type</th><th>Threshold</th><th>Severity</th><th>Enabled</th><th></th></tr>${rows}</table></div>`;
 }
 
 async function loadRules() {
-    const result = await api("/api/rules");
-    result.ok ? show("rules-result", rulesTable(result.body)) : show("rules-result", `<p>Error: ${result.body.error || result.status}</p>`);
+    try {
+        const result = await api("/api/rules");
+        show("rules-result", result.ok ? rulesTable(result.body) : errorText(result));
+    } catch (error) { show("rules-result", errorBox(error)); }
 }
 
-async function toggleRule(ruleId, enabled) {
-    await api(`/api/rules/${ruleId}`, { method: "PUT", body: JSON.stringify({ enabled }) });
-    loadRules();
+// Toggle and delete report failures (e.g. a rule that still has alerts)
+// instead of silently reloading an unchanged table.
+async function ruleAction(path, options) {
+    try {
+        const result = await api(path, options);
+        if (!result.ok) return show("rules-msg", errorText(result));
+        hide("rules-msg");
+        loadRules();
+    } catch (error) { show("rules-msg", errorBox(error)); }
 }
 
-async function deleteRule(ruleId) {
-    await api(`/api/rules/${ruleId}`, { method: "DELETE" });
-    loadRules();
+function toggleRule(ruleId, enabled) {
+    return ruleAction(`/api/rules/${ruleId}`, { method: "PUT", body: JSON.stringify({ enabled }) });
+}
+
+function deleteRule(ruleId) {
+    return ruleAction(`/api/rules/${ruleId}`, { method: "DELETE" });
 }
 
 document.getElementById("rule-form").addEventListener("submit", async (event) => {
@@ -160,27 +192,27 @@ document.getElementById("rule-form").addEventListener("submit", async (event) =>
         severity: document.getElementById("severity").value,
         enabled: 1,
     };
-    const result = await api("/api/rules", { method: "POST", body: JSON.stringify(payload) });
-    if (result.ok) {
+    try {
+        const result = await api("/api/rules", { method: "POST", body: JSON.stringify(payload) });
+        if (!result.ok) return show("rules-msg", errorText(result));
         event.target.reset();
+        hide("rules-msg");
         loadRules();
-    } else {
-        show("rules-result", `<p>Error: ${result.body.error || result.status}</p>`);
-    }
+    } catch (error) { show("rules-msg", errorBox(error)); }
 });
 
 function alertsTable(alerts) {
     if (!Array.isArray(alerts) || !alerts.length) return "<p>No alerts found.</p>";
     const rows = alerts.map((a) => `
         <tr>
-            <td>${a.alert_id}</td><td>${a.customer_id}</td><td>${a.transaction_id}</td>
-            <td>$${Number(a.transaction_amount).toLocaleString()}</td><td>${a.transaction_recipient ?? "-"}</td>
-            <td>${String(a.transaction_datetime ?? "").replace("T", " ")}</td>
-            <td>${severityBadge(a.severity)}</td><td>${a.status}</td>
+            <td>${esc(a.alert_id)}</td><td>${esc(a.customer_id)}</td><td>${esc(a.transaction_id)}</td>
+            <td>$${esc(Number(a.transaction_amount).toLocaleString())}</td><td>${esc(a.transaction_recipient ?? "-")}</td>
+            <td>${esc(String(a.transaction_datetime ?? "").replace("T", " "))}</td>
+            <td>${severityBadge(a.severity)}</td><td>${esc(a.status)}</td>
             <td>${a.ai_explanation ? "Yes" : "No"}</td>
         </tr>`).join("");
-    return `<table><tr><th>ID</th><th>Customer</th><th>Txn</th><th>Amount</th><th>Recipient</th>
-        <th>Date/Time</th><th>Severity</th><th>Status</th><th>Explained</th></tr>${rows}</table>`;
+    return `<div class="table-wrap"><table><tr><th>ID</th><th>Customer</th><th>Txn</th><th>Amount</th><th>Recipient</th>
+        <th>Date/Time</th><th>Severity</th><th>Status</th><th>Explained</th></tr>${rows}</table></div>`;
 }
 
 function sortAlerts(alerts, key) {
@@ -201,7 +233,7 @@ document.getElementById("filter-form").addEventListener("submit", async (event) 
     });
     try {
         const result = await api(`/api/alerts?${params}`);
-        if (!result.ok) return show("alerts-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        if (!result.ok) return show("alerts-result", errorText(result));
         currentAlerts = result.body;
         const sorted = sortAlerts(currentAlerts, document.getElementById("f_sort").value);
         show("alerts-result", alertsTable(sorted));
@@ -215,16 +247,16 @@ document.getElementById("f_sort").addEventListener("change", () => {
 async function viewDetail() {
     const id = document.getElementById("detail_id").value;
     try {
-        const result = await api(`/api/alerts/${id}`);
-        if (!result.ok) return show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        const result = await api(`/api/alerts/${encodeURIComponent(id)}`);
+        if (!result.ok) return show("detail-result", errorText(result));
         const a = result.body;
         show("detail-result", `
-            <p><b>Alert #${a.alert_id}</b> - ${severityBadge(a.severity)} - <b>${a.status}</b><br>
-            Rule: ${a.rule_name ?? "-"} (${a.rule_type ?? "-"}), threshold ${a.threshold_value ?? "-"}${a.threshold_secondary != null ? " / " + a.threshold_secondary : ""}<br>
-            Customer ${a.customer_id} | Transaction ${a.transaction_id} | $${Number(a.transaction_amount).toLocaleString()} to ${a.transaction_recipient ?? "-"}<br>
-            Date: ${a.transaction_datetime ?? "-"} | Category: ${a.transaction_category ?? "-"}</p>
+            <p><b>Alert #${esc(a.alert_id)}</b> - ${severityBadge(a.severity)} - <b>${esc(a.status)}</b><br>
+            Rule: ${esc(a.rule_name ?? "-")} (${esc(a.rule_type ?? "-")}), threshold ${esc(a.threshold_value ?? "-")}${a.threshold_secondary != null ? " / " + esc(a.threshold_secondary) : ""}<br>
+            Customer ${esc(a.customer_id)} | Transaction ${esc(a.transaction_id)} | $${esc(Number(a.transaction_amount).toLocaleString())} to ${esc(a.transaction_recipient ?? "-")}<br>
+            Date: ${esc(a.transaction_datetime ?? "-")} | Category: ${esc(a.transaction_category ?? "-")}</p>
             <p><b>AI Explanation:</b></p>
-            <pre>${a.ai_explanation ?? "Not yet explained - use the AI Mode tab, or the on-demand explain endpoint."}</pre>`);
+            <pre>${esc(a.ai_explanation ?? "Not yet explained - use the AI Mode tab, or the on-demand explain endpoint.")}</pre>`);
     } catch (error) { show("detail-result", errorBox(error)); }
 }
 
@@ -233,27 +265,34 @@ document.getElementById("view-detail-btn").addEventListener("click", viewDetail)
 document.getElementById("update-status-btn").addEventListener("click", async () => {
     const id = document.getElementById("detail_id").value;
     const status = document.getElementById("status-select").value;
-    const result = await api(`/api/alerts/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
-    result.ok ? viewDetail() : show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+    try {
+        const result = await api(`/api/alerts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ status }) });
+        result.ok ? viewDetail() : show("detail-result", errorText(result));
+    } catch (error) { show("detail-result", errorBox(error)); }
 });
 
 document.getElementById("delete-alert-btn").addEventListener("click", async () => {
     const id = document.getElementById("detail_id").value;
-    const result = await api(`/api/alerts/${id}`, { method: "DELETE" });
-    show("detail-result", result.ok ? `<p>Deleted alert ${id}.</p>` : `<p>Error: ${result.body.error || result.status}</p>`);
+    try {
+        const result = await api(`/api/alerts/${encodeURIComponent(id)}`, { method: "DELETE" });
+        show("detail-result", result.ok ? `<p>Deleted alert ${esc(id)}.</p>` : errorText(result));
+    } catch (error) { show("detail-result", errorBox(error)); }
 });
 
 document.getElementById("run-detection-btn").addEventListener("click", async () => {
     show("detection-result", "<p>Running detection...</p>");
     try {
         const result = await api("/api/detection/run", { method: "POST" });
-        if (!result.ok) return show("detection-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        if (!result.ok) return show("detection-result", errorText(result));
         const r = result.body;
+        const skippedRules = r.rules_skipped || [];
         show("detection-result", `
-            <p><b>${r.new_alert_count} new alert(s)</b> from ${r.evaluated} transactions scanned against ${r.rules_applied} rule(s).
-            ${r.skipped_duplicates ? `${r.skipped_duplicates} duplicate(s) skipped. ` : ""}
-            ${r.explanations_skipped ? `${r.explanations_skipped} explanation(s) unavailable. ` : ""}
-            ${r.degraded ? "<b>Degraded:</b> transaction source fell back to seed data." : ""}</p>
+            <p><b>${esc(r.new_alert_count)} new alert(s)</b> from ${esc(r.evaluated)} ${esc(r.source)} transactions scanned against ${esc(r.rules_applied)} rule(s).
+            ${r.skipped_duplicates ? `${esc(r.skipped_duplicates)} duplicate(s) skipped. ` : ""}
+            ${r.unscannable_transactions ? `${esc(r.unscannable_transactions)} transaction(s) could not be scanned. ` : ""}
+            ${r.explanations_skipped ? `${esc(r.explanations_skipped)} explanation(s) unavailable. ` : ""}
+            ${r.failed_writes ? `<b>${esc(r.failed_writes)} alert(s) could not be saved.</b> ` : ""}
+            ${skippedRules.length ? `<b>Rule(s) ${esc(skippedRules.join(", "))} skipped: stored thresholds are not usable.</b>` : ""}</p>
             ${alertsTable(r.new_alerts)}`);
     } catch (error) { show("detection-result", errorBox(error)); }
 });
