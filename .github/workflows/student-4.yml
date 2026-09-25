@@ -83,6 +83,15 @@ jobs:
         working-directory: services/budgeting/backend
         run: python -m tests.test_budget_logic
 
+      # MCP and RAG stay disabled in CI: these checks prove the disabled and
+      # unreachable paths behave, without any shared server running.
+      - name: Run MCP/RAG client and route checks (integrations disabled)
+        working-directory: services/budgeting/backend
+        env:
+          MCP_ENABLED: "false"
+          RAG_ENABLED: "false"
+        run: python -m tests.test_agent_clients
+
       # Pure-function tests for the shared MCP and RAG servers. They need no
       # running server, no ChromaDB and no API key: MCP and RAG stay disabled
       # in CI, only their maths and contracts are checked.
