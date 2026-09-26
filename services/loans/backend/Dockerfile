@@ -20,7 +20,11 @@ ENV DATABASE_SERVICE_URL=http://loans-database-service:5012 \
     ACCOUNTS_SERVICE_URL=http://accounts:5001 \
     LLM_PROVIDER=gemini \
     GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ \
-    GEMINI_MODEL=gemini-flash-lite-latest
+    GEMINI_MODEL=gemini-flash-lite-latest \
+    MCP_ENABLED=true \
+    RAG_ENABLED=true \
+    MCP_SERVER_URL=http://host.docker.internal:8100/mcp \
+    RAG_SERVICE_URL=http://host.docker.internal:8200
 
 EXPOSE 5002
 

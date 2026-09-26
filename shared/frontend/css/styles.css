@@ -266,6 +266,87 @@ td.num { white-space: nowrap; }
     font-style: italic;
 }
 
+/* ------------------------------------------------- MCP / RAG mode toggles */
+
+.feature-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+}
+
+.toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--ink);
+    margin: 0;
+}
+
+.toggle-switch input {
+    appearance: none;
+    width: 40px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    position: relative;
+    transition: background 0.15s ease;
+    cursor: pointer;
+}
+
+.toggle-switch input::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s ease;
+}
+
+.toggle-switch input:checked {
+    background: var(--ok);
+    border-color: var(--ok);
+}
+
+.toggle-switch input:checked::after { transform: translateX(18px); }
+
+.feature-state {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.14rem 0.5rem;
+    border-radius: 999px;
+}
+
+.feature-on { background: var(--ok-tint); color: var(--ok); }
+.feature-off { background: var(--over-tint); color: var(--over); }
+
+.stack-form { display: flex; flex-direction: column; gap: 0.45rem;
+              margin: 0.6rem 0; align-items: stretch; }
+
+.stack-form label { margin: 0.35rem 0 0; }
+
+.stack-form input { width: 100%; }
+
+.rag-helper { font-size: 0.78rem; color: var(--ink-soft); margin: 0; }
+
+.panel-mcp { font-size: 0.88rem; }
+
+.panel-mcp h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+.panel-mcp ul { margin: 0.4rem 0; padding-left: 1.2rem; }
+.panel-mcp pre { white-space: pre-wrap; font-size: 0.8rem; margin: 0.2rem 0; }
+.panel-mcp td pre { margin: 0; max-width: 380px; }
+
+.stack-form .rag-action { align-self: flex-start; }
+
 /* ------------------------------------------------------- feature cards */
 
 .feature-grid {
