@@ -265,6 +265,44 @@ def test_routes_validate_input_before_calling_out():
         assert r.status_code == 503 and "python -m rag_server.server" in r.get_json()["error"]
 
 
+# ---------------------------------------------------------------------------
+# Non-object JSON bodies - a caller's mistake is a 400, never a 500
+# ---------------------------------------------------------------------------
+
+NON_OBJECT_BODIES = ("[1]", '"hi"', "42", "[]")
+BODY_ROUTES = (
+    ("post", "/api/mcp/tool"),
+    ("post", "/api/rag/query"),
+    ("post", "/api/budgets"),
+    ("put", "/api/budgets/1"),
+    ("post", "/api/budgets/insight"),
+)
+
+
+def test_non_object_json_bodies_are_rejected_with_400():
+    """`[1]`, `"hi"` and `42` used to reach `data.get` and raise (review finding
+    on PR #41). Every POST/PUT route now goes through routes.json_object()."""
+    with _env(MCP_ENABLED="false", RAG_ENABLED="false"):
+        c = _client()
+        for method, path in BODY_ROUTES:
+            for body in NON_OBJECT_BODIES:
+                r = getattr(c, method)(path, data=body, content_type="application/json")
+                assert r.status_code == 400, (method, path, body, r.status_code)
+                assert r.get_json()["error"] == "JSON object body required", (path, body)
+
+
+def test_null_or_missing_body_falls_back_to_defaults():
+    """`null` and an absent body mean {}: the route reports what it needs, or
+    that the integration is disabled - it never raises."""
+    with _env(MCP_ENABLED="false", RAG_ENABLED="false"):
+        c = _client()
+        assert c.post("/api/rag/query", data="null", content_type="application/json").status_code == 400
+        assert c.post("/api/rag/query").status_code == 400
+        assert c.post("/api/budgets", data="null", content_type="application/json").status_code == 400
+        assert c.post("/api/mcp/tool", data="null", content_type="application/json").status_code == 503
+        assert c.post("/api/mcp/tool").status_code == 503
+
+
 def _run():
     tests = [(n, o) for n, o in sorted(globals().items()) if n.startswith("test_") and callable(o)]
     failures = []

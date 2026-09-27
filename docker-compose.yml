@@ -239,6 +239,12 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       USE_MOCK_TRANSACTIONS: auto
+    # The shared MCP and RAG servers are host processes (Release 1). Docker
+    # Desktop resolves host.docker.internal by itself; plain Linux Docker (CI
+    # runners, the Azure demo VM) needs this mapping or the backend reports
+    # both servers unreachable.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       budgeting-database-service:
         condition: service_healthy

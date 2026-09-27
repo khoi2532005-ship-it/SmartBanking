@@ -21,8 +21,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
+from routes import json_object
 from services import mcp_client, rag_client
 
 agents_bp = Blueprint("agents", __name__)
@@ -90,7 +91,9 @@ def mcp_tools():
 
 @agents_bp.post("/api/mcp/tool")
 def mcp_tool():
-    data = request.get_json(silent=True) or {}
+    data, error = json_object()
+    if error:
+        return error
     tool = str(data.get("tool") or DEFAULT_TOOL).strip()
     if tool not in ALLOWED_TOOLS:
         return jsonify({
@@ -131,7 +134,9 @@ def mcp_tool():
 
 @agents_bp.post("/api/rag/query")
 def rag_query():
-    data = request.get_json(silent=True) or {}
+    data, error = json_object()
+    if error:
+        return error
     question = str(data.get("query") or "").strip()
     if not question:
         return jsonify({"error": "query is required"}), 400
