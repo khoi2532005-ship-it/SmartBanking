@@ -116,7 +116,12 @@ def test_rag_call_when_shared_server_is_down_is_a_readable_503(client):
     assert "shared RAG server" in response.get_json()["error"]
 
 
+def test_rag_refresh_proxy_is_not_exposed(client):
+    response = client.post("/api/rag/refresh", json={})
+    assert response.status_code == 404
+
+
 def test_rag_disabled_env_var_returns_403_even_with_the_header_on(client, monkeypatch):
     monkeypatch.setenv("RAG_ENABLED", "false")
-    response = client.post("/api/rag/refresh", json={})
+    response = client.post("/api/rag/answer", json={"query": "what is a loan"})
     assert response.status_code == 403

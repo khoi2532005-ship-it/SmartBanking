@@ -1,6 +1,6 @@
 // RAG Mode for Loans & Credit - Release 1 integration.
 // Mirrors the enrolment-app RAG tab: an on/off toggle persisted in
-// localStorage plus refresh / retrieve / answer forms that proxy to the
+// localStorage plus retrieve / answer forms that proxy to the
 // shared RAG server through the loans backend with the X-RAG-Mode header.
 const RAG_BASE = `http://${window.location.hostname}:5002`;
 const RAG_STORAGE_KEY = "loans_rag_mode_enabled";
@@ -90,28 +90,6 @@ function evidenceTable(evidence) {
 function renderRagResult(title, result, extra = "") {
     ragResult.innerHTML = `<h3>${escRag(title)}</h3>${extra}`;
 }
-
-// Refresh corpus
-document.getElementById("rag-refresh-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!ragEnabled()) { renderRagDisabled(); return; }
-
-    ragResult.innerHTML = "<p class='spinner'>Refreshing corpus&hellip;</p>";
-    try {
-        const result = await callRag("/api/rag/refresh", {});
-        if (!result.ok) return showRagError(result.data.error || `Request failed (${result.status}).`);
-        const r = result.data.result || {};
-        renderRagResult("RAG Tool: refresh_corpus", result.data, `
-            <p>${escRag(r.message || "corpus and index rebuilt")}</p>
-            <ul>
-                <li>chunks: ${escRag(r.chunks ?? "-")}</li>
-                <li>sources: ${escRag(r.sources ?? "-")}</li>
-                <li>vector indexed: ${escRag(r.vector_indexed ?? "-")}</li>
-                <li>mode: ${escRag(r.mode ?? "-")}</li>
-                ${r.vector_error ? `<li>vector error: ${escRag(r.vector_error)}</li>` : ""}
-            </ul>`);
-    } catch (error) { showRagError(error && error.message ? error.message : String(error)); }
-});
 
 // Retrieve evidence (no LLM call)
 document.getElementById("rag-retrieve-form").addEventListener("submit", async (event) => {
