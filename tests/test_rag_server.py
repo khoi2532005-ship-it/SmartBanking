@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from rag_server import config  # noqa: E402
 from rag_server.embedding import DIM, embed, tokenize  # noqa: E402
 from rag_server.grounding import confidence, extract_citations  # noqa: E402
-from rag_server.ingest import Chunk, _pack  # noqa: E402
+from rag_server.ingest import Chunk, _pack, chunk_document  # noqa: E402
 from rag_server.retriever import EvidenceRecord, Retriever  # noqa: E402
 
 
@@ -144,3 +144,21 @@ def test_off_topic_query_retrieves_nothing_relevant(corpus):
     retriever = Retriever(chunks=corpus, use_vector=False)
     result = retriever.retrieve("What is the capital of France?", k=5)
     assert all(e.relevance < config.RELEVANCE_THRESHOLD for e in result.evidence)
+
+
+def test_loan_eligibility_query_retrieves_the_approved_checks():
+    chunks = chunk_document(config.CORPUS_DIR / "loans-feature.md")
+    retriever = Retriever(chunks=chunks, use_vector=False)
+
+    result = retriever.retrieve("what are the loan eligibility checks?", k=5)
+    evidence = "\n".join(record.text for record in result.evidence)
+
+    assert any(record.source_id == "loans-feature" for record in result.evidence)
+    assert all(check in evidence for check in (
+        "loan_type_supported",
+        "amount_within_limits",
+        "purpose_provided",
+        "affordability",
+    ))
+    assert "40%" in evidence
+    assert "monthly income" in evidence

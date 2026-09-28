@@ -25,6 +25,15 @@ Explain loan eligibility in plain language. Explain the reasons behind a loan ap
 
 LoanApplications: loan_id, customer_id, loan_type, requested_amount, loan_purpose, application_date, status, interest_rate, approved_amount. Repayments: repayment_id, loan_id, due_date, payment_amount, principal_amount, interest_amount, amount_paid, payment_date, payment_status.
 
+# Loan eligibility checks
+
+SmartBank evaluates four loan eligibility checks: `loan_type_supported`, `amount_within_limits`, `purpose_provided`, and `affordability`. An application is eligible only when all four checks pass.
+
+- `loan_type_supported`: the requested type is PERSONAL, AUTO, EDUCATION, HOME, or BUSINESS.
+- `amount_within_limits`: the requested amount is within the selected loan type's allowed minimum and maximum.
+- `purpose_provided`: the application includes a loan purpose.
+- `affordability`: the estimated monthly payment is at most 40% of monthly income. When monthly income is unavailable, this check is skipped and treated as passed.
+
 # Cross-feature rule
 
 Loans stores only the customer_id and should validate it against the Accounts API when a loan is created. Seeded loans belong to customers 1, 2 and 3, which exist in Accounts.
