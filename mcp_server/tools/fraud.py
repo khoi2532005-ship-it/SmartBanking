@@ -1,4 +1,4 @@
-"""fraud_alerts_count - Fraud Alerts (Khoi). SCAFFOLD - owner to confirm.
+"""fraud_alerts_count - Fraud Alerts (Khoi).
 
 Capability brief
     Question   How many fraud alerts are open, and how severe are they?
@@ -8,9 +8,12 @@ Capability brief
     Scope      Read-only. Aggregates only: no merchant names, amounts or
                transaction ids cross the boundary.
     Non-goals  Does not run detection, create alerts or change alert status.
+    Callers    The Fraud AI Mode tab (Alert Summary card) and the Fraud
+               explanation, which gives the counts to the LLM as the
+               customer's alert history - both through fraud-service.
 
-Khoi: the grouping uses the `severity` and `status` fields your API returns.
-Adjust if your contract changes; keep the tool read-only and aggregate-only.
+The grouping uses the `severity` and `status` fields of GET /api/alerts, the
+contract fraud-service validates (services/constants.py in that service).
 """
 
 from __future__ import annotations
