@@ -181,6 +181,17 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       TRANSACTIONS_SOURCE: ${TRANSACTIONS_SOURCE:-seed}
+      # Release 1: connection to the shared MCP and RAG servers, which run on
+      # the host. The flags default on; CI sets both to false so the
+      # integration is retained but inactive there.
+      MCP_ENABLED: ${MCP_ENABLED:-true}
+      MCP_SERVER_URL: http://host.docker.internal:8100/mcp
+      RAG_ENABLED: ${RAG_ENABLED:-true}
+      RAG_SERVER_URL: http://host.docker.internal:8200
+    # Docker Desktop resolves host.docker.internal by itself; plain Linux
+    # Docker (CI runners, the demo VM) needs this mapping.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       fraud-database-service:
         condition: service_healthy
