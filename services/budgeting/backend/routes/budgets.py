@@ -2,6 +2,7 @@ from datetime import date
 
 from flask import Blueprint, jsonify, request
 
+from routes import json_object
 from services import database_api, transactions_client
 from services.budget_logic import build_summary, evaluate_budget
 
@@ -121,7 +122,9 @@ def spending_breakdown():
 
 @budgets_bp.post("/api/budgets")
 def create_budget():
-    data = request.get_json(silent=True) or {}
+    data, error = json_object()
+    if error:
+        return error
 
     for field in REQUIRED_FIELDS:
         if data.get(field) in (None, ""):
@@ -157,7 +160,9 @@ def create_budget():
 
 @budgets_bp.put("/api/budgets/<int:budget_id>")
 def update_budget(budget_id):
-    data = request.get_json(silent=True) or {}
+    data, error = json_object()
+    if error:
+        return error
 
     payload = {}
 
