@@ -1,7 +1,7 @@
 """Unit tests for the Loans & Credit MCP / RAG backend integration.
 
 No running services, no shared MCP/RAG server, no LLM: the routes are driven
-through the Flask test client with MCP_SERVER_URL / RAG_SERVICE_URL pointed at
+through the Flask test client with MCP_SERVER_URL / RAG_SERVER_URL pointed at
 a port nothing listens on (connection refused), so the "dependency down" paths
 are exercised for real. Skipped where flask is not installed, in line with the
 other test modules.
@@ -26,7 +26,7 @@ pytest.importorskip("requests")
 os.environ["MCP_ENABLED"] = "true"
 os.environ["RAG_ENABLED"] = "true"
 os.environ["MCP_SERVER_URL"] = "http://127.0.0.1:9/mcp"
-os.environ["RAG_SERVICE_URL"] = "http://127.0.0.1:9"
+os.environ["RAG_SERVER_URL"] = "http://127.0.0.1:9"
 
 from app import app  # noqa: E402
 
@@ -65,11 +65,23 @@ def test_mcp_tool_call_when_shared_server_is_down_is_a_readable_503(client):
     assert "loans_list" not in response.get_json()  # never a fabricated result
 
 
-def test_mcp_tools_registry_lists_the_loans_tool(client):
+def test_mcp_tools_registry_comes_from_the_shared_server(client, monkeypatch):
+    tools = [{
+        "name": "shared_tool",
+        "description": "Registered on the shared MCP server",
+        "inputSchema": {"type": "object", "properties": {}},
+    }]
+    monkeypatch.setattr("routes.mcp_mode.mcp_client.list_tools", lambda: tools)
+
     response = client.get("/api/mcp/tools")
     assert response.status_code == 200
-    names = [tool["name"] for tool in response.get_json()["tools"]]
-    assert "loans_list" in names
+    assert response.get_json()["tools"] == tools
+
+
+def test_mcp_tools_registry_when_shared_server_is_down_returns_503(client):
+    response = client.get("/api/mcp/tools")
+    assert response.status_code == 503
+    assert "shared MCP server" in response.get_json()["error"]
 
 
 def test_mcp_disabled_env_var_returns_403_even_with_the_header_on(client, monkeypatch):

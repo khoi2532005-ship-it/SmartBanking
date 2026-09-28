@@ -1,7 +1,7 @@
 """RAG client for the loans backend.
 
 The shared RAG server (rag_server/) runs on the host at localhost:8200;
-Compose containers reach it through RAG_SERVICE_URL (defaults to
+Compose containers reach it through RAG_SERVER_URL (defaults to
 http://host.docker.internal:8200). This module also owns the RAG mode gate,
 mirroring mcp_mode.py: RAG_ENABLED in the environment AND the X-RAG-Mode
 header both have to be on for a request to reach the shared server.
@@ -13,7 +13,7 @@ import os
 
 import requests
 
-RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://localhost:8200")
+RAG_SERVER_URL = os.getenv("RAG_SERVER_URL", "http://localhost:8200")
 
 try:
     RAG_SERVICE_TIMEOUT_SECONDS = int(os.getenv("RAG_SERVICE_TIMEOUT_SECONDS", "180"))
@@ -37,13 +37,13 @@ def call_rag_service(path: str, payload: dict):
     """POST `<path>` to the shared RAG server and return its JSON body."""
     try:
         response = requests.post(
-            f"{RAG_SERVICE_URL}{path}",
+            f"{RAG_SERVER_URL}{path}",
             json=payload,
             timeout=RAG_SERVICE_TIMEOUT_SECONDS,
         )
     except requests.RequestException as exc:
         raise requests.RequestException(
-            f"shared RAG server at {RAG_SERVICE_URL} did not answer: {type(exc).__name__}. "
+            f"shared RAG server at {RAG_SERVER_URL} did not answer: {type(exc).__name__}. "
             "Start it with 'python -m rag_server.server'."
         ) from exc
 

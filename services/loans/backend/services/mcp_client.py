@@ -93,6 +93,17 @@ def initialize() -> dict[str, Any]:
     )
 
 
+def list_tools() -> list[dict[str, Any]]:
+    """`initialize` + `notifications/initialized` + `tools/list`."""
+    initialize()
+    _post({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    result = _reply(
+        "tools/list",
+        _post({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}),
+    )
+    return result.get("tools", [])
+
+
 def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
     """`initialize` + `notifications/initialized` + `tools/call`.
 

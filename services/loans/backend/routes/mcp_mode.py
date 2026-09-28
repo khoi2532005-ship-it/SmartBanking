@@ -18,16 +18,6 @@ from services import mcp_client
 
 mcp_bp = Blueprint("mcp_mode", __name__)
 
-TOOLS = [
-    {
-        "name": "loans_list",
-        "description": "Loans held by one customer, with type, requested amount and status.",
-        "parameters": [{"name": "customer_id", "required": True, "type": "int"},
-                       {"name": "status", "required": False, "type": "str"}],
-    },
-]
-
-
 def mcp_mode_is_enabled(req) -> bool:
     enabled = os.getenv("MCP_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
     if not enabled:
@@ -44,7 +34,11 @@ def mcp_disabled_response():
 def mcp_tools():
     if not mcp_mode_is_enabled(request):
         return mcp_disabled_response()
-    return jsonify({"status": "ok", "tools": TOOLS})
+    try:
+        tools = mcp_client.list_tools()
+    except mcp_client.MCPUnavailable as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 503
+    return jsonify({"status": "ok", "tools": tools})
 
 
 @mcp_bp.post("/api/mcp/loans-list")

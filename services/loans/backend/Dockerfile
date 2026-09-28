@@ -24,7 +24,7 @@ ENV DATABASE_SERVICE_URL=http://loans-database-service:5012 \
     MCP_ENABLED=true \
     RAG_ENABLED=true \
     MCP_SERVER_URL=http://host.docker.internal:8100/mcp \
-    RAG_SERVICE_URL=http://host.docker.internal:8200
+    RAG_SERVER_URL=http://host.docker.internal:8200
 
 EXPOSE 5002
 
