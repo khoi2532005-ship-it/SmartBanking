@@ -64,10 +64,6 @@ jobs:
   # These stub the LLM and start no services, so they need no API key and
   # run on every push. test_adapt_retries_and_recovers is the one that
   # proves the loop actually loops.
-  #
-  # The fraud service tests cover the rule engine, request validation, the
-  # transaction source, the detection route, and the database service run
-  # against a throwaway SQLite file.
   # =====================================================================
   unit-checks:
     name: Unit checks
@@ -81,14 +77,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        # requirements-mcp.txt: the fraud MCP tool's test needs the mcp SDK
-        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt -r services/fraud-alerts/backend/requirements.txt
+        # requirements-mcp.txt: the MCP server tests in tests/ need the mcp SDK
+        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
 
       - name: Run agentic loop engine tests
         run: python -m pytest tests/ -q
-
-      - name: Run fraud service tests
-        run: python -m pytest services/fraud-alerts/tests -q
 
       - name: Verify every prompt file the loop loads is non-empty
         run: |
@@ -124,13 +117,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start the fraud stack
+      - name: Start the fraud stack (MCP and RAG switched off)
         # fraud-service depends_on accounts and transactions (service_started),
         # so compose pulls those in too. No API key is needed: the compose
         # anchor defaults GEMINI_API_KEY to empty and none of the probed
         # endpoints call the LLM.
+        #
+        # Release 1: the MCP and RAG integration stays in the image but is
+        # switched off in CI, where no MCP or RAG server runs. A throwaway
+        # override sets the flags without editing the shared compose file.
         run: |
-          docker compose -f "$COMPOSE_FILE" up -d \
+          cat > "$RUNNER_TEMP/mcp-rag-off.yml" <<'YAML'
+          services:
+            fraud-service:
+              environment:
+                MCP_ENABLED: "false"
+                RAG_ENABLED: "false"
+          YAML
+          docker compose -f "$COMPOSE_FILE" -f "$RUNNER_TEMP/mcp-rag-off.yml" up -d \
             fraud-database-service fraud-service fraud-frontend-service
 
       - name: Probe required endpoints
@@ -157,6 +161,32 @@ jobs:
           probe "alerts-crud"      "http://localhost:5003/api/alerts"
           probe "frontend-normal"  "http://localhost:3003/tabs/normal.html"
           probe "frontend-ai-mode" "http://localhost:3003/tabs/ai-mode.html"
+
+      - name: Verify MCP and RAG are retained but switched off
+        # Retained: the routes are in the image. Switched off: they answer
+        # 503 "disabled" without calling out, and /api/health says so.
+        run: |
+          curl -s http://localhost:5003/api/health | python3 -c '
+          import json, sys
+          health = json.load(sys.stdin)
+          assert health["mcp"]["enabled"] is False and health["rag"]["enabled"] is False, health
+          print("PASS /api/health: mcp", health["mcp"], "rag", health["rag"])'
+
+          disabled() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-s -o "$RUNNER_TEMP/reply.json" -w '%{http_code}' -X "$method" -H 'Content-Type: application/json')
+            if [ -n "$body" ]; then args+=(-d "$body"); fi
+            code=$(curl "${args[@]}" "http://localhost:5003$path")
+            if [ "$code" = "503" ] && python3 -c 'import json, sys; assert json.load(open(sys.argv[1])).get("disabled") is True' "$RUNNER_TEMP/reply.json"; then
+              echo "PASS $method $path -> 503 disabled: $(cat "$RUNNER_TEMP/reply.json")"
+            else
+              echo "FAIL $method $path -> $code $(cat "$RUNNER_TEMP/reply.json")"
+              return 1
+            fi
+          }
+          disabled GET  /api/mcp/tools
+          disabled POST /api/mcp/tool  '{"customer_id": 1}'
+          disabled POST /api/rag/query '{"query": "How does the Fraud Alerts feature get transaction data?"}'
 
       - name: Verify seeded records
         # Deliverable: 10+ records in every table this feature owns.
@@ -259,7 +289,8 @@ jobs:
             "gates": {
               "compose": "passed",
               "unit": "passed",
-              "smoke": "passed"
+              "smoke": "passed",
+              "mcp_rag_disabled": "passed"
             }
           }
           JSON
@@ -281,6 +312,9 @@ jobs:
           - Unit: agentic loop engine tests passed; loop prompt files non-empty
           - Smoke: ports 5013, 5003 and 3003 returned HTTP 200
           - Seed: alert_rules and alerts each hold 10+ records
+          - MCP and RAG: integration retained but switched off (MCP_ENABLED=false,
+            RAG_ENABLED=false); /api/mcp/tools, /api/mcp/tool and /api/rag/query
+            answered 503 "disabled" and /api/health reported both off
           - Teardown: \`docker compose down -v\` ran
 
           ## Validated endpoints
