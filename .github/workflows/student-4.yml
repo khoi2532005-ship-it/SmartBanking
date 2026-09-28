@@ -83,6 +83,15 @@ jobs:
         working-directory: services/budgeting/backend
         run: python -m tests.test_budget_logic
 
+      # MCP and RAG stay disabled in CI: these checks prove the disabled and
+      # unreachable paths behave, without any shared server running.
+      - name: Run MCP/RAG client and route checks (integrations disabled)
+        working-directory: services/budgeting/backend
+        env:
+          MCP_ENABLED: "false"
+          RAG_ENABLED: "false"
+        run: python -m tests.test_agent_clients
+
       # Pure-function tests for the shared MCP and RAG servers. They need no
       # running server, no ChromaDB and no API key: MCP and RAG stay disabled
       # in CI, only their maths and contracts are checked.
@@ -100,6 +109,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-images, unit-checks]
     timeout-minutes: 15
+    # docker-compose.yml reads these when it interpolates the budgeting-service
+    # environment, so the containers start with MCP and RAG disabled in CI.
+    env:
+      MCP_ENABLED: "false"
+      RAG_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -149,6 +163,17 @@ jobs:
               assert line["status"] in ("OVER_BUDGET", "NEAR_LIMIT", "ON_TRACK"), line
           print("summary OK:", s["totals"])
           print("spending source:", s["spending_source"])'
+
+      - name: Verify MCP and RAG are configured but disabled in CI
+        run: |
+          curl -s http://localhost:5004/api/health | python3 -c '
+          import json, sys
+          h = json.load(sys.stdin)
+          assert h["mcp"]["enabled"] is False, h["mcp"]
+          assert h["rag"]["enabled"] is False, h["rag"]
+          assert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"]
+          assert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"]
+          print("mcp:", h["mcp"]); print("rag:", h["rag"])'
 
       - name: Container status
         if: always()
