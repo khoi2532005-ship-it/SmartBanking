@@ -33,6 +33,9 @@ from routes.rules import rules_bp
 from routes.alerts import alerts_bp
 from routes.detection import detection_bp
 from routes.ai import ai_bp
+from routes.mcp import mcp_bp
+from routes.rag import rag_bp
+from services import mcp_client, rag_client
 
 
 def create_app():
@@ -43,10 +46,19 @@ def create_app():
     app.register_blueprint(alerts_bp)
     app.register_blueprint(detection_bp)
     app.register_blueprint(ai_bp)
+    app.register_blueprint(mcp_bp)
+    app.register_blueprint(rag_bp)
 
     @app.get("/api/health")
     def health():
-        return jsonify({"service": "fraud-service", "status": "running"})
+        # Configuration only, no calls out, so health stays instant. CI reads
+        # the flags to show MCP and RAG are present but switched off.
+        return jsonify({
+            "service": "fraud-service",
+            "status": "running",
+            "mcp": {"enabled": mcp_client.enabled(), "url": mcp_client.server_url()},
+            "rag": {"enabled": rag_client.enabled(), "url": rag_client.server_url()},
+        })
 
     return app
 

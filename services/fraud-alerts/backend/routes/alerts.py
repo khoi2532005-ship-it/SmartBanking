@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request
 
 from services import database_api
-from services.constants import ALERT_STATUSES, SEVERITIES
+from services.constants import ALERT_STATUSES
+from services.validation import ValidationError, choice, validate_alert_filters, validate_new_alert
 
 alerts_bp = Blueprint("alerts", __name__)
 
@@ -20,25 +21,10 @@ def submit_alert():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    severity = str(data.get("severity", "")).strip().lower()
-    if severity not in SEVERITIES:
-        return jsonify({"error": f"severity must be one of {', '.join(SEVERITIES)}"}), 400
-
-    status = str(data.get("status", "new")).strip().lower()
-    if status not in ALERT_STATUSES:
-        return jsonify({"error": f"status must be one of {', '.join(ALERT_STATUSES)}"}), 400
-
-    payload = {
-        "rule_id": data.get("rule_id"),
-        "customer_id": data.get("customer_id"),
-        "transaction_id": data.get("transaction_id"),
-        "transaction_amount": data.get("transaction_amount"),
-        "transaction_recipient": data.get("transaction_recipient"),
-        "transaction_datetime": data.get("transaction_datetime"),
-        "transaction_category": data.get("transaction_category"),
-        "severity": severity,
-        "status": status,
-    }
+    try:
+        payload = validate_new_alert(data)
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     try:
         response = database_api.create_alert_response(payload)
@@ -55,16 +41,11 @@ def submit_alert():
 
 @alerts_bp.get("/api/alerts")
 def list_alerts():
-    filters = {
-        "status": request.args.get("status"),
-        "rule_id": request.args.get("rule_id"),
-        "customer_id": request.args.get("customer_id"),
-        "min_amount": request.args.get("min_amount"),
-        "max_amount": request.args.get("max_amount"),
-        "date_from": request.args.get("date_from"),
-        "date_to": request.args.get("date_to"),
-        "q": request.args.get("q"),
-    }
+    try:
+        filters = validate_alert_filters(request.args)
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+
     try:
         alerts = database_api.search_alerts(filters)
     except Exception as exc:
@@ -106,17 +87,15 @@ def update_alert(alert_id):
     if not isinstance(data, dict):
         return jsonify({"error": "JSON body required"}), 400
 
-    status = data.get("status")
-    if status is not None:
-        status = str(status).strip().lower()
-        if status not in ALERT_STATUSES:
-            return jsonify({"error": f"status must be one of {', '.join(ALERT_STATUSES)}"}), 400
-        data = {**data, "status": status}
-
-    allowed = {"status", "ai_explanation", "explanation_generated_at"}
-    updates = {key: value for key, value in data.items() if key in allowed}
-    if not updates:
-        return jsonify({"error": f"No updatable fields provided. Allowed: {', '.join(sorted(allowed))}"}), 400
+    # Status is the only field a caller may change (spec: "Update: alert
+    # status"). The AI explanation is written by this service itself, through
+    # database_api directly, so the public API cannot put arbitrary text there.
+    if "status" not in data:
+        return jsonify({"error": "No updatable fields provided. Allowed: status"}), 400
+    try:
+        updates = {"status": choice(data["status"], "status", ALERT_STATUSES)}
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     try:
         existing = database_api.get_alert_response(alert_id)

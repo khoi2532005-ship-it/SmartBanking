@@ -35,6 +35,22 @@ def _get_client():
     return _client
 
 
+_RATE_LIMITED = ("the AI provider's rate limit was reached (on Gemini's free tier one per-minute "
+                 "quota is shared by everything using the key). Wait a minute and try again.")
+MAX_ERROR_LENGTH = 300
+
+
+def describe_error(error):
+    """A short reason for a failed LLM call that is fit to show a person.
+
+    A rate-limited Gemini call raises a 429 whose message is a page of JSON;
+    the full error still goes to the log, the page gets one sentence."""
+    text = str(error)
+    if "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower():
+        return _RATE_LIMITED
+    return text if len(text) <= MAX_ERROR_LENGTH else text[:MAX_ERROR_LENGTH] + "..."
+
+
 def create_chat_completion(messages, max_tokens=4000, temperature=0.2, model=None):
     response = _get_client().chat.completions.create(
         model=model or _MODEL,

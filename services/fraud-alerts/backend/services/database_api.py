@@ -43,10 +43,10 @@ def update_rule(rule_id, payload):
     return response.json()
 
 
-def delete_rule(rule_id):
-    response = requests.delete(f"{FRAUD_DB_URL}/rules/{rule_id}", timeout=TIMEOUT)
-    response.raise_for_status()
-    return response.json()
+def delete_rule_response(rule_id):
+    """Returns the raw response so the route can pass a 409 (the rule still
+    has alerts) through to the caller instead of treating it as an outage."""
+    return requests.delete(f"{FRAUD_DB_URL}/rules/{rule_id}", timeout=TIMEOUT)
 
 
 # ---------------------------------------------------------------------------

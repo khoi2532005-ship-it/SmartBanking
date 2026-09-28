@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify
 
-from services import database_api
-from services.explain import generate_explanation
+from services import database_api, mcp_client
+from services.explain import fetch_alert_history, generate_explanation
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
 
@@ -25,7 +25,10 @@ def explain_alert(alert_id):
     except Exception as exc:
         return jsonify({"error": f"fraud-database-service unavailable: {exc}"}), 503
 
-    explanation, degraded = generate_explanation(alert, rule)
+    # The customer's alert counts from the shared MCP server, given to the LLM
+    # as context. Optional: the explanation still runs when MCP is off or down.
+    history = fetch_alert_history(alert.get("customer_id"))
+    explanation, degraded = generate_explanation(alert, rule, history)
 
     if not degraded:
         try:
@@ -36,4 +39,10 @@ def explain_alert(alert_id):
         except Exception:
             pass  # explanation still returned to the caller even if it didn't persist
 
-    return jsonify({"alert_id": alert_id, "explanation": explanation, "degraded": degraded})
+    counts, problem = history
+    return jsonify({
+        "alert_id": alert_id,
+        "explanation": explanation,
+        "degraded": degraded,
+        "alert_history": {"tool": mcp_client.FRAUD_TOOL, "counts": counts, "unavailable_reason": problem},
+    })

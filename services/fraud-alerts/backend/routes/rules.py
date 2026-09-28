@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from services import database_api
-from services.constants import RULE_TYPES, SEVERITIES
+from services.validation import RULE_FIELDS, ValidationError, validate_rule
 
 rules_bp = Blueprint("rules", __name__)
 
@@ -25,30 +25,10 @@ def submit_rule():
     if not isinstance(data, dict):
         return jsonify({"error": "JSON body required"}), 400
 
-    rule_type = str(data.get("rule_type", "")).strip().lower()
-    if rule_type not in RULE_TYPES:
-        return jsonify({"error": f"rule_type must be one of {', '.join(RULE_TYPES)}"}), 400
-
-    severity = str(data.get("severity", "")).strip().lower()
-    if severity not in SEVERITIES:
-        return jsonify({"error": f"severity must be one of {', '.join(SEVERITIES)}"}), 400
-
-    if not data.get("rule_name"):
-        return jsonify({"error": "rule_name is required"}), 400
-
     try:
-        float(data.get("threshold_value"))
-    except (TypeError, ValueError):
-        return jsonify({"error": "threshold_value must be a number"}), 400
-
-    payload = {
-        "rule_name": data.get("rule_name"),
-        "rule_type": rule_type,
-        "threshold_value": data.get("threshold_value"),
-        "threshold_secondary": data.get("threshold_secondary"),
-        "severity": severity,
-        "enabled": data.get("enabled", 1),
-    }
+        payload = validate_rule(data)
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     try:
         rule = database_api.create_rule(payload)
@@ -77,28 +57,25 @@ def update_rule(rule_id):
     if not isinstance(data, dict):
         return jsonify({"error": "JSON body required"}), 400
 
-    allowed = {"rule_name", "rule_type", "threshold_value", "threshold_secondary", "severity", "enabled"}
-    updates = {key: value for key, value in data.items() if key in allowed}
+    updates = {key: value for key, value in data.items() if key in RULE_FIELDS}
     if not updates:
-        return jsonify({"error": f"No updatable fields provided. Allowed: {', '.join(sorted(allowed))}"}), 400
-
-    if "rule_type" in updates:
-        updates["rule_type"] = str(updates["rule_type"]).strip().lower()
-        if updates["rule_type"] not in RULE_TYPES:
-            return jsonify({"error": f"rule_type must be one of {', '.join(RULE_TYPES)}"}), 400
-
-    if "severity" in updates:
-        updates["severity"] = str(updates["severity"]).strip().lower()
-        if updates["severity"] not in SEVERITIES:
-            return jsonify({"error": f"severity must be one of {', '.join(SEVERITIES)}"}), 400
+        return jsonify({"error": f"No updatable fields provided. Allowed: {', '.join(sorted(RULE_FIELDS))}"}), 400
 
     try:
         existing = database_api.get_rule_response(rule_id)
         if existing.status_code == 404:
             return jsonify({"error": "Rule not found"}), 404
         existing.raise_for_status()
+    except Exception as exc:
+        return jsonify({"error": f"fraud-database-service unavailable: {exc}"}), 503
 
-        updated = database_api.update_rule(rule_id, updates)
+    try:
+        payload = validate_rule(updates, existing=existing.json())
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    try:
+        updated = database_api.update_rule(rule_id, payload)
     except Exception as exc:
         return jsonify({"error": f"fraud-database-service unavailable: {exc}"}), 503
 
@@ -108,12 +85,12 @@ def update_rule(rule_id):
 @rules_bp.delete("/api/rules/<int:rule_id>")
 def delete_rule(rule_id):
     try:
-        existing = database_api.get_rule_response(rule_id)
-        if existing.status_code == 404:
-            return jsonify({"error": "Rule not found"}), 404
-        existing.raise_for_status()
-
-        database_api.delete_rule(rule_id)
+        response = database_api.delete_rule_response(rule_id)
+        # 409: the rule still has alerts (enforced foreign key) - pass the
+        # database service's explanation through rather than calling it "unavailable".
+        if response.status_code in (404, 409):
+            return jsonify(response.json()), response.status_code
+        response.raise_for_status()
     except Exception as exc:
         return jsonify({"error": f"fraud-database-service unavailable: {exc}"}), 503
 

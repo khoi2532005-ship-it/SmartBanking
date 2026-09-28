@@ -7,3 +7,5 @@ Rule types:
 - new_recipient_high_value: a large first-time transfer to a recipient the customer hasn't paid before.
 
 Each alert snapshots the transaction that triggered it (amount, recipient, date/time, category) plus the rule that fired. Account context, when available, describes the customer's account(s); when it says "unavailable", explain using only the transaction and rule evidence given.
+
+Alert history, when present, counts this customer's fraud alerts (including this one) by severity and status. It comes from the SmartBank MCP server's fraud_alerts_count tool and contains no transaction details. Use it only to say whether this looks like a first alert or part of a pattern; when it says "unavailable", do not mention alert history.
