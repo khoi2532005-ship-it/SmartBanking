@@ -239,6 +239,14 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       USE_MOCK_TRANSACTIONS: auto
+      # Release 1: connection to the shared MCP and RAG servers, which run on
+      # the host (see extra_hosts below). The flags default on; CI runs with
+      # MCP_ENABLED=false RAG_ENABLED=false so the integration is retained
+      # but inactive there.
+      MCP_ENABLED: ${MCP_ENABLED:-true}
+      MCP_SERVER_URL: http://host.docker.internal:8100/mcp
+      RAG_ENABLED: ${RAG_ENABLED:-true}
+      RAG_SERVER_URL: http://host.docker.internal:8200
     # The shared MCP and RAG servers are host processes (Release 1). Docker
     # Desktop resolves host.docker.internal by itself; plain Linux Docker (CI
     # runners, the Azure demo VM) needs this mapping or the backend reports

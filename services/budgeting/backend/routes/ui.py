@@ -543,7 +543,8 @@ def rag_query_fragment():
     except rag_client.RAGError as exc:
         retrieved = (exc.payload.get("retrieval_summary") or {}).get("retrieved_count")
         extra = f" {retrieved} chunks were retrieved before the failure." if retrieved is not None else ""
-        return _alert(f"RAG server error (HTTP {exc.status}): {exc}.{extra}")
+        message = str(exc).rstrip(".")          # server messages may already end with one
+        return _alert(f"RAG server error (HTTP {exc.status}): {message}.{extra}")
 
     summary = answer.get("retrieval_summary") or {}
     meta = (

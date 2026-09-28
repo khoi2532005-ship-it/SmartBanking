@@ -147,9 +147,9 @@ it is a valid grounded response; the UI renders it as a distinct state.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MCP_ENABLED` | `true` | `false` makes MCP endpoints answer 503 without any network call |
+| `MCP_ENABLED` | `true` | `false` makes MCP endpoints answer 503 without any network call. Compose passes it through; CI sets `false` |
 | `MCP_SERVER_URL` | `http://localhost:8100/mcp` | Compose sets `http://host.docker.internal:8100/mcp` |
-| `RAG_ENABLED` | `true` | `false` makes RAG endpoints answer 503 without any network call |
+| `RAG_ENABLED` | `true` | `false` makes RAG endpoints answer 503 without any network call. Compose passes it through; CI sets `false` |
 | `RAG_SERVER_URL` | `http://localhost:8200` | Compose sets `http://host.docker.internal:8200` |
 
 The MCP client (`backend/services/mcp_client.py`) speaks JSON-RPC 2.0 over
