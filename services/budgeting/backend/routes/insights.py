@@ -2,6 +2,7 @@
 
 from flask import Blueprint, jsonify, request
 
+from routes import json_object
 from services import database_api, insight_service
 
 
@@ -10,7 +11,9 @@ insights_bp = Blueprint("insights", __name__)
 
 @insights_bp.post("/api/budgets/insight")
 def generate_insight():
-    data = request.get_json(silent=True) or {}
+    data, error = json_object()
+    if error:
+        return error
     month, year = insight_service.current_period()
 
     payload, status = insight_service.monthly_insight(
