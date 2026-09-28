@@ -140,8 +140,8 @@ def rag_query():
     question = str(data.get("query") or "").strip()
     if not question:
         return jsonify({"error": "query is required"}), 400
-    if len(question) > 1000:
-        return jsonify({"error": "query must be 1000 characters or fewer"}), 400
+    if len(question) > rag_client.MAX_QUERY_CHARS:
+        return jsonify({"error": f"query must be {rag_client.MAX_QUERY_CHARS} characters or fewer"}), 400
     k = data.get("k")
     try:
         k = int(k) if k not in (None, "") else None

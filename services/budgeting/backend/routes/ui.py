@@ -416,6 +416,46 @@ def _integration_alert(exc):
     return _alert(str(exc))
 
 
+def _status_line(label, info, detail=""):
+    """Enabled/reachable state of a shared server, rendered as one line of a panel header.
+
+    Three states, all HTTP 200 so the swap never breaks: inactive (flag off,
+    no network call made), reachable, or unreachable with the start hint.
+    """
+    url = f'<code>{escape(str(info.get("url", "")))}</code>'
+    if not info.get("enabled"):
+        return (f'<span class="badge badge-near">Inactive</span> {label} integration is '
+                f'{escape(str(info.get("note", "disabled")))}: the controls below are retained '
+                f'but make no network call.')
+    if info.get("reachable"):
+        return f'<span class="badge badge-ok">Reachable</span> {label} at {url}. {detail}'
+    return (f'<span class="badge badge-over">Unreachable</span> {label} at {url}: '
+            f'{escape(str(info.get("error", "no response")))}')
+
+
+@ui_bp.get("/mcp/status")
+def mcp_status_fragment():
+    info = mcp_client.status()
+    tools = info.get("tools") or []
+    detail = ""
+    if tools:
+        chips = " ".join(f'<span class="chip">{escape(str(t))}</span>' for t in tools)
+        detail = f"{len(tools)} tools registered: {chips}"
+    return _status_line("MCP server", info, detail)
+
+
+@ui_bp.get("/rag/status")
+def rag_status_fragment():
+    info = rag_client.status()
+    index = info.get("index") or {}
+    detail = ""
+    if info.get("reachable"):
+        detail = (f'{index.get("chunks", 0)} chunks from {index.get("sources", 0)} documents, '
+                  f'retrieval {escape(str(index.get("retrieval_mode", "unknown")))}, '
+                  f'model {escape(str(info.get("model", "unknown")))}.')
+    return _status_line("RAG server", info, detail)
+
+
 @ui_bp.get("/mcp/tools")
 def mcp_tools_fragment():
     """tools/list through this backend: what the shared server offers."""
@@ -535,6 +575,8 @@ def rag_query_fragment():
     question = (request.form.get("query") or "").strip()
     if not question:
         return _alert("Type a question about the SmartBank project first.", "warn")
+    if len(question) > rag_client.MAX_QUERY_CHARS:
+        return _alert(f"Questions are limited to {rag_client.MAX_QUERY_CHARS} characters.", "warn")
 
     try:
         answer = rag_client.query(question)
