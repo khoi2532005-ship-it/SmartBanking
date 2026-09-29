@@ -8,6 +8,10 @@ openai>=1.40
 requests>=2.32
 python-dotenv>=1.0
 
+# Release 1 validation modes (agentic/modes/mcp_validation.py) reuse
+# mcp_server/validate.py, which talks to the shared server through the MCP SDK.
+mcp>=1.10,<2
+
 # Engine tests (tests/test_agentic_loop.py). They stub the LLM and need no
 # running services, so CI can run them on every push.
 pytest>=8.0

@@ -51,6 +51,8 @@ pip install -r requirements-agentic.txt
 python agentic_loop.py                 # menu - use this to demo
 python agentic_loop.py --mode fraud    # one feature
 python agentic_loop.py --all --quiet   # CI; exit code only
+python agentic_loop.py --mode mcp_validation   # Release 1: shared MCP server test record
+python agentic_loop.py --mode rag_validation   # Release 1: shared RAG server evaluation
 ```
 
 Runs append evidence to `docs/evidence/` for the technical report.

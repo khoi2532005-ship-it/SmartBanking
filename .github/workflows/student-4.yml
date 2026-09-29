@@ -16,6 +16,8 @@ on:
       - 'mcp_server/**'
       - 'rag_server/**'
       - 'prompts/_rag/**'
+      - 'prompts/_mcp/**'
+      - 'agentic/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
       - 'requirements-rag.txt'
@@ -30,6 +32,8 @@ on:
       - 'mcp_server/**'
       - 'rag_server/**'
       - 'prompts/_rag/**'
+      - 'prompts/_mcp/**'
+      - 'agentic/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
       - 'requirements-rag.txt'
@@ -99,7 +103,7 @@ jobs:
         run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
 
       - name: Run shared MCP and RAG unit tests
-        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py -q
+        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py -q
 
   # =====================================================================
   # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200

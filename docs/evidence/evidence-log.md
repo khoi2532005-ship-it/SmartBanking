@@ -18,3 +18,5 @@ Appended automatically by `python agentic_loop.py`. One row per run - paste into
 | 20260909T131745Z | budgeting | ok | 1 | no | PASS |
 | 20260909T131749Z | loans | FAIL | 0 | no | FAIL |
 | 20260909T131756Z | transactions | ok | 1 | no | PASS |
+| 20260928T235331Z | mcp_validation | degraded | 1 | no | PASS |
+| 20260928T235337Z | rag_validation | ok | 1 | no | PASS |
