@@ -98,4 +98,7 @@ python -m rag_server.validate --evidence # also saves docs/evidence/rag-validati
 
 Containers reach it at `http://host.docker.internal:8200`. To add a source,
 drop a `.md` file with a front-matter block in `rag_server/corpus/` and
-`POST /refresh`.
+rebuild the index on the host with `python -m rag_server.validate --refresh`
+(a restart also rebuilds it when the corpus changed). A rebuild touches the
+index every feature is querying, so feature UIs, backend proxies and loop runs
+never trigger one.

@@ -98,8 +98,7 @@ def rag_records() -> list:
         R(5, "off-topic query -> insufficient context", "insufficient; no citations; llm_called false",
           "2 off-topic questions refused", True, {"results": off_topic}),
         R(6, "controlled refresh", "/refresh 200; chunk count equals /health afterwards",
-          "HTTP 200: chunks=65, vector_indexed=65, mode=hybrid; health chunks=65", True,
-          {"chunks": 65, "sources": 9, "vector_indexed": 65, "mode": "hybrid", "message": "corpus and index rebuilt"}),
+          "skipped - not requested; the shared index is rebuilt only on purpose", True, {}, True),
     ]
 
 
@@ -260,6 +259,24 @@ def test_rag_unreachable_server_never_calls_the_model(answers, rag_checks):
     result = loop.run(RAGValidationMode())
     assert not result.ok and result.attempts == []
     assert "python -m rag_server.server" in result.evidence.summary
+
+
+def test_rag_mode_never_asks_the_suite_to_refresh_the_shared_index(answers, monkeypatch):
+    """A rebuild touches the index every feature is querying; only an operator
+    may trigger it (python -m rag_server.validate --refresh), never a loop run."""
+    calls: list[dict] = []
+
+    def spy(url, **kwargs):
+        calls.append(kwargs)
+        return rag_records()
+
+    monkeypatch.setattr(rag_validate, "run_checks", spy)
+    answers.append(GOOD_RAG)
+    result = loop.run(RAGValidationMode())
+    assert result.ok
+    assert calls and not calls[0].get("refresh")
+    assert result.evidence.facts["refresh"]["skipped"] is True
+    assert "not rebuilt" in result.evidence.summary
 
 
 def test_rag_lexical_fallback_is_degraded_not_hidden(answers, rag_checks):

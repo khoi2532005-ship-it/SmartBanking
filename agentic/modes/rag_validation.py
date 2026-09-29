@@ -3,11 +3,13 @@
 Runs Lecture 8's evaluation against the team's shared RAG server, has the
 model write the evaluation entry, and checks that entry against the record.
 
-ACT reuses `rag_server/validate.py`: the same six checks the terminal script
-runs (reachable with a populated index, Precision@5 / Recall@5 over the
-benchmark, a grounded answer with citations and a confidence category, every
-claim supported by a cited chunk, off-topic questions refused with no model
-call, a controlled refresh). OBSERVE rejects an entry that misquotes the index
+ACT reuses `rag_server/validate.py`: the same checks the terminal script runs
+(reachable with a populated index, Precision@5 / Recall@5 over the benchmark,
+a grounded answer with citations and a confidence category, every claim
+supported by a cited chunk, off-topic questions refused with no model call).
+The refresh check stays skipped: a rebuild touches the shared index every
+feature is querying, so it is an operator's explicit decision on the host,
+never a side effect of a loop run. OBSERVE rejects an entry that misquotes the index
 size or the metrics, names a confidence the record does not show, drops a
 cited chunk id or invents one, or reports a pass count the record does not
 support; ADAPT retries with that complaint. A server that is unreachable or
@@ -38,6 +40,8 @@ _HITS_RE = re.compile(r"(\d+)\s+of\s+(\d+)")
 
 
 def _tag(record: dict) -> str:
+    if record.get("skipped"):
+        return "SKIP"
     return "PASS" if record["passed"] else "FAIL"
 
 
@@ -70,7 +74,7 @@ class RAGValidationMode(Mode):
                 "a benchmark question returns a grounded answer with at least one citation and a confidence category",
                 "every citation is a retrieved chunk and the expected fact appears in a cited chunk",
                 "off-topic questions return insufficient context with no citations and no model call",
-                "a controlled /refresh rebuilds the index to the same chunk count",
+                "the shared index is left untouched: the refresh check is skipped unless an operator runs it on purpose",
                 "the entry quotes the index size, metrics, confidence and chunk ids exactly and matches the pass count",
             ],
             stop_condition="An entry passes OBSERVE, or the retry budget is spent.",
@@ -110,7 +114,10 @@ class RAGValidationMode(Mode):
         grounded = by_n[3]["detail"]
         claims = by_n[4]["detail"]
         off_topic = by_n[5]["detail"].get("results") or []
-        refresh = by_n[6]["detail"] if 6 in by_n else {}
+        refresh_rec = by_n.get(6) or {}
+        refresh = refresh_rec.get("detail") or {}
+        refresh_skipped = bool(refresh_rec.get("skipped"))
+        skipped = [r["n"] for r in records if r.get("skipped")]
 
         per_query = metrics.get("per_query") or []
         hits = sum(1 for q in per_query if q.get("relevant_in_top5", 0) > 0)
@@ -143,10 +150,15 @@ class RAGValidationMode(Mode):
             },
             "claims": claims,
             "off_topic": off_topic,
-            "refresh": {"chunks": refresh.get("chunks"), "mode": refresh.get("mode")},
+            "refresh": {"skipped": refresh_skipped, "chunks": refresh.get("chunks"), "mode": refresh.get("mode")},
             "passed_count": passed_count,
             "total": len(records),
+            "skipped": skipped,
         })
+        refresh_note = (
+            "Refresh skipped: the shared index was not rebuilt by this run."
+            if refresh_skipped else f"Refresh rebuilt {refresh.get('chunks')} chunks."
+        )
 
         # The summary doubles as the evidence the REVIEW stage judges the entry
         # against, so it carries the ids and figures the entry must quote.
@@ -160,8 +172,9 @@ class RAGValidationMode(Mode):
                 f"Grounded answer to \"{facts['grounded_answer']['query']}\": confidence {confidence}, "
                 f"citations {', '.join(citations) or 'none'}. "
                 f"{len(off_topic)} off-topic questions returned insufficient context with no citations "
-                f"and no model call. Refresh rebuilt {refresh.get('chunks')} chunks. "
+                f"and no model call. {refresh_note} "
                 f"{passed_count}/{len(records)} checks passed"
+                + (f" ({len(skipped)} skipped)" if skipped else "")
             ),
             facts=facts,
             degraded=degraded,
@@ -208,10 +221,14 @@ class RAGValidationMode(Mode):
             f"'{f['claims'].get('keyword')}' present in a cited chunk",
             f"Off-topic questions ({len(f['off_topic'])}):",
             *off_topic_lines,
-            f"Refresh: {f['refresh'].get('chunks')} chunks rebuilt, mode {f['refresh'].get('mode')}",
+            ("Refresh: skipped - this run does not rebuild the shared index"
+             if f["refresh"].get("skipped")
+             else f"Refresh: {f['refresh'].get('chunks')} chunks rebuilt, mode {f['refresh'].get('mode')}"),
             "Checks:",
             *check_lines,
-            f"Checks passed: {f['passed_count']}/{f['total']}",
+            f"Checks passed: {f['passed_count']}/{f['total']}"
+            + (f" (check {', '.join(map(str, f['skipped']))} skipped and counted as passed - see its observed line)"
+               if f.get("skipped") else ""),
         ])
 
         correction = ""

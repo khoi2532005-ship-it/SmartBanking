@@ -2,6 +2,7 @@
 
     python -m rag_server.validate                # print the record
     python -m rag_server.validate --evidence     # also save docs/evidence/rag-validation-<ts>.json
+    python -m rag_server.validate --refresh      # also rebuild the shared index (check 6)
     python -m rag_server.validate --url http://localhost:8200
 
     1  reachable            /health answers and the index has chunks
@@ -12,8 +13,11 @@
                             expected fact appears in a cited chunk
     5  insufficient context off-topic questions return the insufficient
                             response with no citations and no LLM call
-    6  controlled refresh   /refresh rebuilds and reports the same chunk count
-                            /health then serves
+    6  controlled refresh   only with --refresh: /refresh rebuilds and reports
+                            the same chunk count /health then serves. Skipped
+                            otherwise, because a rebuild touches the index every
+                            feature is querying; it is an operator's decision,
+                            never a side effect of a validation run.
 
 Relevance for P@5 / R@5: a chunk is relevant to a benchmark query when it
 comes from one of the expected sources AND contains the expected keyword.
@@ -74,6 +78,7 @@ class Record:
     observed: str = ""
     passed: bool = False
     detail: dict[str, Any] = field(default_factory=dict)
+    skipped: bool = False
 
 
 def _git_sha() -> str:
@@ -96,7 +101,7 @@ def _is_relevant(chunk: dict[str, Any], case: dict[str, Any]) -> bool:
     return chunk["source_id"] in case["sources"] and case["keyword"].lower() in chunk["text"].lower()
 
 
-def run_checks(url: str) -> list[Record]:
+def run_checks(url: str, *, refresh: bool = False) -> list[Record]:
     records: list[Record] = []
 
     # 1 - reachable ---------------------------------------------------------
@@ -214,7 +219,15 @@ def run_checks(url: str) -> list[Record]:
     records.append(rec)
 
     # 6 - controlled refresh --------------------------------------------------------
+    # Opt-in only. A rebuild deletes and recreates the shared collection while
+    # other features may be querying it, so it is never run as a side effect.
     rec = Record(6, "controlled refresh", "/refresh 200; chunk count equals /health afterwards")
+    if not refresh:
+        rec.observed = ("skipped - not requested; the shared index is rebuilt only on purpose: "
+                        "python -m rag_server.validate --refresh")
+        rec.passed, rec.skipped = True, True
+        records.append(rec)
+        return records
     status, body = _post(url, "/refresh", {})
     after = requests.get(f"{url}/health", timeout=(2, 10)).json()["index"]
     rec.observed = (f"HTTP {status}: chunks={body.get('chunks')}, vector_indexed={body.get('vector_indexed')}, "
@@ -233,7 +246,8 @@ def print_report(url: str, records: list[Record]) -> None:
     print(f"  server: {url}   commit: {_git_sha()}   k={config.TOP_K}   threshold={config.RELEVANCE_THRESHOLD}")
     print(rule)
     for r in records:
-        print(f"  {'PASS' if r.passed else 'FAIL'}  {r.n}. {r.check}")
+        tag = "SKIP" if r.skipped else ("PASS" if r.passed else "FAIL")
+        print(f"  {tag}  {r.n}. {r.check}")
         print(f"        expected:  {r.expected}")
         print(f"        observed:  {r.observed}")
         if r.n == 2 and "per_query" in r.detail:
@@ -271,9 +285,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate the shared RAG server.")
     parser.add_argument("--url", default=f"http://localhost:{config.RAG_PORT}")
     parser.add_argument("--evidence", action="store_true")
+    parser.add_argument("--refresh", action="store_true",
+                        help="also run check 6, which rebuilds the shared index via POST /refresh")
     args = parser.parse_args(argv)
 
-    records = run_checks(args.url)
+    records = run_checks(args.url, refresh=args.refresh)
     print_report(args.url, records)
     if args.evidence:
         path = write_evidence(args.url, records)
