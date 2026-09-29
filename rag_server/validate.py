@@ -254,9 +254,10 @@ def print_report(url: str, records: list[Record]) -> None:
             for q in r.detail["per_query"]:
                 print(f"          P@5={q['precision_at_5']:.2f} R@5={q['recall_at_5']:.2f}  "
                       f"top={q['top_chunk']} rel={q['top_relevance']}  {q['query']}")
-    passed = sum(1 for r in records if r.passed)
+    skipped = sum(1 for r in records if r.skipped)
+    passed = sum(1 for r in records if r.passed and not r.skipped)
     print(rule)
-    print(f"  {passed}/{len(records)} checks passed")
+    print(f"  {passed}/{len(records) - skipped} checks passed, {skipped} skipped")
     print(rule)
 
 

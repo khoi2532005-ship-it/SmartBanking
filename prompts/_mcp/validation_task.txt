@@ -6,6 +6,6 @@ Tools: <count> registered - <every tool name, comma-separated, exactly as listed
 Demo call: <tool name> with <the JSON arguments exactly as shown in the evidence>
 Result: total spent <dollar figure> across <budget count> budgets; spending source <source>
 Rejected: <one sentence naming each invalid request that was rejected - the out-of-range month, the non-integer customer_id, the undeclared argument, and the unknown tool - and how the server answered each>
-Verdict: <passed>/<total> checks passed - <PASS or FAIL>
+Verdict: <passed>/<run> checks passed, <skipped> skipped - <PASS or FAIL>
 
-Copy tool names, argument values and figures from the evidence. Do not round, reword or omit them.
+A skipped check was not run and is not a pass: <run> counts only the checks that ran, and <skipped> is stated separately (0 if none). Copy tool names, argument values and figures from the evidence. Do not round, reword or omit them.

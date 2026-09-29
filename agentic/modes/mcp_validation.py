@@ -44,7 +44,12 @@ REJECTION_WORDS = {
     7: (("unknown tool", "no_such_tool"), "the unknown tool"),
 }
 
-_CHECKS_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s*checks")
+_VERDICT_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s*checks passed,\s*(\d+)\s*skipped")
+
+
+def _has_number(line: str, value) -> bool:
+    """`value` appears on `line` as a whole number token (commas ignored)."""
+    return re.search(rf"(?<![\d.]){re.escape(str(value))}(?!\d)", line.replace(",", "")) is not None
 
 
 def _money(value) -> str:
@@ -134,8 +139,10 @@ class MCPValidationMode(Mode):
         spending_source = demo.get("spending_source") or "unknown"
         rejections = [by_n[n] for n in REJECTION_WORDS if n in by_n]
         dependency = by_n.get(8)
-        passed_count = sum(1 for r in records if r["passed"])
+        # A skipped check is not a pass: report passed / run, and skipped apart.
         skipped = [r["n"] for r in records if r["skipped"]]
+        passed_count = sum(1 for r in records if r["passed"] and not r["skipped"])
+        run_count = len(records) - len(skipped)
 
         try:
             sdk_version = metadata.version("mcp")
@@ -169,6 +176,8 @@ class MCPValidationMode(Mode):
                  "observed": dependency["observed"]} if dependency else None
             ),
             "passed_count": passed_count,
+            "run_count": run_count,
+            "skipped_count": len(skipped),
             "total": len(records),
             "skipped": skipped,
         })
@@ -188,8 +197,7 @@ class MCPValidationMode(Mode):
                 f"{demo.get('budget_count')} budgets, total spent {_money(demo.get('total_spent'))} of "
                 f"{_money(demo.get('total_limit'))}, spending source {spending_source}. "
                 f"Rejected: {rejected}. "
-                f"{passed_count}/{len(records)} checks passed"
-                + (f" ({len(skipped)} skipped)" if skipped else "")
+                f"{passed_count}/{run_count} checks passed, {len(skipped)} skipped"
             ),
             facts=facts,
             degraded=degraded,
@@ -218,7 +226,7 @@ class MCPValidationMode(Mode):
             for r in f["records"]
         ]
         skipped_note = (
-            f" (check {', '.join(map(str, f['skipped']))} skipped and counted as passed - see its observed line)"
+            f" (check {', '.join(map(str, f['skipped']))} skipped - not run, not counted as passed; see its observed line)"
             if f["skipped"] else ""
         )
 
@@ -231,7 +239,7 @@ class MCPValidationMode(Mode):
             f"Demo call: {f['demo_call']['tool']} with {json.dumps(f['demo_call']['arguments'])}",
             f"Demo result: total spent {_money(demo['total_spent'])} of {_money(demo['total_limit'])} "
             f"across {demo['budget_count']} budgets; spending source {demo['spending_source']}",
-            f"Checks passed: {f['passed_count']}/{f['total']}{skipped_note}",
+            f"Checks passed: {f['passed_count']}/{f['run_count']}, {f['skipped_count']} skipped{skipped_note}",
         ])
 
         # The Adapt stage, concretely: the previous verdict's complaint becomes
@@ -247,67 +255,76 @@ class MCPValidationMode(Mode):
         return system_prompt, f"{task_prompt}{correction}\n\nEvidence:\n{evidence_block}"
 
     def validate(self, output: str, evidence: Evidence) -> Verdict:
+        """Every figure is checked on the line that is supposed to carry it, so a
+        number that merely appears somewhere in the text does not count."""
         f = evidence.facts
         reasons: list[str] = []
 
         if not output.strip():
             return Verdict(False, ["the entry was empty"])
 
-        text = output.lower()
-        digits_only = text.replace(",", "")
-
-        for label in REQUIRED_LINES:
-            if not _line(output, label):
+        lines = {label: _line(output, label) for label in REQUIRED_LINES}
+        for label, line in lines.items():
+            if not line:
                 reasons.append(f"it did not include the '{label.capitalize()}:' line")
 
-        # Every registered tool, by its exact name, and the count as a number.
-        missing = [name for name in f["tools"] if name.lower() not in text]
-        if missing:
-            reasons.append("it did not name these registered tools: " + ", ".join(missing))
-        if str(f["tool_count"]) not in text:
-            reasons.append(f"it did not state the tool count ({f['tool_count']}) as a number")
+        # Tools line: the count as a number and every registered tool by name.
+        tools_line = lines["tools"].lower()
+        if tools_line:
+            if not _has_number(tools_line, f["tool_count"]):
+                reasons.append(f"the Tools line did not state the tool count ({f['tool_count']}) as a number")
+            missing = [name for name in f["tools"] if name.lower() not in tools_line]
+            if missing:
+                reasons.append("the Tools line did not name these registered tools: " + ", ".join(missing))
 
-        # The demo call: right tool, and every argument with its value.
+        # Demo call line: the right tool and every argument with its value.
         call = f["demo_call"]
-        demo_line = _line(output, "demo call").lower()
+        demo_line = lines["demo call"].lower()
         if demo_line:
             if call["tool"].lower() not in demo_line:
                 reasons.append(f"the Demo call line did not name the tool {call['tool']}")
             for key, value in call["arguments"].items():
-                if key.lower() not in demo_line or str(value).lower() not in demo_line:
+                if key.lower() not in demo_line or not _has_number(demo_line, value):
                     reasons.append(f"the Demo call line did not include the argument {key}={json.dumps(value)}")
 
-        # The totals from the structured result, as numbers.
-        spent = f["demo_result"].get("total_spent")
-        if spent is not None:
-            whole, rounded = str(int(float(spent))), str(int(round(float(spent))))
-            if whole not in digits_only and rounded not in digits_only:
-                reasons.append(f"it did not state the total spent ({_money(spent)}) as a number")
-        count = f["demo_result"].get("budget_count")
-        if count is not None and str(count) not in text:
-            reasons.append(f"it did not state the budget count ({count}) as a number")
+        # Result line: the totals from the structured result, and the spending source.
+        result_line = lines["result"].lower()
+        demo = f["demo_result"]
+        if result_line:
+            spent = demo.get("total_spent")
+            if spent is not None:
+                whole, rounded = int(float(spent)), int(round(float(spent)))
+                if not (_has_number(result_line, whole) or _has_number(result_line, rounded)):
+                    reasons.append(f"the Result line did not state the total spent ({_money(spent)}) as a number")
+            count = demo.get("budget_count")
+            if count is not None and not _has_number(result_line, count):
+                reasons.append(f"the Result line did not state the budget count ({count}) as a number")
+            if str(demo.get("spending_source", "")).lower() not in result_line:
+                reasons.append(f"the Result line did not state the spending source ({demo.get('spending_source')})")
 
-        # Every rejection accounted for.
-        for r in f["rejections"]:
-            words, description = REJECTION_WORDS[r["n"]]
-            if not any(w in text for w in words):
-                reasons.append(f"it did not mention that {description} was rejected")
+        # Rejected line: every rejection accounted for.
+        rejected_line = lines["rejected"].lower()
+        if rejected_line:
+            for r in f["rejections"]:
+                words, description = REJECTION_WORDS[r["n"]]
+                if not any(w in rejected_line for w in words):
+                    reasons.append(f"the Rejected line did not mention that {description} was rejected")
 
-        # The pass count and the verdict word must match the record exactly.
-        match = _CHECKS_RE.search(text)
-        expected = f"{f['passed_count']}/{f['total']}"
-        if not match:
-            reasons.append(f"it did not state the pass count as '{expected} checks passed'")
-        elif f"{match.group(1)}/{match.group(2)}" != expected:
-            reasons.append(
-                f"it reported {match.group(1)}/{match.group(2)} checks passed but the record shows {expected}"
-            )
-        all_passed = f["passed_count"] == f["total"]
-        words = re.findall(r"\b(pass|fail)\b", _line(output, "verdict").lower())
-        final = words[-1] if words else ""
-        if all_passed and final != "pass":
-            reasons.append("the Verdict line must end with PASS because every check passed")
-        if not all_passed and final != "fail":
-            reasons.append("the Verdict line must end with FAIL because a check failed")
+        # Verdict line: passed / run, skipped apart, and the closing word.
+        verdict_line = lines["verdict"].lower()
+        expected = f"{f['passed_count']}/{f['run_count']} checks passed, {f['skipped_count']} skipped"
+        if verdict_line:
+            match = _VERDICT_RE.search(verdict_line)
+            if not match or match.groups() != (str(f["passed_count"]), str(f["run_count"]), str(f["skipped_count"])):
+                reasons.append(
+                    f"the Verdict line must read '{expected}' - a skipped check is not a pass"
+                )
+            all_passed = f["passed_count"] == f["run_count"]
+            words = re.findall(r"\b(pass|fail)\b", verdict_line)
+            final = words[-1] if words else ""
+            if all_passed and final != "pass":
+                reasons.append("the Verdict line must end with PASS because every check that ran passed")
+            if not all_passed and final != "fail":
+                reasons.append("the Verdict line must end with FAIL because a check failed")
 
         return Verdict(ok=not reasons, reasons=reasons)

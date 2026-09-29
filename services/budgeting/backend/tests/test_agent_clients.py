@@ -375,6 +375,21 @@ def test_rag_fragment_renders_grounded_answer_with_badge_and_citation_chips():
     assert "retrieved 5" in page and "relevant 3" in page and "mode hybrid" in page
 
 
+def test_rag_status_fragment_escapes_server_supplied_values():
+    """Counts and mode come from the RAG server's JSON; render them as text, never markup."""
+    original = rag_client.status
+    rag_client.status = lambda: {"enabled": True, "url": "http://x:8200", "reachable": True,
+                                 "index": {"chunks": "<b>65</b>", "sources": 9, "retrieval_mode": "<i>hybrid</i>"},
+                                 "model": "<script>m</script>"}
+    try:
+        with _env(RAG_ENABLED="true"):
+            page = _client().get("/ui/rag/status").get_data(as_text=True)
+    finally:
+        rag_client.status = original
+    assert "<b>" not in page and "<i>" not in page and "<script>" not in page
+    assert "&lt;b&gt;65&lt;/b&gt;" in page and "&lt;i&gt;hybrid&lt;/i&gt;" in page
+
+
 def test_frontend_tab_wires_every_release_1_fragment():
     """The panels use only fragment endpoints that exist on this backend."""
     html = FRONTEND_TAB.read_text(encoding="utf-8")

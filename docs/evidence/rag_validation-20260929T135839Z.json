@@ -1,6 +1,6 @@
 {
   "mode": "rag_validation",
-  "timestamp": "20260929T123219Z",
+  "timestamp": "20260929T135839Z",
   "plan": {
     "goal": "Verify the shared RAG server retrieves the right evidence, answers only from it with citations and a confidence, refuses off-topic questions, and that the model's evaluation entry reports exactly what was observed",
     "checks": [
@@ -16,7 +16,7 @@
   },
   "evidence": {
     "ok": true,
-    "summary": "67 chunks from 9 documents, retrieval mode hybrid. Mean P@5 0.27, mean R@5 0.94, 6 of 6 benchmark questions found a relevant chunk in the top 5. Grounded answer to \"What does the NEAR_LIMIT budget status mean?\": confidence Medium, citations budgeting-feature#003. 2 off-topic questions returned insufficient context with no citations and no model call. Refresh skipped: the shared index was not rebuilt by this run. 6/6 checks passed (1 skipped)",
+    "summary": "67 chunks from 9 documents, retrieval mode hybrid. Mean P@5 0.27, mean R@5 0.94, 6 of 6 benchmark questions found a relevant chunk in the top 5. Grounded answer to \"What does the NEAR_LIMIT budget status mean?\": confidence Medium, citations budgeting-feature#003. 2 off-topic questions returned insufficient context with no citations and no model call. Refresh skipped: the shared index was not rebuilt by this run. 5/5 checks passed, 1 skipped",
     "degraded": false,
     "note": "",
     "facts": {
@@ -117,10 +117,10 @@
           "n": 3,
           "check": "grounded answer with citations and confidence",
           "expected": "200; non-empty answer; >= 1 citation; confidence in High/Medium/Low; insufficient_context false",
-          "observed": "confidence=Medium, citations=['budgeting-feature#003'], insufficient=False, answer='The NEAR_LIMIT budget status means that between 80 and 100 percent of the limit is used [budgeting-feature#003'",
+          "observed": "confidence=Medium, citations=['budgeting-feature#003'], insufficient=False, answer='The NEAR_LIMIT budget status means that between 80 and 100 percent of the budget limit is used [budgeting-feat'",
           "passed": true,
           "detail": {
-            "answer": "The NEAR_LIMIT budget status means that between 80 and 100 percent of the limit is used [budgeting-feature#003]. Spending an amount that is exactly equal to the limit is also considered NEAR_LIMIT rather than over [budgeting-feature#003].",
+            "answer": "The NEAR_LIMIT budget status means that between 80 and 100 percent of the budget limit is used [budgeting-feature#003]. Spending an amount that is exactly equal to the limit is also considered NEAR_LIMIT rather than over [budgeting-feature#003].",
             "citations": [
               {
                 "authority_tier": 1,
@@ -279,7 +279,7 @@
       },
       "grounded_answer": {
         "query": "What does the NEAR_LIMIT budget status mean?",
-        "answer": "The NEAR_LIMIT budget status means that between 80 and 100 percent of the limit is used [budgeting-feature#003]. Spending an amount that is exactly equal to the limit is also considered NEAR_LIMIT rather than over [budgeting-feature#003].",
+        "answer": "The NEAR_LIMIT budget status means that between 80 and 100 percent of the budget limit is used [budgeting-feature#003]. Spending an amount that is exactly equal to the limit is also considered NEAR_LIMIT rather than over [budgeting-feature#003].",
         "confidence_category": "Medium",
         "citations": [
           "budgeting-feature#003"
@@ -318,7 +318,9 @@
         "chunks": null,
         "mode": null
       },
-      "passed_count": 6,
+      "passed_count": 5,
+      "run_count": 5,
+      "skipped_count": 1,
       "total": 6,
       "skipped": [
         6
@@ -329,7 +331,7 @@
     {
       "n": 1,
       "adapt_note": "",
-      "output": "Index: 67 chunks from 9 documents, retrieval mode hybrid\nRetrieval: mean P@5 0.27, mean R@5 0.94, 6 of 6 benchmark questions found a relevant chunk in the top 5\nGrounded answer: confidence Medium, citations budgeting-feature#003\nOff-topic: 2 questions returned insufficient context with no citations and no model call\nVerdict: 6/6 checks passed - PASS",
+      "output": "Index: 67 chunks from 9 documents, retrieval mode hybrid\nRetrieval: mean P@5 0.27, mean R@5 0.94, 6 of 6 benchmark questions found a relevant chunk in the top 5\nGrounded answer: confidence Medium, citations budgeting-feature#003\nOff-topic: 2 questions returned insufficient context with no citations and no model call\nVerdict: 5/5 checks passed, 1 skipped - PASS",
       "passed": true,
       "reasons": [],
       "error": ""

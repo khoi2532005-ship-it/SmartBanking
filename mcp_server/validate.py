@@ -214,9 +214,10 @@ def print_report(url: str, records: list[Record]) -> None:
         print(f"        tool:      {r.tool}  {json.dumps(r.arguments) if r.arguments else ''}")
         print(f"        expected:  {r.expected}")
         print(f"        observed:  {r.observed}")
-    passed = sum(1 for r in records if r.passed)
+    skipped = sum(1 for r in records if r.skipped)
+    passed = sum(1 for r in records if r.passed and not r.skipped)
     print(rule)
-    print(f"  {passed}/{len(records)} checks passed")
+    print(f"  {passed}/{len(records) - skipped} checks passed, {skipped} skipped")
     print(rule)
 
 

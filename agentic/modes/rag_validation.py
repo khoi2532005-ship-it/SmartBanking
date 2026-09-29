@@ -35,8 +35,13 @@ START_HINT = "Start it with: python -m rag_server.server"
 REQUIRED_LINES = ("index", "retrieval", "grounded answer", "off-topic", "verdict")
 
 _CHUNK_ID_RE = re.compile(r"\b([a-z0-9-]+#\d{3})\b")
-_CHECKS_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s*checks")
+_VERDICT_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s*checks passed,\s*(\d+)\s*skipped")
 _HITS_RE = re.compile(r"(\d+)\s+of\s+(\d+)")
+
+
+def _has_number(line: str, value) -> bool:
+    """`value` appears on `line` as a whole number token (commas ignored)."""
+    return re.search(rf"(?<![\d.]){re.escape(str(value))}(?!\d)", line.replace(",", "")) is not None
 
 
 def _tag(record: dict) -> str:
@@ -124,7 +129,9 @@ class RAGValidationMode(Mode):
         citations = [c.get("chunk_id") for c in (grounded.get("citations") or []) if c.get("chunk_id")]
         confidence = grounded.get("confidence_category") or "Unknown"
         mode = index.get("retrieval_mode") or "unknown"
-        passed_count = sum(1 for r in records if r["passed"])
+        # A skipped check is not a pass: report passed / run, and skipped apart.
+        passed_count = sum(1 for r in records if r["passed"] and not r.get("skipped"))
+        run_count = len(records) - len(skipped)
 
         # A lexical fallback means the vector index could not be opened. The
         # checks still ran, but the metrics describe the fallback path, not the
@@ -152,6 +159,8 @@ class RAGValidationMode(Mode):
             "off_topic": off_topic,
             "refresh": {"skipped": refresh_skipped, "chunks": refresh.get("chunks"), "mode": refresh.get("mode")},
             "passed_count": passed_count,
+            "run_count": run_count,
+            "skipped_count": len(skipped),
             "total": len(records),
             "skipped": skipped,
         })
@@ -173,8 +182,7 @@ class RAGValidationMode(Mode):
                 f"citations {', '.join(citations) or 'none'}. "
                 f"{len(off_topic)} off-topic questions returned insufficient context with no citations "
                 f"and no model call. {refresh_note} "
-                f"{passed_count}/{len(records)} checks passed"
-                + (f" ({len(skipped)} skipped)" if skipped else "")
+                f"{passed_count}/{run_count} checks passed, {len(skipped)} skipped"
             ),
             facts=facts,
             degraded=degraded,
@@ -226,8 +234,8 @@ class RAGValidationMode(Mode):
              else f"Refresh: {f['refresh'].get('chunks')} chunks rebuilt, mode {f['refresh'].get('mode')}"),
             "Checks:",
             *check_lines,
-            f"Checks passed: {f['passed_count']}/{f['total']}"
-            + (f" (check {', '.join(map(str, f['skipped']))} skipped and counted as passed - see its observed line)"
+            f"Checks passed: {f['passed_count']}/{f['run_count']}, {f['skipped_count']} skipped"
+            + (f" (check {', '.join(map(str, f['skipped']))} skipped - not run, not counted as passed; see its observed line)"
                if f.get("skipped") else ""),
         ])
 
@@ -242,6 +250,8 @@ class RAGValidationMode(Mode):
         return system_prompt, f"{task_prompt}{correction}\n\nEvidence:\n{evidence_block}"
 
     def validate(self, output: str, evidence: Evidence) -> Verdict:
+        """Every figure is checked on the line that is supposed to carry it, so a
+        number that merely appears somewhere in the text does not count."""
         f = evidence.facts
         idx, met, ans = f["index"], f["metrics"], f["grounded_answer"]
         reasons: list[str] = []
@@ -249,71 +259,74 @@ class RAGValidationMode(Mode):
         if not output.strip():
             return Verdict(False, ["the entry was empty"])
 
-        text = output.lower()
-
-        for label in REQUIRED_LINES:
-            if not _line(output, label):
+        lines = {label: _line(output, label) for label in REQUIRED_LINES}
+        for label, line in lines.items():
+            if not line:
                 reasons.append(f"it did not include the '{label.capitalize()}:' line")
 
-        # Index size and retrieval mode, as given.
-        if str(idx["chunks"]) not in text or str(idx["sources"]) not in text:
-            reasons.append(
-                f"it did not state the index size ({idx['chunks']} chunks from {idx['sources']} documents)"
-            )
-        if str(idx["retrieval_mode"]).lower() not in text:
-            reasons.append(f"it did not state the retrieval mode ({idx['retrieval_mode']})")
+        # Index line: size and retrieval mode, as given.
+        index_line = lines["index"].lower()
+        if index_line:
+            if not (_has_number(index_line, idx["chunks"]) and _has_number(index_line, idx["sources"])):
+                reasons.append(
+                    f"the Index line did not state the index size ({idx['chunks']} chunks from {idx['sources']} documents)"
+                )
+            if str(idx["retrieval_mode"]).lower() not in index_line:
+                reasons.append(f"the Index line did not state the retrieval mode ({idx['retrieval_mode']})")
 
-        # Metrics to two decimals, and the hit count.
-        for name, value in (("P@5", met["mean_precision_at_5"]), ("R@5", met["mean_recall_at_5"])):
-            if value not in text:
-                reasons.append(f"it did not quote mean {name} as {value}")
-        hits_match = _HITS_RE.search(_line(output, "retrieval").lower())
-        expected_hits = (str(met["hits"]), str(met["benchmark_total"]))
-        if not hits_match:
-            reasons.append(
-                f"the Retrieval line did not say '{expected_hits[0]} of {expected_hits[1]} benchmark questions'"
-            )
-        elif hits_match.groups() != expected_hits:
-            reasons.append(
-                f"it reported {hits_match.group(1)} of {hits_match.group(2)} benchmark questions but the "
-                f"record shows {expected_hits[0]} of {expected_hits[1]}"
-            )
+        # Retrieval line: both metrics to two decimals, and the hit count.
+        retrieval_line = lines["retrieval"].lower()
+        if retrieval_line:
+            for name, value in (("P@5", met["mean_precision_at_5"]), ("R@5", met["mean_recall_at_5"])):
+                if value not in retrieval_line:
+                    reasons.append(f"the Retrieval line did not quote mean {name} as {value}")
+            hits_match = _HITS_RE.search(retrieval_line)
+            expected_hits = (str(met["hits"]), str(met["benchmark_total"]))
+            if not hits_match or hits_match.groups() != expected_hits:
+                reasons.append(
+                    f"the Retrieval line must say '{expected_hits[0]} of {expected_hits[1]} benchmark questions'"
+                )
 
-        # Confidence category and citations: exactly the record's, nothing invented.
-        if str(ans["confidence_category"]).lower() not in text:
-            reasons.append(f"it did not state the confidence category ({ans['confidence_category']})")
-        missing = [c for c in ans["citations"] if c.lower() not in text]
-        if missing:
-            reasons.append("it did not list these cited chunk ids: " + ", ".join(missing))
+        # Grounded answer line: the record's confidence and every cited chunk id.
+        answer_line = lines["grounded answer"].lower()
+        if answer_line:
+            if str(ans["confidence_category"]).lower() not in answer_line:
+                reasons.append(
+                    f"the Grounded answer line did not state the confidence category ({ans['confidence_category']})"
+                )
+            missing = [c for c in ans["citations"] if c.lower() not in answer_line]
+            if missing:
+                reasons.append("the Grounded answer line did not list these cited chunk ids: " + ", ".join(missing))
+
+        # Anywhere: a chunk id the evidence never mentioned is an invention.
         known = {c.lower() for c in ans["citations"]} | {
             str(q.get("top_chunk")).lower() for q in met["per_query"]
         }
-        invented = sorted({c for c in _CHUNK_ID_RE.findall(text) if c not in known})
+        invented = sorted({c for c in _CHUNK_ID_RE.findall(output.lower()) if c not in known})
         if invented:
             reasons.append("it cited chunk ids that are not in the evidence: " + ", ".join(invented))
 
-        # Off-topic handling.
-        off_line = _line(output, "off-topic").lower()
-        if off_line and str(len(f["off_topic"])) not in off_line:
-            reasons.append(f"the Off-topic line did not state that {len(f['off_topic'])} questions were refused")
-        if "insufficient" not in text:
-            reasons.append("it did not say the off-topic questions returned insufficient context")
+        # Off-topic line: how many were refused, and that they were refused.
+        off_line = lines["off-topic"].lower()
+        if off_line:
+            if not _has_number(off_line, len(f["off_topic"])):
+                reasons.append(f"the Off-topic line did not state that {len(f['off_topic'])} questions were refused")
+            if "insufficient" not in off_line:
+                reasons.append("the Off-topic line did not say the questions returned insufficient context")
 
-        # Pass count and verdict word must match the record exactly.
-        match = _CHECKS_RE.search(text)
-        expected = f"{f['passed_count']}/{f['total']}"
-        if not match:
-            reasons.append(f"it did not state the pass count as '{expected} checks passed'")
-        elif f"{match.group(1)}/{match.group(2)}" != expected:
-            reasons.append(
-                f"it reported {match.group(1)}/{match.group(2)} checks passed but the record shows {expected}"
-            )
-        all_passed = f["passed_count"] == f["total"]
-        words = re.findall(r"\b(pass|fail)\b", _line(output, "verdict").lower())
-        final = words[-1] if words else ""
-        if all_passed and final != "pass":
-            reasons.append("the Verdict line must end with PASS because every check passed")
-        if not all_passed and final != "fail":
-            reasons.append("the Verdict line must end with FAIL because a check failed")
+        # Verdict line: passed / run, skipped apart, and the closing word.
+        verdict_line = lines["verdict"].lower()
+        expected = f"{f['passed_count']}/{f['run_count']} checks passed, {f['skipped_count']} skipped"
+        if verdict_line:
+            match = _VERDICT_RE.search(verdict_line)
+            if not match or match.groups() != (str(f["passed_count"]), str(f["run_count"]), str(f["skipped_count"])):
+                reasons.append(f"the Verdict line must read '{expected}' - a skipped check is not a pass")
+            all_passed = f["passed_count"] == f["run_count"]
+            words = re.findall(r"\b(pass|fail)\b", verdict_line)
+            final = words[-1] if words else ""
+            if all_passed and final != "pass":
+                reasons.append("the Verdict line must end with PASS because every check that ran passed")
+            if not all_passed and final != "fail":
+                reasons.append("the Verdict line must end with FAIL because a check failed")
 
         return Verdict(ok=not reasons, reasons=reasons)

@@ -109,7 +109,7 @@ GOOD_MCP = (
     'Rejected: month 13 was rejected as out of range, customer_id "abc" was rejected as a non-integer, '
     "the undeclared sql argument was rejected as an extra input, and the unknown tool no_such_tool "
     "was rejected with an explicit error.\n"
-    "Verdict: 8/8 checks passed - PASS"
+    "Verdict: 8/8 checks passed, 0 skipped - PASS"
 )
 
 GOOD_RAG = (
@@ -117,7 +117,7 @@ GOOD_RAG = (
     "Retrieval: mean P@5 0.30, mean R@5 0.83, 2 of 2 benchmark questions found a relevant chunk in the top 5\n"
     "Grounded answer: confidence High, citations budgeting-feature#003\n"
     "Off-topic: 2 questions returned insufficient context with no citations and no model call\n"
-    "Verdict: 6/6 checks passed - PASS"
+    "Verdict: 5/5 checks passed, 1 skipped - PASS"
 )
 
 
@@ -184,10 +184,35 @@ def test_mcp_entry_that_drops_a_tool_is_rejected_then_corrected(answers, mcp_che
 
 
 def test_mcp_wrong_pass_count_is_rejected(answers, mcp_checks):
-    answers.extend([GOOD_MCP.replace("8/8 checks passed - PASS", "7/8 checks passed - FAIL"), GOOD_MCP])
+    answers.extend([GOOD_MCP.replace("8/8 checks passed, 0 skipped - PASS", "7/8 checks passed, 0 skipped - FAIL"), GOOD_MCP])
     result = loop.run(MCPValidationMode())
     assert result.ok and result.adapted
-    assert "8/8" in result.attempts[0].verdict.feedback
+    assert "8/8 checks passed, 0 skipped" in result.attempts[0].verdict.feedback
+
+
+def test_mcp_skipped_check_is_reported_apart_not_as_a_pass(answers, mcp_checks):
+    """Check 8 is skipped when every feature service is up: 7/7 ran and passed, 1 skipped."""
+    mcp_checks[7].skipped = True
+    mcp_checks[7].observed = "skipped - every feature service is running"
+    counted_as_pass = GOOD_MCP.replace("8/8 checks passed, 0 skipped", "8/8 checks passed, 0 skipped")
+    honest = GOOD_MCP.replace("8/8 checks passed, 0 skipped", "7/7 checks passed, 1 skipped")
+    answers.extend([counted_as_pass, honest])
+    result = loop.run(MCPValidationMode())
+    assert result.ok and result.adapted
+    assert result.evidence.facts["passed_count"] == 7 and result.evidence.facts["skipped_count"] == 1
+    assert "7/7 checks passed, 1 skipped" in result.attempts[0].verdict.feedback
+    assert "7/7 checks passed, 1 skipped" in result.evidence.summary
+
+
+def test_mcp_figures_must_sit_on_their_own_line(answers, mcp_checks):
+    """The total spent appearing on the Rejected line does not satisfy the Result line."""
+    misplaced = GOOD_MCP.replace("Result: total spent $2,169.97 across 7 budgets; spending source transactions-api",
+                                 "Result: totals as observed across 7 budgets; spending source transactions-api") \
+                        .replace("Rejected: ", "Rejected: ($2,169.97) ")
+    answers.extend([misplaced, GOOD_MCP])
+    result = loop.run(MCPValidationMode())
+    assert result.ok and result.adapted
+    assert "the Result line did not state the total spent" in result.attempts[0].verdict.feedback
 
 
 def test_mcp_wrong_demo_arguments_are_rejected(answers, mcp_checks):
@@ -244,6 +269,26 @@ def test_rag_misquoted_metric_is_rejected(answers, rag_checks):
     result = loop.run(RAGValidationMode())
     assert result.ok and result.adapted
     assert "P@5 as 0.30" in result.attempts[0].verdict.feedback
+
+
+def test_rag_skipped_refresh_is_not_counted_as_a_pass(answers, rag_checks):
+    """Khoi's review on PR #44: '6/6 passed' hid a skipped check. 5 ran, 1 skipped."""
+    answers.extend([GOOD_RAG.replace("5/5 checks passed, 1 skipped", "6/6 checks passed, 0 skipped"), GOOD_RAG])
+    result = loop.run(RAGValidationMode())
+    assert result.ok and result.adapted
+    assert result.evidence.facts["passed_count"] == 5 and result.evidence.facts["skipped_count"] == 1
+    assert "5/5 checks passed, 1 skipped" in result.attempts[0].verdict.feedback
+    assert "5/5 checks passed, 1 skipped" in result.evidence.summary
+
+
+def test_rag_figures_must_sit_on_their_own_line(answers, rag_checks):
+    """The chunk count on the Off-topic line does not satisfy the Index line."""
+    misplaced = GOOD_RAG.replace("Index: 65 chunks from 9 documents", "Index: the corpus from 9 documents") \
+                        .replace("Off-topic: 2 questions", "Off-topic: 65 chunks indexed; 2 questions")
+    answers.extend([misplaced, GOOD_RAG])
+    result = loop.run(RAGValidationMode())
+    assert result.ok and result.adapted
+    assert "the Index line did not state the index size" in result.attempts[0].verdict.feedback
 
 
 def test_rag_wrong_confidence_is_rejected(answers, rag_checks):

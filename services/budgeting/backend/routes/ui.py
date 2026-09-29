@@ -450,7 +450,7 @@ def rag_status_fragment():
     index = info.get("index") or {}
     detail = ""
     if info.get("reachable"):
-        detail = (f'{index.get("chunks", 0)} chunks from {index.get("sources", 0)} documents, '
+        detail = (f'{escape(str(index.get("chunks", 0)))} chunks from {escape(str(index.get("sources", 0)))} documents, '
                   f'retrieval {escape(str(index.get("retrieval_mode", "unknown")))}, '
                   f'model {escape(str(info.get("model", "unknown")))}.')
     return _status_line("RAG server", info, detail)
