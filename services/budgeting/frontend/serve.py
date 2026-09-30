@@ -19,7 +19,7 @@ from flask import Flask, redirect, send_from_directory
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent
-REPO_ROOT = FRONTEND_DIR.parents[1]
+REPO_ROOT = FRONTEND_DIR.parents[2]      # services/budgeting/frontend -> repo root
 SHARED_DIR = REPO_ROOT / "shared" / "frontend"
 TABS_DIR = FRONTEND_DIR / "tabs"
 

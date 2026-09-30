@@ -31,6 +31,7 @@ CONNECT_TIMEOUT = 2
 START_HINT = "start it on the host with: python -m rag_server.server"
 
 CONFIDENCE_CATEGORIES = ("High", "Medium", "Low", "Unknown")
+MAX_QUERY_CHARS = 1000                  # enforced by both the JSON route and the HTMX fragment
 _REQUIRED_KEYS = ("answer", "citations", "confidence_category", "retrieval_summary", "insufficient_context")
 
 

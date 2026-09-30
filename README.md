@@ -51,6 +51,8 @@ pip install -r requirements-agentic.txt
 python agentic_loop.py                 # menu - use this to demo
 python agentic_loop.py --mode fraud    # one feature
 python agentic_loop.py --all --quiet   # CI; exit code only
+python agentic_loop.py --mode mcp_validation   # Release 1: shared MCP server test record
+python agentic_loop.py --mode rag_validation   # Release 1: shared RAG server evaluation
 ```
 
 Runs append evidence to `docs/evidence/` for the technical report.
@@ -96,4 +98,7 @@ python -m rag_server.validate --evidence # also saves docs/evidence/rag-validati
 
 Containers reach it at `http://host.docker.internal:8200`. To add a source,
 drop a `.md` file with a front-matter block in `rag_server/corpus/` and
-`POST /refresh`.
+rebuild the index on the host with `python -m rag_server.validate --refresh`
+(a restart also rebuilds it when the corpus changed). A rebuild touches the
+index every feature is querying, so feature UIs, backend proxies and loop runs
+never trigger one.

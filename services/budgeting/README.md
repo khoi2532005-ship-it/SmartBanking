@@ -159,10 +159,13 @@ MCP SDK. Checks: `python -m tests.test_agent_clients` from `backend/`.
 ### HTMX fragments
 
 `/ui/*` returns HTML fragments for the frontend to swap in. The `/api/*` JSON
-endpoints are the contract other features consume. Release 1 adds
-`GET /ui/mcp/tools`, `POST /ui/mcp/tool` and `POST /ui/rag/query`, which
-render the MCP tool result, and the grounded answer with citations and a
-confidence badge or the insufficient-context state.
+endpoints are the contract other features consume. Release 1 adds two panels
+to the tab, backed by `GET /ui/mcp/status`, `GET /ui/mcp/tools`,
+`POST /ui/mcp/tool`, `GET /ui/rag/status` and `POST /ui/rag/query`: the
+structured MCP tool result, and the grounded answer with citations and a
+confidence badge or the distinct insufficient-context state. Each panel's
+status line says whether its server is reachable, inactive (flag off) or
+down, and the controls stay in place in every state.
 
 ## Budget status
 

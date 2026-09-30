@@ -165,7 +165,11 @@ credentials to configure, not two.
 
 ## Scope
 
-This is the Release 0 loop. Release 1 adds MCP and RAG (§4.2), and Release 2
-adds Planner/Worker/Reviewer agents. Those extend the same engine — a new mode,
-or a second model role inside `build_prompt`/`validate` — rather than replacing
-it.
+Release 0 shipped the loop with one mode per feature. Release 1 adds two modes
+on the same menu, `mcp_validation` and `rag_validation`, which validate the
+shared MCP and RAG servers: ACT reuses the terminal check suites
+(`mcp_server/validate.py`, `rag_server/validate.py`), the model writes the
+test-record entry, and OBSERVE rejects an entry that names a tool, chunk id,
+metric or pass count the record does not support. Release 2 adds
+Planner/Worker/Reviewer agents. Those extend the same engine - a new mode, or a
+second model role inside `build_prompt`/`validate` - rather than replacing it.

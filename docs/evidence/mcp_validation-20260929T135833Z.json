@@ -1,0 +1,343 @@
+{
+  "mode": "mcp_validation",
+  "timestamp": "20260929T135833Z",
+  "plan": {
+    "goal": "Verify the shared MCP server honours its tool contracts, and that the model's test-record entry reports exactly what was observed",
+    "checks": [
+      "the MCP server answers initialize at http://localhost:8100/mcp",
+      "tools/list publishes every registered tool with an input schema",
+      "a valid budgeting_summary call returns the declared structured result",
+      "an out-of-range month, a non-integer customer_id and an undeclared argument are rejected before any backend call",
+      "an unknown tool is rejected, never served; a tool whose service is down returns an explicit error, never invented data",
+      "the entry names every tool, quotes the demo call and its totals, accounts for every rejection and matches the pass count"
+    ],
+    "stop_condition": "An entry passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "5 tools on http://localhost:8100/mcp: budgeting_summary, accounts_count, loans_list, fraud_alerts_count, transactions_spending. Valid call budgeting_summary {\"customer_id\": 1, \"month\": 9, \"year\": 2026} -> 7 budgets, total spent $1,486.78 of $2,160.00, spending source transactions-api. Rejected: {\"customer_id\": 1, \"month\": 13, \"year\": 2026} -> month must be between 1 and 12, got 13; {\"customer_id\": \"abc\", \"month\": 9, \"year\": 2026} -> 1 validation error for budgeting_summaryArguments customer_id Input should be; {\"customer_id\": 1, \"month\": 9, \"year\": 2026, \"sql\": \"SELECT * FROM budgets\"} -> 1 validation error for budgeting_summaryArguments sql Extra inputs are not per; no_such_tool -> Unknown tool: no_such_tool. 8/8 checks passed, 0 skipped",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "server_url": "http://localhost:8100/mcp",
+      "records": [
+        {
+          "n": 1,
+          "check": "server reachable",
+          "tool": "-",
+          "arguments": {},
+          "expected": "initialize succeeds",
+          "observed": "initialize ok",
+          "passed": true,
+          "skipped": false,
+          "detail": {}
+        },
+        {
+          "n": 2,
+          "check": "tools/list publishes every tool",
+          "tool": "-",
+          "arguments": {},
+          "expected": "5 tools, each with an inputSchema",
+          "observed": "5 tools: budgeting_summary, accounts_count, loans_list, fraud_alerts_count, transactions_spending",
+          "passed": true,
+          "skipped": false,
+          "detail": {
+            "budgeting_summary": {
+              "required": [
+                "customer_id",
+                "month",
+                "year"
+              ],
+              "properties": [
+                "customer_id",
+                "month",
+                "year"
+              ]
+            },
+            "accounts_count": {
+              "required": [],
+              "properties": [
+                "customer_id"
+              ]
+            },
+            "loans_list": {
+              "required": [
+                "customer_id"
+              ],
+              "properties": [
+                "customer_id",
+                "status"
+              ]
+            },
+            "fraud_alerts_count": {
+              "required": [],
+              "properties": [
+                "customer_id",
+                "status"
+              ]
+            },
+            "transactions_spending": {
+              "required": [
+                "customer_id",
+                "month",
+                "year"
+              ],
+              "properties": [
+                "customer_id",
+                "month",
+                "year"
+              ]
+            }
+          }
+        },
+        {
+          "n": 3,
+          "check": "valid invocation",
+          "tool": "budgeting_summary",
+          "arguments": {
+            "customer_id": 1,
+            "month": 9,
+            "year": 2026
+          },
+          "expected": "isError false; structured result with totals and budgets",
+          "observed": "isError false; budget_count=7, total_spent=1486.78, spending_source=transactions-api",
+          "passed": true,
+          "skipped": false,
+          "detail": {
+            "structured_keys": [
+              "budget_count",
+              "budgets",
+              "customer_id",
+              "month",
+              "over_budget_categories",
+              "source",
+              "spending_source",
+              "totals",
+              "unbudgeted_spending",
+              "year"
+            ],
+            "budget_count": 7,
+            "total_spent": 1486.78,
+            "total_limit": 2160.0,
+            "spending_source": "transactions-api",
+            "over_budget_categories": [
+              "Dining Out",
+              "Shopping"
+            ]
+          }
+        },
+        {
+          "n": 4,
+          "check": "domain-invalid input rejected",
+          "tool": "budgeting_summary",
+          "arguments": {
+            "customer_id": 1,
+            "month": 13,
+            "year": 2026
+          },
+          "expected": "isError true mentioning month; backend not called",
+          "observed": "isError True: Error executing tool budgeting_summary: month must be between 1 and 12, got 13",
+          "passed": true,
+          "skipped": false,
+          "detail": {}
+        },
+        {
+          "n": 5,
+          "check": "type-invalid input rejected",
+          "tool": "budgeting_summary",
+          "arguments": {
+            "customer_id": "abc",
+            "month": 9,
+            "year": 2026
+          },
+          "expected": "isError true from schema validation",
+          "observed": "isError True: Error executing tool budgeting_summary: 1 validation error for budgeting_summaryArguments customer_id   Input should be ",
+          "passed": true,
+          "skipped": false,
+          "detail": {}
+        },
+        {
+          "n": 6,
+          "check": "undeclared argument rejected",
+          "tool": "budgeting_summary",
+          "arguments": {
+            "customer_id": 1,
+            "month": 9,
+            "year": 2026,
+            "sql": "SELECT * FROM budgets"
+          },
+          "expected": "isError true: extra inputs not permitted",
+          "observed": "isError True: Error executing tool budgeting_summary: 1 validation error for budgeting_summaryArguments sql   Extra inputs are not per",
+          "passed": true,
+          "skipped": false,
+          "detail": {}
+        },
+        {
+          "n": 7,
+          "check": "unknown tool rejected",
+          "tool": "no_such_tool",
+          "arguments": {},
+          "expected": "JSON-RPC error, or isError true naming the unknown tool; never a result",
+          "observed": "isError True: Unknown tool: no_such_tool",
+          "passed": true,
+          "skipped": false,
+          "detail": {}
+        },
+        {
+          "n": 8,
+          "check": "dependency unavailable -> explicit error",
+          "tool": "loans_list",
+          "arguments": {
+            "customer_id": 1
+          },
+          "expected": "isError true saying the service is unavailable; no fabricated data",
+          "observed": "isError True: Error executing tool loans_list: loans service unavailable: connection refused at http://localhost:5002/api/loans - is t",
+          "passed": true,
+          "skipped": false,
+          "detail": {}
+        }
+      ],
+      "mcp_sdk_version": "1.30.0",
+      "tools": [
+        "budgeting_summary",
+        "accounts_count",
+        "loans_list",
+        "fraud_alerts_count",
+        "transactions_spending"
+      ],
+      "tool_specs": {
+        "budgeting_summary": {
+          "required": [
+            "customer_id",
+            "month",
+            "year"
+          ],
+          "properties": [
+            "customer_id",
+            "month",
+            "year"
+          ]
+        },
+        "accounts_count": {
+          "required": [],
+          "properties": [
+            "customer_id"
+          ]
+        },
+        "loans_list": {
+          "required": [
+            "customer_id"
+          ],
+          "properties": [
+            "customer_id",
+            "status"
+          ]
+        },
+        "fraud_alerts_count": {
+          "required": [],
+          "properties": [
+            "customer_id",
+            "status"
+          ]
+        },
+        "transactions_spending": {
+          "required": [
+            "customer_id",
+            "month",
+            "year"
+          ],
+          "properties": [
+            "customer_id",
+            "month",
+            "year"
+          ]
+        }
+      },
+      "tool_count": 5,
+      "demo_call": {
+        "tool": "budgeting_summary",
+        "arguments": {
+          "customer_id": 1,
+          "month": 9,
+          "year": 2026
+        }
+      },
+      "demo_result": {
+        "budget_count": 7,
+        "total_spent": 1486.78,
+        "total_limit": 2160.0,
+        "spending_source": "transactions-api"
+      },
+      "rejections": [
+        {
+          "n": 4,
+          "check": "domain-invalid input rejected",
+          "tool": "budgeting_summary",
+          "arguments": {
+            "customer_id": 1,
+            "month": 13,
+            "year": 2026
+          },
+          "observed": "isError True: Error executing tool budgeting_summary: month must be between 1 and 12, got 13"
+        },
+        {
+          "n": 5,
+          "check": "type-invalid input rejected",
+          "tool": "budgeting_summary",
+          "arguments": {
+            "customer_id": "abc",
+            "month": 9,
+            "year": 2026
+          },
+          "observed": "isError True: Error executing tool budgeting_summary: 1 validation error for budgeting_summaryArguments customer_id   Input should be "
+        },
+        {
+          "n": 6,
+          "check": "undeclared argument rejected",
+          "tool": "budgeting_summary",
+          "arguments": {
+            "customer_id": 1,
+            "month": 9,
+            "year": 2026,
+            "sql": "SELECT * FROM budgets"
+          },
+          "observed": "isError True: Error executing tool budgeting_summary: 1 validation error for budgeting_summaryArguments sql   Extra inputs are not per"
+        },
+        {
+          "n": 7,
+          "check": "unknown tool rejected",
+          "tool": "no_such_tool",
+          "arguments": {},
+          "observed": "isError True: Unknown tool: no_such_tool"
+        }
+      ],
+      "dependency_check": {
+        "skipped": false,
+        "tool": "loans_list",
+        "observed": "isError True: Error executing tool loans_list: loans service unavailable: connection refused at http://localhost:5002/api/loans - is t"
+      },
+      "passed_count": 8,
+      "run_count": 8,
+      "skipped_count": 0,
+      "total": 8,
+      "skipped": []
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Tools: 5 registered - budgeting_summary, accounts_count, loans_list, fraud_alerts_count, transactions_spending\nDemo call: budgeting_summary with {\"customer_id\": 1, \"month\": 9, \"year\": 2026}\nResult: total spent $1,486.78 across 7 budgets; spending source transactions-api\nRejected: The out-of-range month was rejected with isError True stating month must be between 1 and 12, got 13; the non-integer customer_id was rejected with isError True due to a validation error for customer_id; the undeclared argument was rejected with isError True due to extra inputs; and the unknown tool was rejected with isError True stating unknown tool no_such_tool.\nVerdict: 8/8 checks passed, 0 skipped - PASS",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The answer claims the rejections returned `isError True`, which is not stated in the evidence.\nCorrection: Remove the references to `isError True` since they are not present in the evidence.\nRetest: Verify that the answer only describes the rejection error messages and validation errors explicitly provided in the evidence.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}
