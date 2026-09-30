@@ -18,6 +18,11 @@
 # - Loans, Fraud and Budgeting each ship three images - database, backend/API
 #   and frontend - built from their own Dockerfiles, all with the repo root
 #   as build context.
+#
+# Release 1 notes
+# - The shared MCP server (8100), RAG server (8200), AI-Mode and the agentic
+#   loop run on the host and are NOT compose services. Backends reach them
+#   through the connection config in the x-llm-env anchor below.
 
 x-llm-env: &llm-env
   LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
@@ -29,6 +34,20 @@ x-llm-env: &llm-env
   OLLAMA_API_KEY: ollama
   OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
   OLLAMA_REVIEW_MODEL: ${OLLAMA_REVIEW_MODEL:-llama3.1:8b}
+  # Release 1: connection to the shared MCP and RAG servers, which are host
+  # processes (see the note above). Every backend gets the same values from
+  # here. The flags default on; CI runs with MCP_ENABLED=false
+  # RAG_ENABLED=false so the integration is retained but inactive there.
+  MCP_ENABLED: ${MCP_ENABLED:-true}
+  MCP_SERVER_URL: http://host.docker.internal:8100/mcp
+  RAG_ENABLED: ${RAG_ENABLED:-true}
+  RAG_SERVER_URL: http://host.docker.internal:8200
+
+# Docker Desktop resolves host.docker.internal by itself; plain Linux Docker
+# (CI runners, the demo VM) needs this mapping on every backend that calls the
+# host servers, or they report both servers unreachable.
+x-host-gateway: &host-gateway
+  - "host.docker.internal:host-gateway"
 
 services:
 
@@ -62,6 +81,7 @@ services:
     environment:
       <<: *llm-env
       FLASK_OPEN_CHROME: "0"
+    extra_hosts: *host-gateway
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/api/health')"]
       interval: 10s
@@ -105,12 +125,7 @@ services:
       <<: *llm-env
       DATABASE_SERVICE_URL: http://loans-database-service:5012
       ACCOUNTS_SERVICE_URL: http://accounts:5001
-      MCP_ENABLED: ${MCP_ENABLED:-true}
-      MCP_SERVER_URL: http://host.docker.internal:8100/mcp
-      RAG_ENABLED: ${RAG_ENABLED:-true}
-      RAG_SERVER_URL: http://host.docker.internal:8200
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    extra_hosts: *host-gateway
     depends_on:
       loans-database-service:
         condition: service_healthy
@@ -187,17 +202,7 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       TRANSACTIONS_SOURCE: ${TRANSACTIONS_SOURCE:-seed}
-      # Release 1: connection to the shared MCP and RAG servers, which run on
-      # the host. The flags default on; CI sets both to false so the
-      # integration is retained but inactive there.
-      MCP_ENABLED: ${MCP_ENABLED:-true}
-      MCP_SERVER_URL: http://host.docker.internal:8100/mcp
-      RAG_ENABLED: ${RAG_ENABLED:-true}
-      RAG_SERVER_URL: http://host.docker.internal:8200
-    # Docker Desktop resolves host.docker.internal by itself; plain Linux
-    # Docker (CI runners, the demo VM) needs this mapping.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    extra_hosts: *host-gateway
     depends_on:
       fraud-database-service:
         condition: service_healthy
@@ -256,20 +261,7 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       USE_MOCK_TRANSACTIONS: auto
-      # Release 1: connection to the shared MCP and RAG servers, which run on
-      # the host (see extra_hosts below). The flags default on; CI runs with
-      # MCP_ENABLED=false RAG_ENABLED=false so the integration is retained
-      # but inactive there.
-      MCP_ENABLED: ${MCP_ENABLED:-true}
-      MCP_SERVER_URL: http://host.docker.internal:8100/mcp
-      RAG_ENABLED: ${RAG_ENABLED:-true}
-      RAG_SERVER_URL: http://host.docker.internal:8200
-    # The shared MCP and RAG servers are host processes (Release 1). Docker
-    # Desktop resolves host.docker.internal by itself; plain Linux Docker (CI
-    # runners, the Azure demo VM) needs this mapping or the backend reports
-    # both servers unreachable.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    extra_hosts: *host-gateway
     depends_on:
       budgeting-database-service:
         condition: service_healthy
