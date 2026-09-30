@@ -40,6 +40,38 @@ Fallback local LLM: `docker compose --profile local-llm up -d` and set
 
 Stop everything: `docker compose down -v`
 
+## Release 1 demo run sheet
+
+Four terminals, in this order. The commands are the same on Windows
+(PowerShell) and macOS; only the venv activation differs.
+
+```powershell
+# once, from the repo root
+py -3.12 -m venv .venv                       # macOS: python3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1                 # macOS: source .venv/bin/activate
+pip install -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-rag.txt
+copy .env.example .env                       # then set GEMINI_API_KEY (macOS: cp)
+
+# terminal 1 - shared MCP server, host process on 8100
+python -m mcp_server.server
+
+# terminal 2 - shared RAG server, host process on 8200 (builds the index the first time)
+python -m rag_server.server
+
+# terminal 3 - the five features + home page; containers reach 1 and 2 via host.docker.internal
+docker compose up --build -d
+
+# terminal 4 - the agentic loop, once 1 to 3 are up
+python agentic_loop.py                       # menu: any feature, or the two validation modes
+python agentic_loop.py --mode mcp_validation
+python agentic_loop.py --mode rag_validation
+```
+
+Windows may ask once to let Python accept connections on 8100 and 8200; allow
+it, or the containers cannot reach the two servers. Feature tabs then show
+the MCP and RAG panels live; with the servers off, the panels say so and the
+rest of each feature keeps working.
+
 ## Run the agentic loop
 
 The shared `Plan -> Act -> Observe -> Adapt` workflow for the whole application
