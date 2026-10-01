@@ -17,9 +17,36 @@ def _current_period():
     return today.month, today.year
 
 
+DEMO_FALLBACK_PERIOD = (9, 2026)
+
+
 def _period_from_args(args):
     month, year = _current_period()
-    return int(args.get("month") or month), int(args.get("year") or year)
+    requested_month = args.get("month")
+    requested_year = args.get("year")
+
+    if requested_month not in (None, "") or requested_year not in (None, ""):
+        return int(requested_month or month), int(requested_year or year)
+
+    try:
+        customer_id = int(args.get("customer_id") or 1)
+    except (TypeError, ValueError):
+        customer_id = 1
+
+    if not database_api.search_budgets({
+        "customer_id": customer_id,
+        "month": month,
+        "year": year,
+    }):
+        demo_budgets = database_api.search_budgets({
+            "customer_id": customer_id,
+            "month": DEMO_FALLBACK_PERIOD[0],
+            "year": DEMO_FALLBACK_PERIOD[1],
+        })
+        if demo_budgets:
+            return DEMO_FALLBACK_PERIOD
+
+    return month, year
 
 
 def _passthrough(response):
@@ -46,7 +73,7 @@ def list_budgets():
 @budgets_bp.get("/api/budgets/summary")
 def budget_summary():
     """Budgets for a period, enriched with actual spend from the Transactions API."""
-    customer_id = request.args.get("customer_id", 1)
+    customer_id = int(request.args.get("customer_id", 1))
     month, year = _period_from_args(request.args)
 
     budgets = database_api.search_budgets(
@@ -98,7 +125,7 @@ def list_categories():
 @budgets_bp.get("/api/transactions/spending")
 def spending_breakdown():
     """Exposes what this feature reads from the Transactions API, for the demo."""
-    customer_id = request.args.get("customer_id", 1)
+    customer_id = int(request.args.get("customer_id", 1))
     month, year = _period_from_args(request.args)
 
     totals, source, transactions = transactions_client.spend_by_category(
