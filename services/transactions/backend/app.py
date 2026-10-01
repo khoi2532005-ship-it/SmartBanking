@@ -8,7 +8,10 @@ BASE_DIR = Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from routes.agents import agents_bp
 from routes.transactions import transactions_bp
+from routes.ui import ui_bp
+from services import llm_client, mcp_client, rag_client
 
 
 def create_app():
@@ -16,10 +19,18 @@ def create_app():
     CORS(app)
 
     app.register_blueprint(transactions_bp)
+    app.register_blueprint(agents_bp)
+    app.register_blueprint(ui_bp)
 
     @app.get("/api/health")
     def health():
-        return jsonify({"service": "transactions-service", "status": "running"})
+        return jsonify({
+            "service": "transactions-service",
+            "status": "running",
+            "llm": llm_client.provider(),
+            "mcp": {"enabled": mcp_client.enabled(), "url": mcp_client.server_url()},
+            "rag": {"enabled": rag_client.enabled(), "url": rag_client.server_url()},
+        })
 
     return app
 
