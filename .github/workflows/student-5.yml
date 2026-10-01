@@ -13,6 +13,13 @@ on:
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-5.yml'
+      - 'mcp_server/**'
+      - 'rag_server/**'
+      - 'prompts/_rag/**'
+      - 'prompts/_mcp/**'
+      - 'tests/**'
+      - 'requirements-mcp.txt'
+      - 'requirements-rag.txt'
   pull_request:
     branches: [main]
     paths:
@@ -21,10 +28,23 @@ on:
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-5.yml'
+      - 'mcp_server/**'
+      - 'rag_server/**'
+      - 'prompts/_rag/**'
+      - 'prompts/_mcp/**'
+      - 'tests/**'
+      - 'requirements-mcp.txt'
+      - 'requirements-rag.txt'
   workflow_dispatch:
 
 env:
   COMPOSE_FILE: docker-compose.yml
+  SERVICES: transactions
+  # Keep the feature code and UI in place, but disable both shared integrations
+  # while the containerized CI stack is running. This still proves the routes
+  # and panels render the inactive state instead of crashing.
+  MCP_ENABLED: "false"
+  RAG_ENABLED: "false"
 
 jobs:
 
@@ -42,7 +62,7 @@ jobs:
         run: docker compose version
 
       - name: Build transactions service image
-        run: docker compose -f "$COMPOSE_FILE" build transactions
+        run: docker compose -f "$COMPOSE_FILE" build $SERVICES
 
   # =====================================================================
   # 2. Runtime gate - the stack starts and every endpoint returns HTTP 200
@@ -56,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Start the transactions stack
-        run: docker compose -f "$COMPOSE_FILE" up -d transactions
+        run: docker compose -f "$COMPOSE_FILE" up -d --no-deps $SERVICES
 
       - name: Probe required endpoints
         run: |
@@ -78,6 +98,8 @@ jobs:
 
           probe "database-service" "http://localhost:5015/"
           probe "backend-api"      "http://localhost:5005/api/health"
+          probe "backend-status"   "http://localhost:5005/ui/mcp/status"
+          probe "backend-rag"      "http://localhost:5005/ui/rag/status"
           probe "frontend"         "http://localhost:3005/tabs/transactions.html"
           probe "transactions-crud" "http://localhost:5005/api/transactions"
 
@@ -89,6 +111,31 @@ jobs:
             echo "FAIL expected at least 10 seeded transactions, found $txs"
             exit 1
           fi
+
+      - name: Verify MCP and RAG are configured but disabled in CI
+        run: |
+          curl -s http://localhost:5005/api/health | python3 -c '
+          import json, sys
+          h = json.load(sys.stdin)
+          assert h["mcp"]["enabled"] is False, h["mcp"]
+          assert h["rag"]["enabled"] is False, h["rag"]
+          assert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"]
+          assert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"]
+          print("mcp:", h["mcp"])
+          print("rag:", h["rag"])
+          '
+
+          curl -s http://localhost:5005/ui/mcp/status | grep -q "Inactive" \
+            || { echo "FAIL /ui/mcp/status did not report the inactive state"; exit 1; }
+          curl -s http://localhost:5005/ui/rag/status | grep -q "Inactive" \
+            || { echo "FAIL /ui/rag/status did not report the inactive state"; exit 1; }
+
+          page=$(curl -s http://localhost:3005/tabs/transactions.html)
+          for needle in 'hx-post="/ui/mcp/tool"' 'hx-get="/ui/mcp/tools"' 'hx-post="/ui/rag/query"'; do
+            printf '%s' "$page" | grep -qF "$needle" \
+              || { echo "FAIL frontend tab lacks $needle"; exit 1; }
+          done
+          echo "panels present in the frontend; status fragments report the inactive state"
 
       - name: Container status
         if: always()
@@ -149,6 +196,7 @@ jobs:
 
           - Build: transactions service image built successfully
           - Smoke: ports 5015, 5005 and 3005 returned HTTP 200
+          - MCP/RAG: integrations retained in the feature but disabled in CI (MCP_ENABLED=false, RAG_ENABLED=false)
           - Teardown: \`docker compose down -v\` ran
 
           ## Validated endpoints
@@ -157,6 +205,7 @@ jobs:
           |---|---|
           | transactions | \`GET http://localhost:5015/\` |
           | transactions | \`GET http://localhost:5005/api/health\` |
+          | transactions | \`GET http://localhost:5005/ui/mcp/status\`, \`GET http://localhost:5005/ui/rag/status\` (inactive in CI) |
           | transactions | \`GET http://localhost:5005/api/transactions\` |
           | transactions | \`GET http://localhost:3005/tabs/transactions.html\` |
           MD
