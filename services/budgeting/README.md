@@ -89,7 +89,11 @@ Transactions API contract is not final.
 ## Database
 
 `budgeting_and_insights.db`, owned solely by `budgets-db-api`. Seeded at image
-build time by `init_db.py`.
+build time by `init_db.py`. The seeded budgets are a fixed demo period,
+**September 2026** (plus three August lines for history): the tab defaults to
+it, the CI smoke test names it, and the loop's budgeting mode falls back to it
+when the current month is empty. API calls without `month`/`year` use the
+current month and answer an empty month as empty.
 
 | Table | Columns | Seeded |
 |---|---|---|
