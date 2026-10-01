@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TABS_DIR = os.path.join(BASE_DIR, "tabs")
-SHARED_FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "shared-frontend"))
+SHARED_FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "shared", "frontend"))
 
 
 @app.get("/")

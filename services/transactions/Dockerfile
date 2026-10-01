@@ -6,7 +6,7 @@ COPY services/transactions/database/requirements.txt database-requirements.txt
 COPY services/transactions/backend/ backend/
 COPY services/transactions/database/ database/
 COPY services/transactions/frontend/ frontend/
-COPY shared/frontend/ shared-frontend/
+COPY shared/frontend/ shared/frontend/
 COPY services/transactions/run.py run.py
 COPY prompts/ prompts/
 
