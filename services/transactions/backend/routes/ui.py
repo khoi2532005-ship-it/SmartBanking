@@ -17,6 +17,18 @@ def _current_period():
     return today.month, today.year
 
 
+def _period(source):
+    """Month and year from the panel's inputs, or the current month if either is missing or out of range."""
+    month, year = _current_period()
+    try:
+        chosen_month, chosen_year = int(source.get("month")), int(source.get("year"))
+    except (TypeError, ValueError):
+        return month, year
+    if 1 <= chosen_month <= 12 and 2000 <= chosen_year <= 2100:
+        return chosen_month, chosen_year
+    return month, year
+
+
 def _customer(source):
     try:
         return int(source.get("customer_id") or 1)
@@ -102,7 +114,7 @@ def mcp_tools_fragment():
 @ui_bp.post("/mcp/tool")
 def mcp_tool_fragment():
     customer_id = _customer(request.form)
-    month, year = _current_period()
+    month, year = _period(request.form)
     try:
         result = mcp_client.transactions_spending(customer_id, month, year)
     except (mcp_client.MCPDisabled, mcp_client.MCPUnreachable, mcp_client.MCPProtocolError) as exc:

@@ -6,7 +6,15 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TABS_DIR = os.path.join(BASE_DIR, "tabs")
-SHARED_FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "shared-frontend"))
+# The shared theme and vendored htmx: copied to /app/shared-frontend in the
+# image (server.py is /app/frontend/server.py), or shared/frontend in a repo checkout.
+_SHARED_CANDIDATES = (
+    os.path.join(BASE_DIR, "..", "shared-frontend"),
+    os.path.join(BASE_DIR, "..", "..", "..", "shared", "frontend"),
+)
+SHARED_FRONTEND_DIR = os.path.abspath(
+    next((path for path in _SHARED_CANDIDATES if os.path.isdir(path)), _SHARED_CANDIDATES[0])
+)
 
 
 @app.get("/")
