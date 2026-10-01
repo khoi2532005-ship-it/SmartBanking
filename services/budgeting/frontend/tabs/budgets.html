@@ -208,18 +208,13 @@
     </section>
 
     <section class="card">
-        <h2>Budget summary <span class="muted">via the shared MCP server</span></h2>
-        <p class="muted">
-            Calls this feature's read-only <code>budgeting_summary</code> tool on the
-            team's shared MCP server, through the budgets backend, for the customer and
-            period selected above. The tool reads the same summary endpoint as the table.
-        </p>
+        <h2>Budget summary <span class="muted">via MCP</span></h2>
         <p class="status-line">
             <span id="mcp-status" class="status-text"
                   hx-get="/ui/mcp/status"
                   hx-trigger="load"
                   hx-swap="innerHTML">
-                <span class="spinner">Checking the MCP server...</span>
+                <span class="spinner">Checking...</span>
             </span>
             <button type="button" class="btn btn-secondary btn-small"
                     hx-get="/ui/mcp/status"
@@ -245,7 +240,7 @@
             </div>
             <div>
                 <span id="mcp-spinner" class="htmx-indicator spinner">
-                    Calling the MCP server...
+                    Calling...
                 </span>
             </div>
         </div>
@@ -258,19 +253,13 @@
     </section>
 
     <section class="card">
-        <h2>Ask the project documents <span class="muted">via the shared RAG server</span></h2>
-        <p class="muted">
-            Sends a question to the team's shared RAG server, through the budgets
-            backend. The answer is generated only from retrieved SmartBank documents
-            and comes back with citations and an evidence-based confidence. An
-            off-topic question gets an explicit insufficient-context reply, not a guess.
-        </p>
+        <h2>Ask the project documents <span class="muted">via RAG</span></h2>
         <p class="status-line">
             <span id="rag-status" class="status-text"
                   hx-get="/ui/rag/status"
                   hx-trigger="load"
                   hx-swap="innerHTML">
-                <span class="spinner">Checking the RAG server...</span>
+                <span class="spinner">Checking...</span>
             </span>
             <button type="button" class="btn btn-secondary btn-small"
                     hx-get="/ui/rag/status"
@@ -293,7 +282,7 @@
             </div>
             <div>
                 <span id="rag-spinner" class="htmx-indicator spinner">
-                    Retrieving evidence and asking the model...
+                    Asking...
                 </span>
             </div>
         </form>
@@ -307,7 +296,7 @@
             <button type="button" class="chip chip-btn"
                     data-question="Which tools does the shared MCP server expose?">MCP tools</button>
             <button type="button" class="chip chip-btn"
-                    data-question="What is the weather in Sydney today?">Off-topic (expect insufficient context)</button>
+                    data-question="What is the weather in Sydney today?">Off-topic</button>
         </div>
 
         <div id="rag-panel" class="panel">

@@ -316,7 +316,7 @@ def test_status_fragments_render_the_inactive_state_without_network():
         for path in ("/ui/mcp/status", "/ui/rag/status"):
             r = c.get(path)
             assert r.status_code == 200, (path, r.status_code)
-            assert b"Inactive" in r.data and b"disabled" in r.data, path
+            assert b"Inactive" in r.data and b"_ENABLED=false" in r.data, path
 
 
 def test_status_fragments_render_unreachable_with_the_start_hint():

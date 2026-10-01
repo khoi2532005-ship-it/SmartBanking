@@ -412,24 +412,19 @@ STATUS_BADGE = {"OVER_BUDGET": ("over", "Over budget"),
 def _integration_alert(exc):
     """The same readable failure for every fragment: disabled, down, or broken."""
     if isinstance(exc, (mcp_client.MCPDisabled, rag_client.RAGDisabled)):
-        return _alert(f"{exc} - this control is retained but inactive here.", "warn")
+        return _alert(str(exc), "warn")
     return _alert(str(exc))
 
 
 def _status_line(label, info, detail=""):
-    """Enabled/reachable state of a shared server, rendered as one line of a panel header.
-
-    Three states, all HTTP 200 so the swap never breaks: inactive (flag off,
-    no network call made), reachable, or unreachable with the start hint.
-    """
+    """Badge, address and counts for a shared server. Always HTTP 200."""
     url = f'<code>{escape(str(info.get("url", "")))}</code>'
     if not info.get("enabled"):
-        return (f'<span class="badge badge-near">Inactive</span> {label} integration is '
-                f'{escape(str(info.get("note", "disabled")))}: the controls below are retained '
-                f'but make no network call.')
+        flag = "MCP_ENABLED=false" if label.startswith("MCP") else "RAG_ENABLED=false"
+        return f'<span class="badge badge-near">Inactive</span> <code>{flag}</code>'
     if info.get("reachable"):
-        return f'<span class="badge badge-ok">Reachable</span> {label} at {url}. {detail}'
-    return (f'<span class="badge badge-over">Unreachable</span> {label} at {url}: '
+        return f'<span class="badge badge-ok">Reachable</span> {url}' + (f" &middot; {detail}" if detail else "")
+    return (f'<span class="badge badge-over">Unreachable</span> {url} &middot; '
             f'{escape(str(info.get("error", "no response")))}')
 
 
@@ -440,7 +435,7 @@ def mcp_status_fragment():
     detail = ""
     if tools:
         chips = " ".join(f'<span class="chip">{escape(str(t))}</span>' for t in tools)
-        detail = f"{len(tools)} tools registered: {chips}"
+        detail = f"{len(tools)} tools: {chips}"
     return _status_line("MCP server", info, detail)
 
 
@@ -450,9 +445,10 @@ def rag_status_fragment():
     index = info.get("index") or {}
     detail = ""
     if info.get("reachable"):
-        detail = (f'{escape(str(index.get("chunks", 0)))} chunks from {escape(str(index.get("sources", 0)))} documents, '
-                  f'retrieval {escape(str(index.get("retrieval_mode", "unknown")))}, '
-                  f'model {escape(str(info.get("model", "unknown")))}.')
+        detail = (f'{escape(str(index.get("chunks", 0)))} chunks &middot; '
+                  f'{escape(str(index.get("sources", 0)))} documents &middot; '
+                  f'{escape(str(index.get("retrieval_mode", "unknown")))} &middot; '
+                  f'{escape(str(info.get("model", "unknown")))}')
     return _status_line("RAG server", info, detail)
 
 
@@ -476,8 +472,6 @@ def mcp_tools_fragment():
         for t in tools
     )
     return f"""
-    <p class="muted">{len(tools)} tools registered on the shared MCP server at
-    <code>{escape(mcp_client.server_url())}</code> (via <code>tools/list</code>).</p>
     <ul class="insight-history">{items}</ul>"""
 
 
@@ -496,7 +490,6 @@ def mcp_tool_fragment():
         return _alert(f"The MCP tool returned an error: {result.text}", "warn")
 
     data = result.structured or {}
-    source = data.get("source") or {}
     totals = data.get("totals") or {}
 
     rows = ""
@@ -516,8 +509,7 @@ def mcp_tool_fragment():
     return f"""
     <article class="insight-card">
       <h3>MCP tool result: <code>budgeting_summary</code></h3>
-      <p class="muted">Structured result returned by the shared MCP server for customer
-      {customer_id}, {month:02d}/{year}. Arguments: <code>{escape(json.dumps(result.arguments))}</code></p>
+      <p class="muted">Customer {customer_id}, {month:02d}/{year} &middot; <code>{escape(json.dumps(result.arguments))}</code></p>
       <div class="summary-strip">
         <div class="stat">
           <span class="stat-label">Total spent</span>
@@ -541,11 +533,6 @@ def mcp_tool_fragment():
           <tbody>{rows}</tbody>
         </table>
       </div>
-      <p class="muted insight-meta">Tool boundary: read-only, one customer, one month.
-      Source of record: <code>{escape(str(source.get("feature", "")))}</code>
-      <code>{escape(str(source.get("endpoint", "")))}</code> at
-      <code>{escape(str(source.get("service_url", "")))}</code>, via MCP server
-      <code>{escape(mcp_client.server_url())}</code>.</p>
     </article>"""
 
 
@@ -602,9 +589,7 @@ def rag_query_fragment():
         <article class="insight-card rag-insufficient">
           <h3>Insufficient context</h3>
           <p class="alert alert-warn">{escape(str(answer.get("answer", "")))}</p>
-          <p class="muted">No chunk passed the relevance threshold for
-          <em>{escape(question)}</em>, so no answer was generated and no citations exist.
-          {_confidence_badge(answer.get("confidence_category", "Unknown"))}</p>
+          <p class="muted">{_confidence_badge(answer.get("confidence_category", "Unknown"))}</p>
           <p class="muted insight-meta">Retrieval: {meta}. Model: {escape(str(model))}.</p>
         </article>"""
 
@@ -624,7 +609,6 @@ def rag_query_fragment():
       <p>{_answer_html(answer.get("answer", ""))}</p>
       <h4 class="muted">Citations ({len(answer.get("citations") or [])})</h4>
       <ul class="insight-history">{citations}</ul>
-      <p class="muted insight-meta">Answer generated only from the cited chunks. Retrieval: {meta}.
-      Model: {escape(str(model))}. Confidence is derived from the evidence, not the model.</p>
+      <p class="muted insight-meta">Retrieval: {meta}. Model: {escape(str(model))}.</p>
     </article>"""
 
