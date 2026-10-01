@@ -54,7 +54,7 @@
       </div>
       <div>
         <label for="customer">Customer ID</label>
-        <input id="customer" type="number" min="1" placeholder="1" />
+        <input id="customer" name="customer_id" type="number" min="1" placeholder="1" />
       </div>
       <div>
         <label for="type">Type</label>
@@ -115,7 +115,15 @@
       <button type="button" class="btn-secondary" hx-get="/ui/mcp/status" hx-target="#mcp-status" hx-swap="innerHTML">Re-check</button>
     </p>
     <div class="row">
-      <button type="button" class="btn-ai" hx-post="/ui/mcp/tool" hx-target="#mcp-panel" hx-swap="innerHTML" hx-include="#customer, #account" hx-indicator="#mcp-spinner">Run transactions_spending</button>
+      <div>
+        <label for="mcp-month">Month</label>
+        <input id="mcp-month" name="month" type="number" min="1" max="12" value="9" />
+      </div>
+      <div>
+        <label for="mcp-year">Year</label>
+        <input id="mcp-year" name="year" type="number" min="2000" max="2100" value="2026" />
+      </div>
+      <button type="button" class="btn-ai" hx-post="/ui/mcp/tool" hx-target="#mcp-panel" hx-swap="innerHTML" hx-include="#customer, #mcp-month, #mcp-year" hx-indicator="#mcp-spinner">Run transactions_spending</button>
       <button type="button" class="btn-secondary" hx-get="/ui/mcp/tools" hx-target="#mcp-tools-panel" hx-swap="innerHTML" hx-indicator="#mcp-spinner">Registered tools</button>
       <span id="mcp-spinner" class="spinner" style="display:none;">Calling the MCP server...</span>
     </div>
@@ -150,7 +158,7 @@
     <div id="rag-panel" class="panel"><p class="muted">No question asked yet.</p></div>
   </div>
 
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="/js/htmx.min.js"></script>
   <script>
     const API = `http://${window.location.hostname}:5005`;
 
