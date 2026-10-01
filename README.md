@@ -67,6 +67,8 @@ python agentic_loop.py --mode mcp_validation
 python agentic_loop.py --mode rag_validation
 ```
 
+Seeded demo data is September 2026: the budgeting tab opens on it and the
+loop's budgeting mode finds it by itself when the current month is empty.
 Windows may ask once to let Python accept connections on 8100 and 8200; allow
 it, or the containers cannot reach the two servers. Feature tabs then show
 the MCP and RAG panels live; with the servers off, the panels say so and the

@@ -17,9 +17,40 @@ def _current_period():
     return today.month, today.year
 
 
-def _period_from_args(args):
-    month, year = _current_period()
-    return int(args.get("month") or month), int(args.get("year") or year)
+def _int_arg(args, name, default, low=None, high=None):
+    """One integer query argument: (value, None), or (None, a 400 response)."""
+    raw = args.get(name)
+    if raw in (None, ""):
+        value = default
+    else:
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return None, (jsonify({"error": f"{name} must be an integer"}), 400)
+    if (low is not None and value < low) or (high is not None and value > high):
+        return None, (jsonify({"error": f"{name} must be between {low} and {high}"}), 400)
+    return value, None
+
+
+def _request_scope(args):
+    """customer_id, month and year from the query string, validated.
+
+    The period defaults to the current month on purpose: a caller that omits
+    it is asking about now, and a month with no budgets is answered as empty,
+    never with another month's figures. The seeded demo period is September
+    2026; the frontend and the CI smoke test name it explicitly.
+    """
+    month_now, year_now = _current_period()
+    customer_id, error = _int_arg(args, "customer_id", 1, low=1)
+    if error:
+        return None, error
+    month, error = _int_arg(args, "month", month_now, low=1, high=12)
+    if error:
+        return None, error
+    year, error = _int_arg(args, "year", year_now, low=2000, high=2100)
+    if error:
+        return None, error
+    return (customer_id, month, year), None
 
 
 def _passthrough(response):
@@ -46,8 +77,10 @@ def list_budgets():
 @budgets_bp.get("/api/budgets/summary")
 def budget_summary():
     """Budgets for a period, enriched with actual spend from the Transactions API."""
-    customer_id = request.args.get("customer_id", 1)
-    month, year = _period_from_args(request.args)
+    scope, error = _request_scope(request.args)
+    if error:
+        return error
+    customer_id, month, year = scope
 
     budgets = database_api.search_budgets(
         {"customer_id": customer_id, "month": month, "year": year}
@@ -60,7 +93,7 @@ def budget_summary():
     summary = build_summary(budgets, spend_totals)
     summary.update(
         {
-            "customer_id": int(customer_id),
+            "customer_id": customer_id,
             "month": month,
             "year": year,
             "spending_source": source,
@@ -98,15 +131,17 @@ def list_categories():
 @budgets_bp.get("/api/transactions/spending")
 def spending_breakdown():
     """Exposes what this feature reads from the Transactions API, for the demo."""
-    customer_id = request.args.get("customer_id", 1)
-    month, year = _period_from_args(request.args)
+    scope, error = _request_scope(request.args)
+    if error:
+        return error
+    customer_id, month, year = scope
 
     totals, source, transactions = transactions_client.spend_by_category(
         customer_id, month, year
     )
     return jsonify(
         {
-            "customer_id": int(customer_id),
+            "customer_id": customer_id,
             "month": month,
             "year": year,
             "spending_source": source,

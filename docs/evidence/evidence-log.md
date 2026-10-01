@@ -20,3 +20,4 @@ Appended automatically by `python agentic_loop.py`. One row per run - paste into
 | 20260909T131756Z | transactions | ok | 1 | no | PASS |
 | 20260929T135833Z | mcp_validation | ok | 1 | no | PASS |
 | 20260929T135839Z | rag_validation | ok | 1 | no | PASS |
+| 20261001T065153Z | budgeting | ok | 1 | no | PASS |
