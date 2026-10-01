@@ -17,6 +17,12 @@ Actual spending comes from the Transactions feature over HTTP. When that
 service is down the budgets API falls back to mock transactions and says so
 in `spending_source`; this mode surfaces that as `degraded=True` so a pass
 earned on mock data is never reported as a clean pass.
+
+The seeded demo data lives in a fixed month (September 2026), so the current
+month is often empty. Unless BUDGET_LOOP_MONTH / BUDGET_LOOP_YEAR pin a
+period, the mode then uses the customer's most recent budget period and says
+so in the evidence. The API itself never does that: an empty month is
+answered as empty, and the fallback is this mode's decision.
 """
 
 from __future__ import annotations
@@ -35,6 +41,8 @@ PROMPT_FAMILY = "budgeting"
 CUSTOMER_ID = int(os.getenv("BUDGET_LOOP_CUSTOMER", "1"))
 MONTH = int(os.getenv("BUDGET_LOOP_MONTH", str(date.today().month)))
 YEAR = int(os.getenv("BUDGET_LOOP_YEAR", str(date.today().year)))
+# An explicitly pinned period is respected even when it is empty.
+PERIOD_PINNED = "BUDGET_LOOP_MONTH" in os.environ or "BUDGET_LOOP_YEAR" in os.environ
 
 STATUS_WORDS = {
     "OVER_BUDGET": "over budget",
@@ -45,6 +53,28 @@ STATUS_WORDS = {
 
 def _money(value) -> str:
     return f"${float(value):,.2f}"
+
+
+def _summary_url(customer_id: int, month: int, year: int) -> str:
+    return f"{BUDGET_SERVICE_URL}/api/budgets/summary?customer_id={customer_id}&month={month}&year={year}"
+
+
+def _latest_budget_period(customer_id: int) -> tuple[int, int] | None:
+    """(month, year) of the customer's most recent budget, or None."""
+    try:
+        rows = net.get_json(f"{BUDGET_SERVICE_URL}/api/budgets?customer_id={customer_id}")
+    except net.ServiceUnreachable:
+        return None
+    periods = set()
+    for row in rows if isinstance(rows, list) else []:
+        try:
+            periods.add((int(row["year"]), int(row["month"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    if not periods:
+        return None
+    year, month = max(periods)
+    return month, year
 
 
 class BudgetingMode(Mode):
@@ -60,7 +90,8 @@ class BudgetingMode(Mode):
             ),
             checks=[
                 "budgeting-service responds on /api/budgets/summary",
-                f"at least one budget exists for customer {CUSTOMER_ID} in {MONTH:02d}/{YEAR}",
+                f"at least one budget exists for customer {CUSTOMER_ID} in {MONTH:02d}/{YEAR}"
+                + ("" if PERIOD_PINNED else ", else in the customer's most recent budget period"),
                 "actual spending was retrieved (live Transactions API, or mock marked degraded)",
                 "the AI insight states the total spent as a dollar figure",
                 "the AI insight names every over-budget category, or says none are over",
@@ -69,12 +100,9 @@ class BudgetingMode(Mode):
         )
 
     def collect(self) -> Evidence:
-        url = (
-            f"{BUDGET_SERVICE_URL}/api/budgets/summary"
-            f"?customer_id={CUSTOMER_ID}&month={MONTH}&year={YEAR}"
-        )
+        month, year = MONTH, YEAR
         try:
-            summary = net.get_json(url)
+            summary = net.get_json(_summary_url(CUSTOMER_ID, month, year))
         except net.ServiceUnreachable as exc:
             return Evidence(
                 ok=False,
@@ -83,11 +111,25 @@ class BudgetingMode(Mode):
             )
 
         lines = summary.get("budgets") or []
+        fallback_from = None
+        if not lines and not PERIOD_PINNED:
+            # The current month has no budgets (the seed is a fixed demo month).
+            # Use the customer's most recent budget period and say so below.
+            latest = _latest_budget_period(CUSTOMER_ID)
+            if latest and latest != (month, year):
+                fallback_from = (month, year)
+                month, year = latest
+                try:
+                    summary = net.get_json(_summary_url(CUSTOMER_ID, month, year))
+                except net.ServiceUnreachable as exc:
+                    return Evidence(ok=False, summary=f"budgeting-service at {BUDGET_SERVICE_URL}: {exc}")
+                lines = summary.get("budgets") or []
+
         if not lines:
             return Evidence(
                 ok=False,
                 summary=(
-                    f"No budgets for customer {CUSTOMER_ID} in {MONTH:02d}/{YEAR}. "
+                    f"No budgets for customer {CUSTOMER_ID} in {month:02d}/{year}. "
                     "Seed the database (services/budgeting/database/init_db.py) or "
                     "set BUDGET_LOOP_MONTH / BUDGET_LOOP_YEAR to a seeded period."
                 ),
@@ -111,10 +153,16 @@ class BudgetingMode(Mode):
             else max(lines, key=lambda line: line.get("percent_used", 0))
         )
 
+        period_note = (
+            f"{fallback_from[0]:02d}/{fallback_from[1]} has no budgets, using the most recent "
+            f"budget period {month:02d}/{year}; "
+            if fallback_from else ""
+        )
+
         return Evidence(
             ok=True,
             summary=(
-                f"{len(lines)} budgets for customer {CUSTOMER_ID} in {MONTH:02d}/{YEAR}; "
+                f"{period_note}{len(lines)} budgets for customer {CUSTOMER_ID} in {month:02d}/{year}; "
                 f"spent {_money(totals.get('total_spent', 0))} of "
                 f"{_money(totals.get('total_limit', 0))}; "
                 f"{len(over)} over budget"
@@ -124,8 +172,12 @@ class BudgetingMode(Mode):
             ),
             facts={
                 "customer_id": CUSTOMER_ID,
-                "month": MONTH,
-                "year": YEAR,
+                "month": month,
+                "year": year,
+                "period_fallback": (
+                    {"requested": f"{fallback_from[0]:02d}/{fallback_from[1]}", "used": f"{month:02d}/{year}"}
+                    if fallback_from else None
+                ),
                 "totals": totals,
                 "budgets": lines,
                 "over_budget": over,
@@ -173,7 +225,7 @@ class BudgetingMode(Mode):
             f"Total spent: {_money(totals.get('total_spent', 0))} of "
             f"{_money(totals.get('total_limit', 0))} budgeted "
             f"({totals.get('percent_used', 0)}% used)",
-            f"Categories over budget: "
+            "Categories over budget: "
             + (", ".join(l["category"] for l in facts["over_budget"]) or "none"),
             f"Spending data source: {facts['spending_source']}",
             "Per category:",
