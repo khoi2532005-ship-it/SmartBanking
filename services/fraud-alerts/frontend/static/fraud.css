@@ -35,28 +35,15 @@
 
 /* ----------------------------------------------------------------- tables */
 
-.table-wrap { transition: opacity 0.15s ease; }
-.table-wrap.is-loading { opacity: 0.55; }
-
-.data-table { margin: 0; }
-.data-table .num { text-align: right; }
-.data-table .nowrap { white-space: nowrap; }
-.data-table .actions { text-align: right; white-space: nowrap; }
-.data-table .actions button + button { margin-left: 0.35rem; }
 .data-table th abbr { text-decoration: none; cursor: help; }
-.data-table tbody tr.empty-row:hover > td { background: none; }
-th.num .sort-btn { flex-direction: row-reverse; }
 
 .alerts-table { min-width: 760px; }
 .rules-table { min-width: 720px; }
 
-tr.is-clickable { cursor: pointer; }
 .data-table tbody tr.is-fresh > td { background: var(--brand-tint); }
 .data-table tbody tr.is-fresh:hover > td { background: #dde9fe; }
 tr.is-off td, tr.is-off .cell-sub { color: var(--ink-faint); }
 tr.is-off .pill { opacity: 0.6; }
-
-.table-foot { margin: 0.75rem 0 0; color: var(--ink-soft); font-size: 0.82rem; }
 
 /* -------------------------------------------------------- detection run */
 
