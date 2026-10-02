@@ -4,9 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Budgeting &amp; Spending Insights - SmartBank</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css?v=2">
     <!-- Vendored locally so the demo does not depend on network access. -->
     <script src="/js/htmx.min.js"></script>
+    <!-- Stat tiles, insight cards, status lines and RAG answers come from the
+         shared theme; these are specific to the budgets table. -->
     <style>
         .inline-edit { display: flex; gap: 0.3rem; align-items: center; }
         .inline-edit input { width: 92px; }
@@ -14,78 +16,17 @@
         td.actions .btn { margin-left: 0.25rem; }
         .category { font-weight: 600; }
         .over-by { color: var(--over); font-weight: 600; }
-        .summary-strip {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        .stat {
-            background: var(--ground);
-            border: 1px solid var(--line-soft);
-            border-radius: var(--radius-small);
-            padding: 0.7rem 0.85rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.1rem;
-        }
-        .stat-label { font-size: 0.74rem; text-transform: uppercase;
-                      letter-spacing: 0.04em; color: var(--ink-faint);
-                      font-weight: 700; }
-        .stat-value { font-size: 1.15rem; font-weight: 650; }
-        .stat-sub { font-size: 0.8rem; color: var(--ink-soft); }
-        .stat-over { background: var(--over-tint); border-color: #f3c2bd; }
-        .stat-over .stat-value { color: var(--over); font-size: 0.95rem; }
-        .stat-ok { background: var(--ok-tint); border-color: #b7e0c7; }
-        .stat-ok .stat-value { color: var(--ok); font-size: 0.95rem; }
-        .insight-card h3 { margin: 0 0 0.5rem; font-size: 0.98rem; }
-        .insight-card p { margin: 0 0 0.6rem; }
-        .insight-meta { margin-bottom: 0 !important; }
-        .insight-history { list-style: none; padding: 0; margin: 0; }
-        .insight-history li { border-top: 1px solid var(--line-soft);
-                              padding: 0.7rem 0; }
-        .insight-history li:first-child { border-top: 0; }
-        .history-head { display: flex; gap: 0.5rem; align-items: center;
-                        margin-bottom: 0.3rem; flex-wrap: wrap; }
-        .insight-history p { margin: 0; font-size: 0.9rem; }
         .source-note { margin-bottom: 0; }
         .unbudgeted { margin: 0.5rem 0 0; }
-        /* Release 1: shared MCP and RAG server panels */
-        .status-line { display: flex; gap: 0.5rem; align-items: center;
-                       flex-wrap: wrap; margin: 0.25rem 0 0.9rem;
-                       font-size: 0.87rem; color: var(--ink-soft); }
-        .status-line .status-text { flex: 1 1 240px; min-width: 0; }
-        .status-line .badge { margin-left: 0; }
-        .status-line .btn-small { margin-left: auto; }
-        .rag-form .grow { flex: 1 1 320px; }
-        .rag-form .grow input { width: 100%; }
-        .chips { margin: 0.6rem 0 0; }
-        .chip-btn { border: 1px solid transparent; cursor: pointer; font: inherit;
-                    font-size: 0.78rem; font-weight: 600; line-height: 1.4; }
-        .chip-btn:hover { background: var(--brand-tint); border-color: var(--brand);
-                          color: var(--brand-dark); }
-        .rag-answer { border-left: 4px solid var(--ok); padding-left: 0.75rem; }
-        .rag-insufficient { border-left: 4px solid var(--warn); padding-left: 0.75rem; }
-        .insight-card h4 { margin: 0.7rem 0 0.2rem; font-size: 0.78rem;
-                           text-transform: uppercase; letter-spacing: 0.04em; }
     </style>
 </head>
 <body>
 
-<header class="app-header">
-    <div class="app-shell">
-        <a class="brand" href="http://localhost:3000/">
-            <span class="brand-mark">SB</span>
-            SmartBank
-        </a>
-    </div>
-</header>
-
 <main class="app-shell">
 
     <section class="card">
-        <h2>Budgeting &amp; Spending Insights</h2>
-        <p class="tagline">
+        <h2>Customer and period</h2>
+        <p class="muted">
             Set a monthly limit per spending category and track it against your
             actual transactions.
         </p>
@@ -141,8 +82,11 @@
               hx-include="#period-form">
             <div>
                 <label for="category">Category</label>
+                <!-- hx-target="this": without it the select inherits the form's
+                     #budget-list target and its options never arrive. -->
                 <select id="category" name="category" required
                         hx-get="/ui/categories-options"
+                        hx-target="this"
                         hx-trigger="load"
                         hx-swap="innerHTML">
                     <option value="">Loading categories...</option>
@@ -208,7 +152,7 @@
     </section>
 
     <section class="card">
-        <h2>Budget summary <span class="muted">via MCP</span></h2>
+        <h2>Budget summary <span class="tag">MCP</span></h2>
         <p class="status-line">
             <span id="mcp-status" class="status-text"
                   hx-get="/ui/mcp/status"
@@ -253,7 +197,7 @@
     </section>
 
     <section class="card">
-        <h2>Ask the project documents <span class="muted">via RAG</span></h2>
+        <h2>Ask the project documents <span class="tag">RAG</span></h2>
         <p class="status-line">
             <span id="rag-status" class="status-text"
                   hx-get="/ui/rag/status"
