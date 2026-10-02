@@ -1,275 +1,360 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Fraud Alerts - AI Mode</title>
-    <link rel="stylesheet" href="/css/styles.css">
-    <style>
-        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
-        .app-shell { max-width: none; padding: 1rem; }
-        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .row > div { display: flex; flex-direction: column; }
-        .row > .grow { flex: 1 1 18rem; }
-        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9rem; }
-        .is-hidden { display: none; }
-        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
-        .panel.degraded { background: #fdf2e9; border-color: #d68910; }
-        .panel p, .panel ul { overflow-wrap: anywhere; }
-        .counts { display: flex; gap: 1.5rem; flex-wrap: wrap; }
-        .counts table { width: auto; min-width: 12rem; }
-        .examples .chip { cursor: pointer; border: 0; font: inherit; }
-        /* The theme's button:hover is dark brand; chip text is brand too, so it vanished. */
-        .examples .chip:hover { background: var(--brand); color: #fff; }
-        .source-list { margin: 0.25rem 0 0; padding-left: 1.2rem; }
-        /* Tab strip linking the Normal and AI Mode views. */
-        .tab-strip { margin: 0 0 1rem; }
-        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fraud Alerts AI Mode - SmartBank</title>
+    <link rel="stylesheet" href="/css/styles.css?v=2">
+    <link rel="stylesheet" href="/static/fraud.css">
 </head>
 <body>
 <main class="app-shell">
-    <nav class="feature-nav tab-strip" aria-label="Fraud Alerts views">
-        <a class="nav-item" href="/tabs/normal.html">Normal</a>
-        <a class="nav-item is-active" href="/tabs/ai-mode.html" aria-current="page">AI Mode</a>
-    </nav>
-    <section class="card">
-        <h2>Explain a Flagged Transaction</h2>
-        <form id="explain-form" class="row">
-            <div><label for="alert_id">Alert ID</label>
-                <input id="alert_id" type="number" min="1" placeholder="1" required></div>
-            <button type="submit">Explain</button>
-        </form>
-        <div id="explanation-result" class="panel is-hidden"></div>
+    <header class="topbar">
+        <nav class="view-tabs" aria-label="Fraud Alerts views">
+            <a class="view-tab" href="/tabs/normal.html?v=2">Normal</a>
+            <a class="view-tab is-active" href="/tabs/ai-mode.html?v=2" aria-current="page">AI Mode</a>
+        </nav>
+        <div id="service-status" class="service-status"></div>
+    </header>
 
-        <p style="font-size: 0.8rem;">
-            (<code id="provider-note">Gemini / Ollama, via LLM_PROVIDER</code>). Requires an API key configured on fraud-service.
-            The customer's alert history comes from the shared MCP server when it is running.
-        </p>
+    <div id="offline-banner" class="alert alert-error is-hidden" role="alert"></div>
+
+    <section class="card" aria-labelledby="explain-title">
+        <div class="card-head">
+            <div>
+                <h2 id="explain-title">Explain a flagged transaction</h2>
+                <p class="muted">The AI says in plain English why a rule flagged the transaction, using only the alert,
+                    its rule, the customer's account and their alert history.</p>
+            </div>
+        </div>
+        <form id="explain-form" class="inline-form">
+            <div class="field field-grow">
+                <label for="alert_id">Alert</label>
+                <select id="alert_id" required><option value="">Loading alerts&hellip;</option></select>
+            </div>
+            <button type="submit" id="explain-btn">Explain</button>
+        </form>
+        <div id="explanation-result" class="result is-hidden" aria-live="polite"></div>
+        <p class="footnote">Runs on the model set by <code>LLM_PROVIDER</code> (Gemini or Ollama) on fraud-service.
+            A successful explanation is saved to the alert and shows in the Normal tab.</p>
     </section>
 
-    <section class="card">
-        <h2>Alert Summary <span class="muted">via MCP</span></h2>
-        <p class="muted">fraud-service calls the <code>fraud_alerts_count</code> tool on the shared MCP server.
-            Read-only, and counts only: no amounts, recipients or transaction IDs.</p>
-        <form id="mcp-form" class="row">
-            <div><label for="mcp_customer">Customer ID</label>
-                <input id="mcp_customer" type="number" min="1" placeholder="all customers"></div>
-            <div><label for="mcp_status">Status</label>
+    <section class="card" aria-labelledby="mcp-title">
+        <div class="card-head">
+            <div>
+                <h2 id="mcp-title">Alert summary <span class="tag">MCP</span></h2>
+                <p class="muted">fraud-service calls the <code>fraud_alerts_count</code> tool on the shared MCP server.
+                    Read-only, and counts only: no amounts, recipients or transaction IDs.</p>
+            </div>
+        </div>
+        <form id="mcp-form" class="inline-form">
+            <div class="field">
+                <label for="mcp_customer">Customer ID</label>
+                <input id="mcp_customer" type="number" min="1" step="1" placeholder="All customers">
+            </div>
+            <div class="field">
+                <label for="mcp_status">Status</label>
                 <select id="mcp_status">
-                    <option value="">any status</option>
-                    <option value="new">new</option>
-                    <option value="reviewed">reviewed</option>
-                    <option value="dismissed">dismissed</option>
-                    <option value="confirmed">confirmed</option>
-                </select></div>
-            <button type="submit">Count alerts</button>
+                    <option value="">Any status</option>
+                    <option value="new">New</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="confirmed">Confirmed fraud</option>
+                    <option value="dismissed">Dismissed</option>
+                </select>
+            </div>
+            <button type="submit" id="mcp-count-btn">Count alerts</button>
             <button type="button" id="mcp-tools" class="btn-secondary">Registered tools</button>
         </form>
-        <div id="mcp-result" class="panel is-hidden"></div>
+        <div id="mcp-result" class="panel is-hidden" aria-live="polite"></div>
     </section>
 
-    <section class="card">
-        <h2>Ask about Fraud Alerts <span class="muted">via RAG</span></h2>
-        <p class="muted">fraud-service asks the shared RAG server, which answers only from SmartBank's approved
-            documents, with source citations and a confidence category.</p>
-        <form id="rag-form" class="row">
-            <div class="grow"><label for="rag_query">Question</label>
-                <input id="rag_query" maxlength="1000" required
-                       placeholder="How does the Fraud Alerts feature get transaction data?"></div>
-            <button type="submit">Ask</button>
-        </form>
-        <div class="chips examples">Try:
-            <button type="button" class="chip" data-question="How does the Fraud Alerts feature get transaction data?">transaction data</button>
-            <button type="button" class="chip" data-question="What alert statuses does the Fraud Alerts feature use?">alert statuses</button>
-            <button type="button" class="chip" data-question="What will the ASX 200 close at tomorrow?">off-topic question</button>
+    <section class="card" aria-labelledby="rag-title">
+        <div class="card-head">
+            <div>
+                <h2 id="rag-title">Ask about Fraud Alerts <span class="tag">RAG</span></h2>
+                <p class="muted">fraud-service asks the shared RAG server, which answers only from SmartBank's approved
+                    documents, with source citations and a confidence category.</p>
+            </div>
         </div>
-        <div id="rag-result" class="panel is-hidden"></div>
+        <form id="rag-form" class="inline-form">
+            <div class="field field-grow">
+                <label for="rag_query">Question</label>
+                <input id="rag_query" maxlength="1000" required
+                       placeholder="How does the Fraud Alerts feature get transaction data?">
+            </div>
+            <button type="submit" id="rag-ask-btn">Ask</button>
+        </form>
+        <div class="chips examples">Try
+            <button type="button" class="chip-btn" data-question="How does the Fraud Alerts feature get transaction data?">Transaction data</button>
+            <button type="button" class="chip-btn" data-question="What alert statuses does the Fraud Alerts feature use?">Alert statuses</button>
+            <button type="button" class="chip-btn" data-question="What will the ASX 200 close at tomorrow?">Off-topic question</button>
+        </div>
+        <div id="rag-result" class="panel is-hidden" aria-live="polite"></div>
     </section>
 </main>
 
+<script src="/static/fraud.js"></script>
 <script>
-const API = `http://${window.location.hostname}:5003`;
+const FRAUD_TOOL = "fraud_alerts_count";
+let alertList = [];
+let explainRequest = 0;     // only the newest explanation may render
 
-async function api(path, options = {}) {
-    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
-    const response = await fetch(`${API}${path}`, options);
-    const body = await response.json().catch(() => ({}));
-    return { ok: response.ok, status: response.status, body };
-}
-
-function show(elId, html, degraded) {
-    const el = document.getElementById(elId);
-    el.classList.remove("is-hidden");
-    el.classList.toggle("degraded", !!degraded);
-    el.innerHTML = html;
-}
-
-// Everything from the API goes through esc() before innerHTML: explanations
-// and RAG answers are model output, and alerts carry user-entered text.
-function esc(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (c) => (
-        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-function requestFailed(error) {
-    return `<p class="alert alert-error">Request failed - is fraud-service running?</p><pre>${esc(error)}</pre>`;
+function showPanel(id, html) {
+    const panel = byId(id);
+    panel.innerHTML = html;
+    panel.classList.remove("is-hidden");
 }
 
 // 503 "disabled" is a switched-off integration (as in CI), not a fault.
 function errorHtml(result) {
-    const kind = result.body.disabled ? "alert-warn" : "alert-error";
-    return `<p class="alert ${kind}">${esc(result.body.error || `HTTP ${result.status}`)}</p>`;
-}
-
-function spread(groups) {
-    const entries = Object.entries(groups || {});
-    return entries.length ? entries.map(([name, count]) => `${esc(name)} ${esc(count)}`).join(", ") : "none";
-}
-
-function countTable(title, groups) {
-    const rows = Object.entries(groups || {})
-        .map(([name, count]) => `<tr><td>${esc(name)}</td><td>${esc(count)}</td></tr>`).join("");
-    return `<table><tr><th>${esc(title)}</th><th>Alerts</th></tr>${rows || "<tr><td colspan=\"2\">none</td></tr>"}</table>`;
+    return alertBox(result.body.disabled ? "warn" : "error", esc(errorMessage(result)));
 }
 
 // ---------------------------------------------------------------- Explain
 
+function optionLabel(a) {
+    return `#${a.alert_id} · ${fmtMoney(a.transaction_amount)} · ${a.transaction_recipient || "Unknown recipient"}`
+        + ` · ${titleCase(a.severity)}`;
+}
+
+// Alerts without a saved explanation come first: they are the ones to explain.
+async function loadAlertOptions(selected) {
+    const select = byId("alert_id");
+    try {
+        const result = await api("/api/alerts");
+        if (!result.ok) {
+            showPanel("explanation-result", alertBox("error", esc(errorMessage(result))));
+            throw new Error(errorMessage(result));
+        }
+        alertList = result.body;
+        select.replaceChildren();
+        [["Not explained yet", alertList.filter((a) => !a.ai_explanation)],
+         ["Already explained", alertList.filter((a) => a.ai_explanation)]].forEach(([label, list]) => {
+            if (!list.length) return;
+            const group = document.createElement("optgroup");
+            group.label = `${label} (${list.length})`;
+            list.forEach((a) => group.append(new Option(optionLabel(a), a.alert_id)));
+            select.append(group);
+        });
+        if (!alertList.length) select.append(new Option("No alerts yet - run detection in the Normal tab", ""));
+        if (alertList.some((a) => Number(a.alert_id) === selected)) select.value = String(selected);
+        byId("explain-btn").disabled = !alertList.length;
+        return true;
+    } catch (error) {
+        select.replaceChildren(new Option("Alerts unavailable", ""));
+        byId("explain-btn").disabled = true;
+        return false;
+    }
+}
+
+function summaryHtml(a) {
+    return `<div class="alert-summary">
+        <div>
+            <div class="summary-amount">${esc(fmtMoney(a.transaction_amount))}</div>
+            <div class="summary-line">to <strong>${esc(a.transaction_recipient || "Unknown recipient")}</strong>
+                · ${esc(fmtDate(a.transaction_datetime))}</div>
+            ${a.rule_name ? `<div class="summary-line muted">${esc(a.rule_name)}: ${esc(describeRule(a))}</div>` : ""}
+        </div>
+        <div class="badge-row">${severityBadge(a.severity)}${statusBadge(a.status)}</div>
+    </div>`;
+}
+
 function historyHtml(history) {
     if (!history) return "";
     if (!history.counts) {
-        return `<p class="muted">Alert history from MCP unavailable: ${esc(history.unavailable_reason)}</p>`;
+        return `<p class="provenance">Alert history from MCP unavailable: ${esc(history.unavailable_reason)}</p>`;
     }
     const c = history.counts;
-    return `<p class="muted">Context given to the AI from MCP tool <code>${esc(history.tool)}</code>:
-        ${esc(c.alert_count)} alert(s) for this customer (including this one) - by severity: ${spread(c.by_severity)};
-        by status: ${spread(c.by_status)}.</p>`;
+    const spread = (groups) => Object.entries(groups || {}).map(([name, n]) => `${esc(name)} ${esc(n)}`).join(", ") || "none";
+    return `<p class="provenance">Context from MCP tool <code>${esc(history.tool)}</code>:
+        ${esc(plural(c.alert_count, "alert"))} for this customer, including this one
+        (severity: ${spread(c.by_severity)}; status: ${spread(c.by_status)}).</p>`;
 }
 
-document.getElementById("explain-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const alertId = document.getElementById("alert_id").value;
-    show("explanation-result", "<p>Thinking...</p>", false);
-    try {
-        const result = await api(`/api/ai/alerts/${encodeURIComponent(alertId)}/explain`);
-        if (!result.ok) return show("explanation-result", `<p>Error: ${esc(result.body.error || result.status)}</p>`, true);
-        const r = result.body;
-        show(
-            "explanation-result",
-            `<pre>${esc(r.explanation)}</pre>${r.degraded ? "<p><i>AI explanation degraded - check GEMINI_API_KEY / OLLAMA_BASE_URL.</i></p>" : ""}`
-                + historyHtml(r.alert_history),
-            r.degraded
-        );
-    } catch (error) {
-        show("explanation-result", `<p>Request failed - is fraud-service running?</p><pre>${esc(error)}</pre>`, true);
+// fraud-service returns "AI explanation unavailable: <reason>" when the model
+// could not be called; any other degraded text is a real answer that failed
+// the check for naming the rule or the amount.
+const UNAVAILABLE = /^AI explanation unavailable:\s*/i;
+
+function explanationHtml(r) {
+    const text = String(r.explanation || "");
+    if (r.degraded && UNAVAILABLE.test(text)) {
+        return alertBox("warn", `<strong>AI explanation unavailable.</strong> ${esc(text.replace(UNAVAILABLE, ""))}`)
+            + historyHtml(r.alert_history);
     }
+    return `<div class="ai-note"><span class="ai-label">AI explanation</span>${prose(text)}</div>
+        ${r.degraded ? alertBox("warn", "This answer names neither the rule nor the amount, so it was not saved. Try again for a more specific one.") : ""}
+        ${historyHtml(r.alert_history)}`;
+}
+
+async function explain(alertId) {
+    const request = ++explainRequest;
+    const listed = alertList.find((a) => Number(a.alert_id) === alertId);
+    showPanel("explanation-result", `<div id="explain-summary">${listed ? summaryHtml(listed) : ""}</div>
+        <div id="explain-body"><p class="thinking">Asking the AI why alert #${alertId} was flagged&hellip;</p></div>`);
+
+    // The detail adds the rule that fired; it arrives while the model is still working.
+    api(`/api/alerts/${alertId}`).then((detail) => {
+        if (request === explainRequest && detail.ok) byId("explain-summary").innerHTML = summaryHtml(detail.body);
+    }).catch(() => {});
+
+    try {
+        const result = await api(`/api/ai/alerts/${alertId}/explain`);
+        if (request !== explainRequest) return;
+        byId("explain-body").innerHTML = result.ok ? explanationHtml(result.body) : alertBox("error", esc(errorMessage(result)));
+        // Saved now, so it moves to "Already explained".
+        if (result.ok && !result.body.degraded) loadAlertOptions(alertId);
+    } catch (error) {
+        if (request === explainRequest) byId("explain-body").innerHTML = networkError(error);
+    }
+}
+
+byId("explain-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const alertId = Number(byId("alert_id").value);
+    if (alertId) withBusy(byId("explain-btn"), "Explaining…", () => explain(alertId));
 });
 
-// ---------------------------------------------------------------- MCP
+// -------------------------------------------------------------------- MCP
+
+function countList(title, groups, order, badge) {
+    const entries = Object.entries(groups || {});
+    const total = entries.reduce((sum, [, count]) => sum + Number(count), 0);
+    const rank = (name) => (order.includes(name) ? order.indexOf(name) : order.length);
+    const rows = entries.sort(([a], [b]) => rank(a) - rank(b)).map(([name, count]) => {
+        const share = total ? Math.round((Number(count) / total) * 100) : 0;
+        return `<li>${badge(name)}
+            <span class="meter meter-${esc(name)}" title="${esc(count)} of ${total} (${share}%)"><span style="width: ${share}%"></span></span>
+            <span class="count-num">${esc(count)}</span></li>`;
+    }).join("");
+    return `<div><h3 class="section-title">${title}</h3><ul class="count-list">${rows || '<li class="muted">None</li>'}</ul></div>`;
+}
 
 function toolResultHtml(body) {
     const r = body.result || {};
     const who = r.customer_id != null ? `customer ${esc(r.customer_id)}` : "all customers";
-    const which = r.status_filter ? `, status ${esc(r.status_filter)}` : "";
+    const which = r.status_filter ? `, status ${esc(STATUS_LABELS[r.status_filter] || r.status_filter)}` : "";
     const source = r.source || {};
-    return `<p><strong>${esc(r.alert_count)}</strong> alert(s) for ${who}${which}</p>
-        <div class="counts table-scroll">${countTable("Severity", r.by_severity)}${countTable("Status", r.by_status)}</div>
-        <p class="muted">Structured result from MCP tool <code>${esc(body.tool)}</code>
-            at <code>${esc(body.server)}</code>, arguments <code>${esc(JSON.stringify(body.arguments || {}))}</code>.
+    return `<p class="figure-line"><span class="figure">${esc(r.alert_count)}</span>
+            ${Number(r.alert_count) === 1 ? "alert" : "alerts"} for ${who}${which}</p>
+        <div class="count-groups">
+            ${countList("By severity", r.by_severity, SEVERITIES, severityBadge)}
+            ${countList("By status", r.by_status, STATUSES, statusBadge)}
+        </div>
+        <p class="provenance">Structured result from MCP tool <code>${esc(body.tool)}</code> at <code>${esc(body.server)}</code>,
+            arguments <code>${esc(JSON.stringify(body.arguments || {}))}</code>.
             Source of record: ${esc(source.feature)} <code>${esc(source.endpoint)}</code>.</p>`;
 }
 
-document.getElementById("mcp-form").addEventListener("submit", async (event) => {
+byId("mcp-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const payload = {};
-    const customer = document.getElementById("mcp_customer").value.trim();
-    const status = document.getElementById("mcp_status").value;
+    const customer = byId("mcp_customer").value.trim();
+    const status = byId("mcp_status").value;
     if (customer) payload.customer_id = customer;
     if (status) payload.status = status;
-    show("mcp-result", "<p>Asking the MCP server...</p>", false);
-    try {
-        const result = await api("/api/mcp/tool", { method: "POST", body: JSON.stringify(payload) });
-        show("mcp-result", result.ok ? toolResultHtml(result.body) : errorHtml(result), false);
-    } catch (error) {
-        show("mcp-result", requestFailed(error), false);
-    }
+    withBusy(byId("mcp-count-btn"), "Counting…", async () => {
+        try {
+            const result = await api("/api/mcp/tool", { method: "POST", body: JSON.stringify(payload) });
+            showPanel("mcp-result", result.ok ? toolResultHtml(result.body) : errorHtml(result));
+        } catch (error) {
+            showPanel("mcp-result", networkError(error));
+        }
+    });
 });
 
-document.getElementById("mcp-tools").addEventListener("click", async () => {
-    show("mcp-result", "<p>Listing tools...</p>", false);
+byId("mcp-tools").addEventListener("click", (event) => withBusy(event.currentTarget, "Listing…", async () => {
     try {
         const result = await api("/api/mcp/tools");
-        if (!result.ok) return show("mcp-result", errorHtml(result), false);
-        const items = (result.body.tools || []).map((t) => `
-            <li><code>${esc(t.name)}</code> - ${esc(t.description)}
-                <span class="muted">(arguments: ${esc((t.arguments || []).join(", ") || "none")})</span></li>`).join("");
-        show("mcp-result", `<p>${esc(result.body.tool_count)} tools registered on <code>${esc(result.body.server)}</code>:</p>
-            <ul class="source-list">${items}</ul>`, false);
+        if (!result.ok) return showPanel("mcp-result", errorHtml(result));
+        const tools = (result.body.tools || []).map((t) => `
+            <li${t.name === FRAUD_TOOL ? ' class="is-ours"' : ""}><code>${esc(t.name)}</code> ${esc(t.description)}
+                <span class="cell-sub">Arguments: ${esc((t.arguments || []).join(", ") || "none")}</span></li>`).join("");
+        showPanel("mcp-result", `<p class="figure-line"><span class="figure">${esc(result.body.tool_count)}</span>
+            tools registered on <code>${esc(result.body.server)}</code></p><ul class="tool-list">${tools}</ul>`);
     } catch (error) {
-        show("mcp-result", requestFailed(error), false);
+        showPanel("mcp-result", networkError(error));
     }
-});
+}));
 
-// ---------------------------------------------------------------- RAG
+// -------------------------------------------------------------------- RAG
 
-const CONFIDENCE_BADGES = { High: "badge-ok", Medium: "badge-near", Low: "badge-over" };
+const CONFIDENCE_PILLS = { High: "pill-ok", Medium: "pill-warn", Low: "pill-over" };
 
 function confidenceBadge(category) {
-    const cls = CONFIDENCE_BADGES[category] || "";
-    return `<span class="badge ${cls}">Confidence: ${esc(category)}</span>`;
+    return `<span class="pill ${CONFIDENCE_PILLS[category] || "pill-neutral"}">Confidence: ${esc(category)}</span>`;
 }
 
-// Escape first, then turn [source-id#001] citation markers into chips. The
-// pattern only matches characters esc() leaves alone, so no markup gets back in.
+// prose() escapes first; the citation pattern only matches characters esc()
+// leaves alone, so turning [source-id#001] markers into chips adds no markup
+// from the answer itself.
 function answerHtml(text) {
-    return esc(text).replace(/\[([a-z0-9-]+#\d{3})\]/g, '<span class="chip">$1</span>');
+    return prose(text).replace(/\[([a-z0-9-]+#\d{3})\]/g, '<span class="chip cite">$1</span>');
 }
 
 function retrievalLine(r) {
     const s = r.retrieval_summary || {};
     const model = (r.generation || {}).model || "not called";
-    return `<p class="muted">Retrieval: ${esc(s.relevant_count)} of ${esc(s.retrieved_count)} retrieved chunks relevant,
+    return `<p class="provenance">Retrieval: ${esc(s.relevant_count)} of ${esc(s.retrieved_count)} retrieved chunks relevant,
         top chunk <code>${esc(s.top_chunk)}</code>, ${esc(s.retrieval_mode)} search. Model: ${esc(model)}.</p>`;
 }
 
 function ragAnswerHtml(r) {
     if (r.insufficient_context) {
         // The server's message already begins "Insufficient context: ...".
-        return `<p class="alert alert-warn">${esc(r.answer)}</p>
-            <p>${confidenceBadge(r.confidence_category)}
-               <span class="muted">No approved document was relevant enough, so nothing was generated or cited.</span></p>
-            ${retrievalLine(r)}`;
+        return `<div class="rag-answer is-insufficient">${confidenceBadge(r.confidence_category)}
+                <p>${esc(r.answer)}</p>
+                <p class="hint">No approved document was relevant enough, so nothing was generated or cited.</p>
+            </div>${retrievalLine(r)}`;
     }
     const sources = (r.citations || []).map((c) => `
-        <li><span class="chip">${esc(c.chunk_id)}</span> ${esc(c.title)}${c.heading ? ` - ${esc(c.heading)}` : ""}</li>`).join("");
-    return `<p>${confidenceBadge(r.confidence_category)}</p>
-        <p>${answerHtml(r.answer)}</p>
-        <p><strong>Sources</strong></p><ul class="source-list">${sources}</ul>
+        <li><span class="chip cite">${esc(c.chunk_id)}</span> ${esc(c.title)}${c.heading ? ` - ${esc(c.heading)}` : ""}</li>`).join("");
+    return `<div class="rag-answer">${confidenceBadge(r.confidence_category)}${answerHtml(r.answer)}</div>
+        ${sources ? `<h3 class="section-title">Sources</h3><ol class="source-list">${sources}</ol>` : ""}
         ${retrievalLine(r)}`;
 }
 
-async function askRag(question) {
-    show("rag-result", "<p>Retrieving and generating...</p>", false);
-    try {
-        const result = await api("/api/rag/query", { method: "POST", body: JSON.stringify({ query: question }) });
-        if (result.ok) return show("rag-result", ragAnswerHtml(result.body), false);
-        const summary = result.body.retrieval_summary;
-        const retrieved = summary ? `<p class="muted">${esc(summary.retrieved_count)} chunks were retrieved before the failure.</p>` : "";
-        show("rag-result", errorHtml(result) + retrieved, false);
-    } catch (error) {
-        show("rag-result", requestFailed(error), false);
-    }
+function askRag(question) {
+    return withBusy(byId("rag-ask-btn"), "Asking…", async () => {
+        showPanel("rag-result", '<p class="thinking">Searching the approved documents&hellip;</p>');
+        try {
+            const result = await api("/api/rag/query", { method: "POST", body: JSON.stringify({ query: question }) });
+            if (result.ok) return showPanel("rag-result", ragAnswerHtml(result.body));
+            const summary = result.body.retrieval_summary;
+            const retrieved = summary
+                ? `<p class="provenance">Retrieved ${esc(plural(summary.retrieved_count, "chunk"))} before the failure.</p>` : "";
+            showPanel("rag-result", errorHtml(result) + retrieved);
+        } catch (error) {
+            showPanel("rag-result", networkError(error));
+        }
+    });
 }
 
-document.getElementById("rag-form").addEventListener("submit", (event) => {
+byId("rag-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    askRag(document.getElementById("rag_query").value.trim());
+    askRag(byId("rag_query").value.trim());
 });
 
 document.querySelectorAll(".examples [data-question]").forEach((button) => {
     button.addEventListener("click", () => {
-        document.getElementById("rag_query").value = button.dataset.question;
+        if (byId("rag-ask-btn").classList.contains("is-busy")) return;   // the shown answer must match the question
+        byId("rag_query").value = button.dataset.question;
         askRag(button.dataset.question);
     });
+});
+
+// ------------------------------------------------------------------- start
+
+// "Explain in AI Mode" on an alert in the Normal tab links here with ?alert=<id>.
+const requested = Number(new URLSearchParams(window.location.search).get("alert")) || null;
+
+checkService({ integrations: true });
+loadAlertOptions(requested).then((ok) => {
+    if (!ok || !requested || byId("alert_id").value !== String(requested)) return;
+    // Explain it straight away, and drop the parameter so a reload does not
+    // ask the model again.
+    history.replaceState(null, "", window.location.pathname);
+    byId("explain-form").requestSubmit();
 });
 </script>
 </body>

@@ -2,74 +2,76 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Transactions</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f7fb; color: #1f2937; }
-    h1, h2, h3 { margin-bottom: 0.5rem; }
-    .section { background: white; border: 1px solid #dfe6ee; border-radius: 12px; padding: 16px; margin: 20px 0; }
-    .row { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
-    .row > * { display:flex; flex-direction:column; }
-    button { padding: 8px 12px; border: 1px solid #cbd5e1; background: #eff6ff; border-radius: 8px; cursor: pointer; }
-    .btn-secondary { background: #f3f4f6; }
-    .btn-ai { background: #ecfdf5; }
-    input, select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; }
-    pre { background:#f4f4f4; padding:10px; white-space: pre-wrap; border-radius: 8px; }
-    .muted { color: #6b7280; }
-    .panel { margin-top: 12px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
-    .chip { display:inline-block; background:#eef2ff; color:#3730a3; padding:4px 8px; border-radius:999px; font-size:12px; margin:2px; }
-    .status-line { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-    .status-text { font-size: 0.95rem; }
-    .spinner { color:#4b5563; font-size:0.9rem; }
-    .is-hidden { display:none; }
-    .rag-form .grow { flex:1; min-width:240px; }
-    .rag-form input { width:100%; }
-    .insight-card { border-left: 4px solid #22c55e; padding-left: 12px; }
-    .rag-insufficient { border-left-color: #f59e0b; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
-    .badge-ok { background:#dcfce7; color:#166534; }
-    .badge-near { background:#fef3c7; color:#92400e; }
-    .badge-over { background:#fee2e2; color:#991b1b; }
-    .alert { padding: 8px 10px; border-radius: 8px; }
-    .alert-error { background:#fee2e2; color:#991b1b; }
-    .alert-warn { background:#fef3c7; color:#92400e; }
-    .table-scroll { overflow-x:auto; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { padding: 8px 10px; border-bottom:1px solid #e5e7eb; text-align:left; }
-    .summary-strip { display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; }
-    .stat { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; min-width:140px; }
-    .stat-label { display:block; font-size:12px; color:#64748b; text-transform:uppercase; }
-    .stat-value { display:block; font-size:1.2rem; font-weight:700; }
-    .stat-sub { display:block; font-size: 12px; color:#64748b; }
-  </style>
+  <link rel="stylesheet" href="/css/styles.css?v=2">
+  <script src="/js/dashboard.js?v=2"></script>
 </head>
 <body>
-  <h1>Transactions</h1>
-  <p class="muted">This page calls the Transactions API and also exercises the shared MCP and RAG servers.</p>
+<main class="app-shell">
 
-  <div class="section">
-    <div class="row">
+  <section class="summary-strip is-raised" id="tx-tiles" aria-label="Transactions overview">
+    <div class="stat"><span class="stat-label">Transactions</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+    <div class="stat"><span class="stat-label">Deposits</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+    <div class="stat"><span class="stat-label">Withdrawals &amp; transfers</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+    <div class="stat"><span class="stat-label">Net</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+  </section>
+
+  <section class="card" aria-labelledby="tx-title">
+    <div class="card-head">
       <div>
-        <label for="account">Account ID</label>
-        <input id="account" type="number" min="1" placeholder="1" />
+        <h2 id="tx-title">Transactions</h2>
+        <p class="muted">Deposits, withdrawals and transfers. Narrow them by account, customer or text.</p>
       </div>
-      <div>
-        <label for="customer">Customer ID</label>
-        <input id="customer" name="customer_id" type="number" min="1" placeholder="1" />
+      <div class="card-actions">
+        <button id="btn" class="btn-secondary">Refresh</button>
       </div>
-      <div>
-        <label for="type">Type</label>
-        <select id="type">
-          <option value="">Any</option>
-          <option value="Deposit">Deposit</option>
-          <option value="Withdrawal">Withdrawal</option>
-          <option value="Transfer">Transfer</option>
-        </select>
-      </div>
-      <button id="btn">Fetch transactions</button>
     </div>
+    <div class="segmented" id="tx-type-tabs" role="group" aria-label="Filter by type">
+      <button type="button" data-value="" aria-pressed="true">All <span class="seg-count"></span></button>
+      <button type="button" data-value="deposit" aria-pressed="false">Deposits <span class="seg-count"></span></button>
+      <button type="button" data-value="withdrawal" aria-pressed="false">Withdrawals <span class="seg-count"></span></button>
+      <button type="button" data-value="transfer" aria-pressed="false">Transfers <span class="seg-count"></span></button>
+    </div>
+    <div class="toolbar">
+      <div class="field field-grow">
+        <label for="tx-q">Search</label>
+        <input id="tx-q" type="search" placeholder="Description or category" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="account">Account ID</label>
+        <input id="account" type="number" min="1" placeholder="Any" />
+      </div>
+      <div class="field">
+        <label for="customer">Customer ID</label>
+        <input id="customer" name="customer_id" type="number" min="1" placeholder="Any" />
+      </div>
+    </div>
+    <div class="table-wrap" id="tx-wrap">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col" data-sort="date"><button type="button" class="sort-btn">Date</button></th>
+              <th scope="col" data-sort="description"><button type="button" class="sort-btn">Description</button></th>
+              <th scope="col" data-sort="category"><button type="button" class="sort-btn">Category</button></th>
+              <th scope="col" data-sort="type"><button type="button" class="sort-btn">Type</button></th>
+              <th scope="col" data-sort="account"><button type="button" class="sort-btn">Account</button></th>
+              <th scope="col" class="num" data-sort="amount"><button type="button" class="sort-btn">Amount</button></th>
+            </tr>
+          </thead>
+          <tbody id="out">
+            <tr class="empty-row"><td colspan="6"><p class="empty-state">Loading transactions&hellip;</p></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="table-foot" id="tx-count"></p>
+  </section>
 
+  <section class="card">
     <h2>Create transaction</h2>
-    <div class="row" style="margin-bottom: 12px;">
+    <div class="row">
       <div>
         <label for="newAccountId">Account ID</label>
         <input id="newAccountId" type="number" min="1" value="1" />
@@ -100,19 +102,17 @@
       </div>
       <button id="createBtn">Create transaction</button>
     </div>
+    <div id="create-result" class="panel is-hidden" aria-live="polite"></div>
+  </section>
 
-    <h2>Result</h2>
-    <pre id="out">(no data)</pre>
-  </div>
-
-  <div class="section">
-    <h2>Spending summary <span class="muted">via the shared MCP server</span></h2>
+  <section class="card">
+    <h2>Spending summary <span class="tag">MCP</span></h2>
     <p class="muted">Calls the shared <code>transactions_spending</code> tool for the current customer and month.</p>
     <p class="status-line">
       <span id="mcp-status" class="status-text" hx-get="/ui/mcp/status" hx-trigger="load" hx-swap="innerHTML">
         <span class="spinner">Checking the MCP server...</span>
       </span>
-      <button type="button" class="btn-secondary" hx-get="/ui/mcp/status" hx-target="#mcp-status" hx-swap="innerHTML">Re-check</button>
+      <button type="button" class="btn-secondary btn-small" hx-get="/ui/mcp/status" hx-target="#mcp-status" hx-swap="innerHTML">Re-check</button>
     </p>
     <div class="row">
       <div>
@@ -125,20 +125,20 @@
       </div>
       <button type="button" class="btn-ai" hx-post="/ui/mcp/tool" hx-target="#mcp-panel" hx-swap="innerHTML" hx-include="#customer, #mcp-month, #mcp-year" hx-indicator="#mcp-spinner">Run transactions_spending</button>
       <button type="button" class="btn-secondary" hx-get="/ui/mcp/tools" hx-target="#mcp-tools-panel" hx-swap="innerHTML" hx-indicator="#mcp-spinner">Registered tools</button>
-      <span id="mcp-spinner" class="spinner" style="display:none;">Calling the MCP server...</span>
+      <span id="mcp-spinner" class="htmx-indicator spinner">Calling the MCP server...</span>
     </div>
     <div id="mcp-panel" class="panel"><p class="muted">No tool call made yet.</p></div>
     <div id="mcp-tools-panel" class="panel is-hidden"></div>
-  </div>
+  </section>
 
-  <div class="section">
-    <h2>Ask the project documents <span class="muted">via the shared RAG server</span></h2>
+  <section class="card">
+    <h2>Ask the project documents <span class="tag">RAG</span></h2>
     <p class="muted">Sends a question to the shared RAG server and renders the grounded answer with citations.</p>
     <p class="status-line">
       <span id="rag-status" class="status-text" hx-get="/ui/rag/status" hx-trigger="load" hx-swap="innerHTML">
         <span class="spinner">Checking the RAG server...</span>
       </span>
-      <button type="button" class="btn-secondary" hx-get="/ui/rag/status" hx-target="#rag-status" hx-swap="innerHTML">Re-check</button>
+      <button type="button" class="btn-secondary btn-small" hx-get="/ui/rag/status" hx-target="#rag-status" hx-swap="innerHTML">Re-check</button>
     </p>
     <form class="row rag-form" id="rag-form" hx-post="/ui/rag/query" hx-target="#rag-panel" hx-swap="innerHTML" hx-indicator="#rag-spinner">
       <div class="grow">
@@ -146,17 +146,19 @@
         <input id="rag-query" name="query" type="text" maxlength="1000" required placeholder="e.g. What does transactions_spending summarize?">
       </div>
       <button type="submit" class="btn-ai">Ask</button>
-      <span id="rag-spinner" class="spinner" style="display:none;">Retrieving evidence and asking the model...</span>
+      <span id="rag-spinner" class="htmx-indicator spinner">Retrieving evidence and asking the model...</span>
     </form>
-    <div class="chips" style="margin-top: 10px;">
+    <div class="chips">
       Try:
-      <button type="button" class="chip" data-question="What does the shared transactions_spending tool summarize?">Transactions tool</button>
-      <button type="button" class="chip" data-question="Which feature is the source of record for transactions?">Source of record</button>
-      <button type="button" class="chip" data-question="What tools does the shared MCP server expose?">MCP tools</button>
-      <button type="button" class="chip" data-question="What is the weather in Sydney today?">Off-topic</button>
+      <button type="button" class="chip chip-btn" data-question="What does the shared transactions_spending tool summarize?">Transactions tool</button>
+      <button type="button" class="chip chip-btn" data-question="Which feature is the source of record for transactions?">Source of record</button>
+      <button type="button" class="chip chip-btn" data-question="What tools does the shared MCP server expose?">MCP tools</button>
+      <button type="button" class="chip chip-btn" data-question="What is the weather in Sydney today?">Off-topic</button>
     </div>
     <div id="rag-panel" class="panel"><p class="muted">No question asked yet.</p></div>
-  </div>
+  </section>
+
+</main>
 
   <script src="/js/htmx.min.js"></script>
   <script>
@@ -188,26 +190,117 @@
       }
     });
 
-    document.getElementById('btn').addEventListener('click', async () => {
+    // Values from the API go through esc() before they reach innerHTML.
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // ------------------------------------------------------ transactions list
+    // Loads on open and follows the search, account and customer boxes; the
+    // type tabs split the result, and the tiles summarise it. Stored amounts
+    // are signed inconsistently (seeded withdrawals are negative, new ones
+    // positive), so money in and out goes by type rather than by sign.
+    let transactions = [];
+    let txRequest = 0;            // only the newest request may render
+    let txReady = false;
+
+    const txType = (t) => String(t.type || '').toLowerCase();
+    const isDeposit = (t) => txType(t) === 'deposit';
+    const signedAmount = (t) => (isDeposit(t) ? 1 : -1) * Math.abs(Number(t.amount) || 0);
+    const emptyRow = (html) => `<tr class="empty-row"><td colspan="6">${html}</td></tr>`;
+
+    function amountText(t) {
+      const value = signedAmount(t);
+      if (t.currency && t.currency !== 'AUD') return `${t.currency} ${value.toFixed(2)}`;
+      return (value > 0 ? '+' : '') + SB.fmtMoney(value);
+    }
+
+    function scopeText() {
       const account = document.getElementById('account').value.trim();
       const customer = document.getElementById('customer').value.trim();
-      const type = document.getElementById('type').value;
+      if (account) return `account #${account}`;
+      if (customer) return `customer #${customer}`;
+      return 'all accounts';
+    }
+
+    function renderTxTiles() {
+      const deposits = transactions.filter(isDeposit);
+      const outgoing = transactions.filter((t) => !isDeposit(t));
+      const total = (rows) => rows.reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0);
+      const net = total(deposits) - total(outgoing);
+      SB.renderTiles(document.getElementById('tx-tiles'), [
+        { label: 'Transactions', value: transactions.length, sub: scopeText() },
+        { label: 'Deposits', value: SB.fmtMoneyShort(total(deposits)), sub: SB.plural(deposits.length, 'deposit') },
+        { label: 'Withdrawals & transfers', value: SB.fmtMoneyShort(total(outgoing)), sub: SB.plural(outgoing.length, 'payment') },
+        { label: 'Net', value: (net > 0 ? '+' : '') + SB.fmtMoneyShort(net), sub: 'deposits minus payments' },
+      ]);
+    }
+
+    const txTabs = SB.tabs(document.getElementById('tx-type-tabs'), () => renderTransactions());
+    const txSort = SB.sortable(document.querySelector('#tx-wrap thead'), { key: 'date', dir: 'desc' },
+      () => renderTransactions(), { date: 'desc', amount: 'desc' });
+
+    function renderTransactions() {
+      if (!txReady) return;
+      txTabs.update(SB.countBy(transactions, txType));
+      const visible = txTabs.value ? transactions.filter((t) => txType(t) === txTabs.value) : transactions;
+      const valueOf = {
+        date: (t) => `${t.date || ''} ${String(t.transaction_id).padStart(8, '0')}`,
+        description: (t) => String(t.description || '').toLowerCase(),
+        category: (t) => String(t.category || '').toLowerCase(),
+        type: (t) => txType(t),
+        account: (t) => Number(t.account_id) || 0,
+        amount: (t) => signedAmount(t),
+      }[txSort.key];
+      const rows = SB.sortBy(visible, valueOf, txSort.dir);
+      document.getElementById('out').innerHTML = rows.length ? rows.map((t) => `
+        <tr>
+          <td class="nowrap">${esc(t.date)}<span class="cell-sub">#${esc(t.transaction_id)}</span></td>
+          <td>${esc(t.description || '–')}</td>
+          <td>${esc(t.category || '–')}</td>
+          <td>${esc(SB.titleCase(t.type))}</td>
+          <td>#${esc(t.account_id)}</td>
+          <td class="num">${esc(amountText(t))}</td>
+        </tr>`).join('')
+        : emptyRow('<div class="empty-state"><strong>No transactions match these filters</strong></div>');
+      document.getElementById('tx-count').textContent =
+        `Showing ${rows.length} of ${SB.plural(transactions.length, 'transaction')} for ${scopeText()}`;
+    }
+
+    async function loadTransactions() {
+      const request = ++txRequest;
       const params = new URLSearchParams();
+      const account = document.getElementById('account').value.trim();
+      const customer = document.getElementById('customer').value.trim();
+      const q = document.getElementById('tx-q').value.trim();
       if (account) params.set('account_id', account);
       if (customer) params.set('customer_id', customer);
-      if (type) params.set('type', type);
-
-      const url = `${API}/api/transactions${params.toString() ? `?${params}` : ''}`;
-      document.getElementById('out').textContent = 'Loading...';
-
+      if (q) params.set('q', q);
+      const wrap = document.getElementById('tx-wrap');
+      wrap.classList.add('is-loading');
       try {
-        const res = await fetch(url);
+        const res = await fetch(`${API}/api/transactions${params.toString() ? `?${params}` : ''}`);
         if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
         const data = await res.json();
-        document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+        if (request !== txRequest) return;
+        transactions = Array.isArray(data) ? data : [];
+        txReady = true;
+        renderTxTiles();
+        renderTransactions();
       } catch (err) {
-        document.getElementById('out').textContent = 'Error: ' + err;
+        if (request === txRequest) {
+          document.getElementById('out').innerHTML =
+            emptyRow(`<p class="alert alert-error">Error: ${esc(err.message || err)}</p>`);
+        }
+      } finally {
+        if (request === txRequest) wrap.classList.remove('is-loading');
       }
+    }
+
+    document.getElementById('btn').addEventListener('click', () => loadTransactions());
+    ['tx-q', 'account', 'customer'].forEach((id) => {
+      document.getElementById(id).addEventListener('input', SB.debounce(() => loadTransactions()));
     });
 
     document.getElementById('createBtn').addEventListener('click', async () => {
@@ -220,7 +313,9 @@
         date: document.getElementById('newDate').value
       };
 
-      document.getElementById('out').textContent = 'Creating transaction...';
+      const result = document.getElementById('create-result');
+      result.classList.remove('is-hidden');
+      result.innerHTML = '<p class="thinking">Creating transaction...</p>';
 
       try {
         const res = await fetch(`${API}/api/transactions`, {
@@ -232,15 +327,19 @@
         const data = contentType.includes('application/json') ? await res.json() : await res.text();
 
         if (!res.ok) {
-          throw new Error(typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+          throw new Error(typeof data === 'string' ? data : (data.error || JSON.stringify(data)));
         }
 
-        document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+        const id = data && data.transaction_id != null ? ` #${esc(data.transaction_id)}` : '';
+        const category = data && data.category ? ` Category: ${esc(data.category)}.` : '';
+        result.innerHTML = `<p class="alert alert-success">Transaction${id} created.${category}</p>`;
         document.getElementById('btn').click();
       } catch (err) {
-        document.getElementById('out').textContent = 'Error: ' + err;
+        result.innerHTML = `<p class="alert alert-error">Error: ${esc(err.message || err)}</p>`;
       }
     });
+
+    loadTransactions();
   </script>
 </body>
 </html>

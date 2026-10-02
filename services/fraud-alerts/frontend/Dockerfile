@@ -7,7 +7,8 @@ FROM nginx:alpine
 # /css/styles.css and /js/htmx.min.js resolve exactly as they do in dev.
 COPY shared/frontend/ /usr/share/nginx/html/
 
-# This feature's tabs.
+# This feature's tabs, and the stylesheet and helpers both tabs share.
 COPY services/fraud-alerts/frontend/templates/tabs/ /usr/share/nginx/html/tabs/
+COPY services/fraud-alerts/frontend/static/ /usr/share/nginx/html/static/
 
 EXPOSE 80

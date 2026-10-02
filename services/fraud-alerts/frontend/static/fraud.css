@@ -1,0 +1,207 @@
+/* ==========================================================================
+   Fraud Alerts - what is specific to the Normal and AI Mode tabs.
+   Everything generic (top bar, tabs, cards, stat tiles, tables, pills,
+   dialogs, forms) comes from the shared theme in /css/styles.css.
+   ========================================================================== */
+
+/* Alert status: the dot carries the colour, the text stays ink. */
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    color: var(--ink);
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.status::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%;
+                  background: var(--ink-faint); }
+.status-new::before { background: var(--brand); }
+.status-reviewed::before { background: var(--warn); }
+.status-confirmed::before { background: var(--over); }
+.status-dismissed::before { background: var(--ok); }
+.segmented .status { font-size: inherit; color: inherit; }
+
+.ai-chip {
+    display: inline-block;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    background: var(--brand-tint);
+    color: var(--brand-dark);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+/* ----------------------------------------------------------------- tables */
+
+.data-table th abbr { text-decoration: none; cursor: help; }
+
+.alerts-table { min-width: 760px; }
+.rules-table { min-width: 720px; }
+
+.data-table tbody tr.is-fresh > td { background: var(--brand-tint); }
+.data-table tbody tr.is-fresh:hover > td { background: #dde9fe; }
+tr.is-off td, tr.is-off .cell-sub { color: var(--ink-faint); }
+tr.is-off .pill { opacity: 0.6; }
+
+/* -------------------------------------------------------- detection run */
+
+.detect-summary {
+    margin: 0 0 1rem;
+    padding: 0.85rem 1rem 0.95rem;
+    background: var(--ai-tint);
+    border: 1px solid #cfe0fb;
+    border-radius: var(--radius-small);
+}
+.detect-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.detect-head h3 { margin: 0.2rem 0 0; font-size: 0.98rem; }
+
+.mini-stats { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin: 0.5rem 0 0; }
+.mini-stat { display: flex; flex-direction: column; }
+.mini-value { font-size: 1.3rem; font-weight: 650; line-height: 1.25; }
+.mini-label { color: var(--ink-soft); font-size: 0.78rem; }
+
+.new-alerts { margin: 0.85rem 0 0; padding: 0; list-style: none; border-top: 1px solid #d9e6fb; }
+.new-alerts li { border-bottom: 1px solid #d9e6fb; }
+.new-alerts button {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.5rem 0.35rem;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--ink);
+    font-weight: 400;
+    text-align: left;
+}
+.new-alerts button:hover { background: rgba(255, 255, 255, 0.75); }
+.new-alerts .grow { flex: 1; min-width: 0; font-weight: 600; }
+.new-alerts .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.notes { display: grid; gap: 0.3rem; margin: 0.75rem 0 0; padding: 0; list-style: none; font-size: 0.86rem; }
+.notes li::before { content: "\2022"; margin-right: 0.45rem; }
+.note-warn { color: var(--warn); }
+.note-error { color: var(--over); font-weight: 600; }
+
+/* ------------------------------------------------------------ alert drawer */
+
+.amount-figure { margin: 0; font-size: 2rem; font-weight: 650; line-height: 1.15; }
+.badge-row { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap; margin-top: 0.5rem; }
+
+.status-picker { display: flex; width: 100%; }
+.status-picker button { flex: 1 1 auto; }
+
+.rule-box {
+    padding: 0.7rem 0.9rem;
+    background: var(--ground);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-small);
+}
+.rule-box strong { display: block; }
+.rule-box p { margin: 0.1rem 0 0; color: var(--ink-soft); font-size: 0.88rem; }
+
+.rule-preview {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--ground);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-small);
+    font-size: 0.88rem;
+}
+
+.save-note { color: var(--ok); font-weight: 600; }
+
+/* --------------------------------------------------------- AI Mode tab */
+
+.result { margin-top: 1rem; }
+.result .ai-note, .result .alert { margin-top: 0.9rem; }
+.result .alert { margin-bottom: 0; }
+
+.alert-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 0.9rem 1rem;
+    background: var(--ground);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-small);
+}
+.alert-summary .badge-row { margin-top: 0.15rem; }
+.summary-amount { font-size: 1.4rem; font-weight: 650; line-height: 1.2; }
+.summary-line { margin-top: 0.15rem; font-size: 0.9rem; overflow-wrap: anywhere; }
+
+.count-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0.5rem 2.5rem;
+}
+.count-list { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+.count-list li { display: grid; grid-template-columns: 9.5rem minmax(60px, 1fr) 2.5rem; align-items: center;
+                 gap: 0.75rem; }
+.count-list li > :first-child { justify-self: start; }
+.count-num { font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Meter: the fill carries the state, the track is a lighter step of the same hue. */
+.meter { height: 8px; overflow: hidden; background: var(--neutral-tint); border-radius: 999px; }
+.meter > span { display: block; height: 100%; background: var(--ink-faint); border-radius: 999px; }
+.meter-high { background: var(--over-tint); }
+.meter-high > span { background: var(--over); }
+.meter-medium { background: var(--warn-tint); }
+.meter-medium > span { background: var(--warn); }
+.meter-new { background: var(--brand-tint); }
+.meter-new > span { background: var(--brand); }
+.meter-reviewed { background: var(--warn-tint); }
+.meter-reviewed > span { background: var(--warn); }
+.meter-confirmed { background: var(--over-tint); }
+.meter-confirmed > span { background: var(--over); }
+.meter-dismissed { background: var(--ok-tint); }
+.meter-dismissed > span { background: var(--ok); }
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 640px) {
+    .count-list li { grid-template-columns: 8rem minmax(40px, 1fr) 2rem; }
+
+    /* Alerts stack into cards; the sortable headers stay as a sort bar. */
+    .alerts-table { display: block; min-width: 0; }
+    .alerts-table thead, .alerts-table tbody { display: block; }
+    .alerts-table thead tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 1rem;
+        padding-bottom: 0.55rem;
+        border-bottom: 1px solid var(--line);
+    }
+    .alerts-table thead tr::before { content: "Sort"; color: var(--ink-faint); font-size: 0.8rem; }
+    .alerts-table thead th { display: block; padding: 0; border: 0; }
+    .alerts-table thead th:not([data-sort]) { display: none; }
+    .alerts-table tbody tr {
+        display: grid;
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "txn txn txn amount"
+            "rule rule rule date"
+            "sev status . ai";
+        align-items: center;
+        gap: 0.3rem 0.6rem;
+        padding: 0.75rem 0.25rem;
+        border-bottom: 1px solid var(--line-soft);
+    }
+    .alerts-table tbody tr.empty-row { display: block; border-bottom: 0; }
+    .alerts-table tbody td { display: block; padding: 0; border: 0; background: none !important; }
+    .alerts-table tbody tr.is-fresh { background: var(--brand-tint); }
+    .alerts-table td:nth-child(1) { grid-area: txn; }
+    .alerts-table td:nth-child(2) { grid-area: rule; color: var(--ink-soft); font-size: 0.85rem; }
+    .alerts-table td:nth-child(3) { grid-area: date; text-align: right; color: var(--ink-soft); font-size: 0.85rem; }
+    .alerts-table td:nth-child(3) .cell-sub { display: inline; margin-left: 0.3rem; }
+    .alerts-table td:nth-child(4) { grid-area: amount; align-self: start; font-weight: 650; }
+    .alerts-table td:nth-child(5) { grid-area: sev; }
+    .alerts-table td:nth-child(6) { grid-area: status; }
+    .alerts-table td:nth-child(7) { grid-area: ai; text-align: right; }
+}
