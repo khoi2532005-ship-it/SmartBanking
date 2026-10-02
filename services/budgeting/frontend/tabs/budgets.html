@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/styles.css?v=2">
     <!-- Vendored locally so the demo does not depend on network access. -->
     <script src="/js/htmx.min.js"></script>
+    <script src="/js/dashboard.js?v=2"></script>
     <!-- Stat tiles, insight cards, status lines and RAG answers come from the
          shared theme; these are specific to the budgets table. -->
     <style>
@@ -23,6 +24,13 @@
 <body>
 
 <main class="app-shell">
+
+    <!-- Filled from the summary the budget list renders (see liftSummary). -->
+    <section class="summary-strip is-raised" id="budget-tiles" aria-label="Budget overview">
+        <div class="stat"><span class="stat-label">Total spent</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Remaining</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Status</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+    </section>
 
     <section class="card">
         <h2>Customer and period</h2>
@@ -105,6 +113,18 @@
 
     <section class="card">
         <h2>Budgets this period</h2>
+        <div class="segmented" id="budget-status-tabs" role="group" aria-label="Filter by status">
+            <button type="button" data-value="" aria-pressed="true">All <span class="seg-count"></span></button>
+            <button type="button" data-value="over" aria-pressed="false">Over budget <span class="seg-count"></span></button>
+            <button type="button" data-value="near" aria-pressed="false">Near limit <span class="seg-count"></span></button>
+            <button type="button" data-value="ok" aria-pressed="false">On track <span class="seg-count"></span></button>
+        </div>
+        <div class="toolbar">
+            <div class="field field-grow">
+                <label for="budget-search">Search</label>
+                <input id="budget-search" type="search" placeholder="Category" autocomplete="off">
+            </div>
+        </div>
         <div id="budget-list" class="table-scroll"
              hx-get="/ui/budgets"
              hx-trigger="load"
@@ -299,6 +319,100 @@ document.body.addEventListener("htmx:sendError", (event) => {
         '<p class="alert alert-error">Could not reach the budgets API at ' +
         BUDGETS_API + ". Start budgets-api and try again.</p>";
 });
+
+// ------------------------------------------------------------ dashboard view
+// The budget list is rendered by the API. After each swap its summary tiles
+// move to the top of the page, and the status tabs, search box and column
+// headers filter and sort the rows in place (htmx bindings move with them).
+
+const BUDGET_SORT_COLUMNS = ["category", "spent", "progress", "remaining"];
+let budgetSort = { key: null, dir: "asc" };     // null keeps the API's order
+
+const budgetStatus = (row) =>
+    row.classList.contains("is-over") ? "over" : row.classList.contains("is-near") ? "near" : "ok";
+
+function amountIn(text) {
+    const match = String(text).replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : 0;
+}
+
+const BUDGET_SORT_VALUE = {
+    category: (row) => (row.querySelector(".category") || row.cells[0]).textContent.trim().toLowerCase(),
+    spent: (row) => amountIn(row.cells[1].textContent),
+    progress: (row) => amountIn((row.querySelector(".pct") || row.cells[2]).textContent),
+    // "$25.20 over" sorts below "$5.00 left".
+    remaining: (row) => (row.cells[3].textContent.includes("over") ? -1 : 1) * amountIn(row.cells[3].textContent),
+};
+
+const budgetTabs = SB.tabs(document.getElementById("budget-status-tabs"), () => applyBudgetView());
+
+function liftSummary() {
+    const strip = document.querySelector("#budget-list .summary-strip");
+    const tiles = document.getElementById("budget-tiles");
+    if (strip) {
+        tiles.replaceChildren(...strip.children);
+        strip.remove();
+    } else {
+        SB.renderTiles(tiles, [
+            { label: "Total spent", value: "–", sub: "no budgets this period" },
+            { label: "Remaining", value: "–" },
+            { label: "Status", value: "–" },
+        ]);
+    }
+}
+
+function makeBudgetHeadersSortable() {
+    const thead = document.querySelector("#budget-list table.budget-table thead");
+    if (!thead) return;
+    thead.querySelectorAll("th").forEach((th, index) => {
+        const key = BUDGET_SORT_COLUMNS[index];
+        if (!key) return;
+        th.dataset.sort = key;
+        th.innerHTML = `<button type="button" class="sort-btn">${SB.esc(th.textContent)}</button>`;
+    });
+    SB.sortable(thead, budgetSort, (state) => {
+        budgetSort = { key: state.key, dir: state.dir };
+        applyBudgetView();
+    }, { spent: "desc", progress: "desc" });
+}
+
+function applyBudgetView() {
+    const tbody = document.querySelector("#budget-list table.budget-table tbody");
+    const rows = tbody ? [...tbody.querySelectorAll("tr.budget-row")] : [];
+    budgetTabs.update(SB.countBy(rows, budgetStatus));
+    if (!tbody) return;
+    const query = document.getElementById("budget-search").value.trim().toLowerCase();
+    let shown = 0;
+    rows.forEach((row) => {
+        const visible = (!budgetTabs.value || budgetStatus(row) === budgetTabs.value)
+            && (!query || BUDGET_SORT_VALUE.category(row).includes(query));
+        row.classList.toggle("is-hidden", !visible);
+        if (visible) shown += 1;
+    });
+    if (budgetSort.key) {
+        SB.sortBy(rows, BUDGET_SORT_VALUE[budgetSort.key], budgetSort.dir).forEach((row) => tbody.append(row));
+    }
+    let empty = tbody.querySelector("tr.empty-row");
+    if (!shown && rows.length) {
+        if (!empty) {
+            empty = document.createElement("tr");
+            empty.className = "empty-row";
+            empty.innerHTML = '<td colspan="5"><div class="empty-state"><strong>No budgets match these filters</strong></div></td>';
+            tbody.append(empty);
+        }
+    } else if (empty) {
+        empty.remove();
+    }
+}
+
+document.body.addEventListener("htmx:afterSwap", (event) => {
+    if (event.detail.target.id !== "budget-list") return;
+    liftSummary();
+    makeBudgetHeadersSortable();
+    applyBudgetView();
+});
+
+document.getElementById("budget-search").addEventListener("input", SB.debounce(applyBudgetView, 150));
 </script>
 
 </body>
