@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Loans Dashboard</title>
     <link rel="stylesheet" href="/css/styles.css?v=2">
+    <script src="/js/dashboard.js?v=2"></script>
     <style>
         #approve-btn { margin-left: auto; }
     </style>
@@ -12,7 +13,64 @@
 <body>
 <main class="app-shell">
 
+    <section class="summary-strip is-raised" id="loan-tiles" aria-label="Loans overview">
+        <div class="stat"><span class="stat-label">Applications</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Approved amount</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Requested</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Rejected</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+    </section>
+
     <!-- Normal Mode -->
+    <section class="card" aria-labelledby="loans-title">
+        <div class="card-head">
+            <div>
+                <h2 id="loans-title">Loan applications</h2>
+                <p class="muted">Select an application to open its details and repayment schedule below.</p>
+            </div>
+        </div>
+        <div class="segmented" id="loan-status-tabs" role="group" aria-label="Filter by status">
+            <button type="button" data-value="" aria-pressed="true">All <span class="seg-count"></span></button>
+            <button type="button" data-value="PENDING" aria-pressed="false">Pending <span class="seg-count"></span></button>
+            <button type="button" data-value="APPROVED" aria-pressed="false">Approved <span class="seg-count"></span></button>
+            <button type="button" data-value="REJECTED" aria-pressed="false">Rejected <span class="seg-count"></span></button>
+            <button type="button" data-value="CANCELLED" aria-pressed="false">Cancelled <span class="seg-count"></span></button>
+        </div>
+        <form id="search-form" class="toolbar" role="search" aria-label="Search loan applications">
+            <div class="field field-grow">
+                <label for="q">Search</label>
+                <input id="q" name="q" type="search" placeholder="ID, customer, purpose..." autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="f_loan_type">Type</label>
+                <select id="f_loan_type"><option value="">Any</option>
+                    <option>PERSONAL</option><option>AUTO</option><option>EDUCATION</option>
+                    <option>HOME</option><option>BUSINESS</option></select>
+            </div>
+        </form>
+        <div class="table-wrap" id="loans-wrap">
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" data-sort="loan_id"><button type="button" class="sort-btn">ID</button></th>
+                            <th scope="col" data-sort="customer_id"><button type="button" class="sort-btn">Customer</button></th>
+                            <th scope="col" data-sort="loan_type"><button type="button" class="sort-btn">Type</button></th>
+                            <th scope="col" class="num" data-sort="requested_amount"><button type="button" class="sort-btn">Requested</button></th>
+                            <th scope="col" class="num" data-sort="approved_amount"><button type="button" class="sort-btn">Approved</button></th>
+                            <th scope="col" class="num" data-sort="interest_rate"><button type="button" class="sort-btn">Rate</button></th>
+                            <th scope="col" data-sort="application_date"><button type="button" class="sort-btn">Applied</button></th>
+                            <th scope="col" data-sort="status"><button type="button" class="sort-btn">Status</button></th>
+                        </tr>
+                    </thead>
+                    <tbody id="loans-body">
+                        <tr class="empty-row"><td colspan="8"><p class="empty-state">Loading loan applications&hellip;</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="table-foot" id="loans-count"></p>
+    </section>
+
     <section class="card">
         <h2>Submit Loan Application</h2>
         <form id="apply-form" class="row">
@@ -36,23 +94,6 @@
         <div id="apply-result" class="panel is-hidden"></div>
     </section>
 
-    <section class="card">
-        <h2>Search &amp; Filter Loan Applications</h2>
-        <form id="search-form" class="row">
-            <div><label for="q">Free text</label>
-                <input id="q" name="q" type="text" placeholder="id, customer, purpose..."></div>
-            <div><label for="f_status">Status</label>
-                <select id="f_status"><option value="">Any</option>
-                    <option>PENDING</option><option>APPROVED</option>
-                    <option>REJECTED</option><option>CANCELLED</option></select></div>
-            <div><label for="f_loan_type">Type</label>
-                <select id="f_loan_type"><option value="">Any</option>
-                    <option>PERSONAL</option><option>AUTO</option><option>EDUCATION</option>
-                    <option>HOME</option><option>BUSINESS</option></select></div>
-            <button type="submit">Search Loans</button>
-        </form>
-        <div id="loans-result" class="panel is-hidden"></div>
-    </section>
     <section class="card">
         <h2>Loan Details &amp; Repayment Schedule</h2>
         <form id="detail-form" class="row">

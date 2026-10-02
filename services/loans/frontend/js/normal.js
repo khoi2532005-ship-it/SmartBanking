@@ -24,20 +24,6 @@ function errorMessage(error, status = "") {
     return status ? `Request failed (${status}).` : "Request failed.";
 }
 
-function loansTable(loans) {
-    if (!Array.isArray(loans) || !loans.length) return "<p>No loan applications found.</p>";
-    const rows = loans.map((l) => `
-        <tr>
-            <td>${l.loan_id}</td><td>${l.customer_id}</td><td>${l.loan_type}</td>
-            <td>$${Number(l.requested_amount).toLocaleString()}</td>
-            <td>${l.status}</td><td>${l.interest_rate ?? "-"}</td>
-            <td>${l.approved_amount ? "$" + Number(l.approved_amount).toLocaleString() : "-"}</td>
-            <td>${String(l.application_date).slice(0, 10)}</td>
-        </tr>`).join("");
-    return `<table><tr><th>ID</th><th>Customer</th><th>Type</th><th>Requested</th>
-        <th>Status</th><th>Rate %</th><th>Approved</th><th>Date</th></tr>${rows}</table>`;
-}
-
 function repaymentsTable(repayments) {
     if (!Array.isArray(repayments) || !repayments.length) return "<p>No repayments found.</p>";
     const rows = repayments.map((r) => `
@@ -72,22 +58,120 @@ document.getElementById("apply-form").addEventListener("submit", async (event) =
                  Eligible now: ${e.eligible ? "Yes" : "No"} |
                  Est. payment: $${e.estimated_monthly_payment ?? "-"} @ ${e.proposed_interest_rate ?? "-"}%</p>
                  <ul>${e.checks.map((c) => `<li>${c.passed ? "PASS" : "FAIL"} - ${c.detail}</li>`).join("")}</ul>`);
+            loadLoans();
         } else show("apply-result", `<p>Error: ${result.body.error || result.status}</p>`);
     } catch (error) { show("apply-result", errorBox(error)); }
 });
 
-// Search loans
-document.getElementById("search-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const params = new URLSearchParams();
-    if (document.getElementById("q").value) params.set("q", document.getElementById("q").value);
-    if (document.getElementById("f_status").value) params.set("status", document.getElementById("f_status").value);
-    if (document.getElementById("f_loan_type").value) params.set("loan_type", document.getElementById("f_loan_type").value);
+// Loan applications list: loads on open and follows the search box; the type
+// select and the status tabs filter it here, and the tiles cover every loan.
+let allLoans = [];
+let loans = [];              // matching the search box
+let loansRequest = 0;        // only the newest request may render
+let loansReady = false;
+
+const LOAN_PILLS = { PENDING: "pill-warn", APPROVED: "pill-ok", REJECTED: "pill-over", CANCELLED: "pill-neutral" };
+const loanStatus = (l) => String(l.status || "").toUpperCase();
+// Seeded loans say "Personal Loan" and new ones "PERSONAL", so match the start.
+const typeMatches = (l, type) => !type || String(l.loan_type || "").toUpperCase().startsWith(type);
+
+function renderLoanTiles() {
+    const count = (status) => allLoans.filter((l) => loanStatus(l) === status).length;
+    const approved = allLoans.filter((l) => loanStatus(l) === "APPROVED");
+    const approvedTotal = approved.reduce((sum, l) => sum + (Number(l.approved_amount) || 0), 0);
+    const requestedTotal = allLoans.reduce((sum, l) => sum + (Number(l.requested_amount) || 0), 0);
+    SB.renderTiles(document.getElementById("loan-tiles"), [
+        { label: "Applications", value: allLoans.length, sub: `${count("PENDING")} pending review` },
+        { label: "Approved amount", value: SB.fmtMoneyShort(approvedTotal), sub: SB.plural(approved.length, "approved loan") },
+        { label: "Requested", value: SB.fmtMoneyShort(requestedTotal),
+          sub: allLoans.length ? `average ${SB.fmtMoneyShort(requestedTotal / allLoans.length)}` : "no applications yet" },
+        { label: "Rejected", value: count("REJECTED"), sub: `${count("CANCELLED")} cancelled` },
+    ]);
+}
+
+const loanTabs = SB.tabs(document.getElementById("loan-status-tabs"), () => renderLoans());
+const loanSort = SB.sortable(document.querySelector("#loans-wrap thead"),
+    { key: "application_date", dir: "desc" }, () => renderLoans(),
+    { requested_amount: "desc", approved_amount: "desc", interest_rate: "desc", application_date: "desc" });
+
+function renderLoans() {
+    if (!loansReady) return;
+    const ofType = loans.filter((l) => typeMatches(l, document.getElementById("f_loan_type").value));
+    loanTabs.update(SB.countBy(ofType, loanStatus));
+    const visible = loanTabs.value ? ofType.filter((l) => loanStatus(l) === loanTabs.value) : ofType;
+    const valueOf = {
+        loan_id: (l) => Number(l.loan_id),
+        customer_id: (l) => Number(l.customer_id),
+        loan_type: (l) => String(l.loan_type),
+        requested_amount: (l) => Number(l.requested_amount) || 0,
+        approved_amount: (l) => Number(l.approved_amount) || 0,
+        interest_rate: (l) => Number(l.interest_rate) || 0,
+        application_date: (l) => String(l.application_date || ""),
+        status: (l) => loanStatus(l),
+    }[loanSort.key];
+    const rows = SB.sortBy(visible, valueOf, loanSort.dir);
+    document.getElementById("loans-body").innerHTML = rows.length ? rows.map((l) => `
+        <tr class="is-clickable" data-loan="${Number(l.loan_id)}">
+            <td><button type="button" class="link-btn">#${SB.esc(l.loan_id)}</button></td>
+            <td>#${SB.esc(l.customer_id)}</td>
+            <td>${SB.esc(SB.titleCase(l.loan_type))}${l.loan_purpose ? `<span class="cell-sub">${SB.esc(l.loan_purpose)}</span>` : ""}</td>
+            <td class="num">${SB.esc(SB.fmtMoney(l.requested_amount))}</td>
+            <td class="num">${l.approved_amount ? SB.esc(SB.fmtMoney(l.approved_amount)) : "–"}</td>
+            <td class="num">${l.interest_rate != null ? `${SB.esc(l.interest_rate)}%` : "–"}</td>
+            <td class="nowrap">${SB.esc(String(l.application_date || "").slice(0, 10))}</td>
+            <td><span class="pill ${LOAN_PILLS[loanStatus(l)] || "pill-neutral"}">${SB.esc(SB.titleCase(l.status))}</span></td>
+        </tr>`).join("")
+        : '<tr class="empty-row"><td colspan="8"><div class="empty-state"><strong>No loan applications match these filters</strong></div></td></tr>';
+    document.getElementById("loans-count").textContent = `Showing ${rows.length} of ${SB.plural(loans.length, "application")}`;
+}
+
+async function loadLoans() {
+    const request = ++loansRequest;
+    const q = document.getElementById("q").value.trim();
+    const wrap = document.getElementById("loans-wrap");
+    wrap.classList.add("is-loading");
     try {
-        const result = await api(`/api/loans?${params}`);
-        result.ok ? show("loans-result", loansTable(result.body))
-                  : show("loans-result", `<p>Error: ${result.body.error || result.status}</p>`);
-    } catch (error) { show("loans-result", errorBox(error)); }
+        const [matching, all] = await Promise.all([
+            api(`/api/loans${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+            q ? api("/api/loans") : null,
+        ]);
+        if (request !== loansRequest) return;
+        if (!matching.ok) {
+            document.getElementById("loans-body").innerHTML = `<tr class="empty-row"><td colspan="8">
+                <p class="alert alert-error">Error: ${SB.esc(matching.body.error || matching.status)}</p></td></tr>`;
+            return;
+        }
+        loans = Array.isArray(matching.body) ? matching.body : [];
+        if (!all) allLoans = loans;
+        else if (all.ok && Array.isArray(all.body)) allLoans = all.body;
+        loansReady = true;
+        renderLoanTiles();
+        renderLoans();
+    } catch (error) {
+        if (request === loansRequest) {
+            document.getElementById("loans-body").innerHTML = `<tr class="empty-row"><td colspan="8">
+                <p class="alert alert-error">Request failed - is loan-service running? (${SB.esc(error.message || error)})</p></td></tr>`;
+        }
+    } finally {
+        if (request === loansRequest) wrap.classList.remove("is-loading");
+    }
+}
+
+document.getElementById("search-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadLoans();
+});
+document.getElementById("q").addEventListener("input", SB.debounce(() => loadLoans()));
+document.getElementById("f_loan_type").addEventListener("change", () => renderLoans());
+
+// Selecting an application opens its details below and sets it for AI Mode.
+document.getElementById("loans-body").addEventListener("click", (event) => {
+    const row = event.target.closest("tr[data-loan]");
+    if (!row) return;
+    detailIdInput.value = row.dataset.loan;
+    document.getElementById("ai_loan_id").value = row.dataset.loan;
+    viewDetails();
+    document.getElementById("detail-form").closest(".card").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 // View loan details and manage decisions
@@ -132,6 +216,7 @@ async function decision(action) {
                     ? `${result.body.repayments_created} repayments created, first due ${result.body.first_due_date}, monthly $${result.body.monthly_payment}.`
                     : "") + "</p>");
             viewDetails();
+            loadLoans();
         } else show("detail-result", `<p>Error: ${errorMessage(result.body, result.status)}</p>`);
     } catch (error) { show("detail-result", errorBox(error)); }
 }
@@ -155,6 +240,7 @@ document.getElementById("delete-btn").addEventListener("click", async () => {
         const result = await api(`/api/loans/${detailIdInput.value}`, { method: "DELETE" });
         result.ok ? show("detail-result", `<p>Deleted loan ${detailIdInput.value} and its repayments.</p>`)
                   : show("detail-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        if (result.ok) loadLoans();
     } catch (error) { show("detail-result", errorBox(error)); }
 });
 
@@ -195,3 +281,5 @@ document.getElementById("upcoming-btn").addEventListener("click", async () => {
                   : show("repayments-result", `<p>Error: ${result.body.error || result.status}</p>`);
     } catch (error) { show("repayments-result", errorBox(error)); }
 });
+
+loadLoans();
