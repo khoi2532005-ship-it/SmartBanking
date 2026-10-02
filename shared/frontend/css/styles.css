@@ -547,6 +547,17 @@ th[aria-sort="descending"] .sort-btn::after { content: "\2193"; opacity: 1; }
 .stat-ok { background: var(--ok-tint); border-color: #b7e0c7; }
 .stat-ok .stat-value { color: var(--ok); font-size: 0.95rem; }
 
+/* Headline tiles that sit on the page itself, above the cards. */
+.summary-strip.is-raised { margin-bottom: 1.25rem; }
+.summary-strip.is-raised .stat {
+    padding: 0.9rem 1rem;
+    background: var(--surface);
+    border-color: var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.summary-strip.is-raised .stat-value { font-size: 1.7rem; }
+
 /* A big number with its caption, e.g. "26 alerts for all customers". */
 .figure-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; margin: 0; }
 .figure-line .figure { font-size: 2rem; font-weight: 650; line-height: 1.1; }
@@ -951,6 +962,8 @@ button.feature-card h3 { font-weight: 650; }
     .app-shell { padding: 0.75rem 0.75rem 2rem; }
     .card { padding: 1rem; }
     .form-grid { grid-template-columns: minmax(0, 1fr); }
+    .summary-strip.is-raised { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .summary-strip.is-raised .stat-value { font-size: 1.4rem; }
     .toolbar .field { flex: 1 1 calc(50% - 0.75rem); }
     .toolbar .input-affix input, .toolbar input[type="date"] { width: 100%; }
     .drawer-head, .drawer-body, .drawer-foot { padding-left: 1rem; padding-right: 1rem; }

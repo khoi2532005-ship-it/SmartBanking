@@ -11,13 +11,20 @@
 <main class="app-shell">
     <header class="topbar">
         <nav class="view-tabs" aria-label="Fraud Alerts views">
-            <a class="view-tab is-active" href="/tabs/normal.html" aria-current="page">Normal</a>
-            <a class="view-tab" href="/tabs/ai-mode.html">AI Mode</a>
+            <a class="view-tab is-active" href="/tabs/normal.html?v=2" aria-current="page">Normal</a>
+            <a class="view-tab" href="/tabs/ai-mode.html?v=2">AI Mode</a>
         </nav>
         <div id="service-status" class="service-status"></div>
     </header>
 
     <div id="offline-banner" class="alert alert-error is-hidden" role="alert"></div>
+
+    <section class="summary-strip is-raised" id="kpis" aria-label="Alert overview">
+        <div class="stat"><span class="stat-label">Open alerts</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">High severity, open</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Value under review</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Confirmed fraud</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+    </section>
 
     <section class="card" aria-labelledby="alerts-title">
         <div class="card-head">
@@ -29,13 +36,6 @@
                 <span class="muted" id="detect-scope"></span>
                 <button type="button" id="run-detection-btn">Run detection</button>
             </div>
-        </div>
-
-        <div class="summary-strip" id="kpis" aria-label="Alert overview">
-            <div class="stat"><span class="stat-label">Open alerts</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
-            <div class="stat"><span class="stat-label">High severity, open</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
-            <div class="stat"><span class="stat-label">Value under review</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
-            <div class="stat"><span class="stat-label">Confirmed fraud</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
         </div>
 
         <div id="detection-result" class="is-hidden" aria-live="polite"></div>
