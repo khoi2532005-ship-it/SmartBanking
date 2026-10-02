@@ -1,27 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Loans Dashboard</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css?v=2">
     <style>
-        pre { white-space: pre-wrap; font-size: 0.8rem; }
-        .row { margin-bottom: 1rem; }
-        .panel { margin-bottom: 1rem; }
         #approve-btn { margin-left: auto; }
     </style>
 </head>
 <body>
-<header class="app-header">
-    <div class="app-shell">
-        <a class="brand" href="/">
-            <span class="brand-mark">SB</span>
-            SmartBank
-        </a>
-    </div>
-</header>
-
 <main class="app-shell">
 
     <!-- Normal Mode -->
@@ -46,7 +34,9 @@
             <button type="submit">Submit Application</button>
         </form>
         <div id="apply-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Search &amp; Filter Loan Applications</h2>
         <form id="search-form" class="row">
             <div><label for="q">Free text</label>
@@ -75,7 +65,9 @@
             <button type="button" class="btn-danger is-hidden" id="delete-btn" hidden>Delete</button>
         </form>
         <div id="detail-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Update Repayment</h2>
         <form id="repay-form" class="row">
             <div><label for="repay_id">Repayment ID</label>
@@ -88,7 +80,9 @@
             <button type="submit">Update Payment</button>
         </form>
         <div id="repay-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>All Repayments / Upcoming</h2>
         <form class="row">
             <button type="button" id="all-repayments-btn">All Repayments</button>
@@ -109,7 +103,9 @@
             <button type="button" class="btn-ai" id="explain-repayments-btn">Explain Repayments</button>
         </form>
         <div id="explanation-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Compare Repayment Options &amp; Get a Recommendation</h2>
         <p>Compare monthly payments and total interest across different loan terms, using an existing loan or the amount, rate, and income you provide.</p>
         <form id="compare-form" class="row">

@@ -3,7 +3,7 @@ function explain(kind) {
     show("explanation-result", "<p>Thinking...</p>");
     api(`/api/ai/loans/${loanId}/${kind}`)
         .then((result) => result.ok
-            ? show("explanation-result", `<pre>${result.body.explanation}</pre>`)
+            ? show("explanation-result", `<div class="ai-note"><pre>${result.body.explanation}</pre></div>`)
             : show("explanation-result", `<p>Error: ${result.body.error || result.status}</p>`))
         .catch((error) => show("explanation-result", errorBox(error)));
 }
@@ -35,6 +35,6 @@ document.getElementById("compare-form").addEventListener("submit", async (event)
             <td>${o.payment_share_of_income != null ? o.payment_share_of_income + "%" : "-"}</td></tr>`).join("");
         show("compare-result",
             `<table><tr><th>Term</th><th>Monthly</th><th>Total Interest</th><th>% of Income</th></tr>${rows}</table>
-             <p><b>AI Recommendation:</b></p><pre>${result.body.recommendation}</pre>`);
+             <div class="ai-note"><span class="ai-label">AI Recommendation</span><pre>${result.body.recommendation}</pre></div>`);
     } catch (error) { show("compare-result", errorBox(error)); }
 });
