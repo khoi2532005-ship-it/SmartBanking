@@ -1,303 +1,849 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Fraud Alerts Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fraud Alerts - SmartBank</title>
     <link rel="stylesheet" href="/css/styles.css">
-    <style>
-        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
-        .app-shell { max-width: none; padding: 1rem; }
-        .card { margin-bottom: 1.5rem; }
-        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
-        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
-        th { background: #f0f3f7; cursor: pointer; }
-        /* Long unbroken names and explanations wrap instead of widening the page. */
-        td { overflow-wrap: anywhere; }
-        .table-wrap { overflow-x: auto; }
-        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .row > div { display: flex; flex-direction: column; }
-        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
-        .is-hidden { display: none; }
-        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
-        .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
-        .sev-high { background: #c0392b; }
-        .sev-medium { background: #d68910; }
-        .sev-low { background: #7f8c8d; }
-        button { cursor: pointer; }
-        /* Tab strip linking the Normal and AI Mode views. */
-        .tab-strip { margin: 0 0 1rem; }
-        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
-    </style>
+    <link rel="stylesheet" href="/static/fraud.css">
 </head>
 <body>
 <main class="app-shell">
-    <nav class="feature-nav tab-strip" aria-label="Fraud Alerts views">
-        <a class="nav-item is-active" href="/tabs/normal.html" aria-current="page">Normal</a>
-        <a class="nav-item" href="/tabs/ai-mode.html">AI Mode</a>
-    </nav>
-    <section class="card">
-        <h2>Alert Rules</h2>
-        <form id="rule-form" class="row">
-            <div><label for="rule_name">Rule name</label>
-                <input id="rule_name" type="text" placeholder="Large Transaction Alert" required></div>
-            <div><label for="rule_type">Type</label>
-                <select id="rule_type">
-                    <option value="amount_over">amount_over</option>
-                    <option value="velocity">velocity</option>
-                    <option value="unusual_time">unusual_time</option>
-                    <option value="new_recipient_high_value">new_recipient_high_value</option>
-                </select></div>
-            <div><label for="threshold_value">Threshold</label>
-                <input id="threshold_value" type="number" step="0.01" placeholder="5000" required></div>
-            <div><label for="threshold_secondary">Secondary (velocity mins / unusual_time end hour, exclusive)</label>
-                <input id="threshold_secondary" type="number" step="0.01" placeholder="optional"></div>
-            <div><label for="severity">Severity</label>
-                <select id="severity"><option>low</option><option selected>medium</option><option>high</option></select></div>
-            <button type="submit">Add Rule</button>
-        </form>
-        <div id="rules-msg" class="panel is-hidden"></div>
-        <div id="rules-result"></div>
+    <header class="topbar">
+        <nav class="view-tabs" aria-label="Fraud Alerts views">
+            <a class="view-tab is-active" href="/tabs/normal.html" aria-current="page">Normal</a>
+            <a class="view-tab" href="/tabs/ai-mode.html">AI Mode</a>
+        </nav>
+        <div id="service-status" class="service-status"></div>
+    </header>
+
+    <div id="offline-banner" class="alert alert-error is-hidden" role="alert"></div>
+
+    <section class="kpis" id="kpis" aria-label="Alert overview">
+        <div class="kpi"><span class="kpi-label">Open alerts</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
+        <div class="kpi"><span class="kpi-label">High severity, open</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
+        <div class="kpi"><span class="kpi-label">Value under review</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
+        <div class="kpi"><span class="kpi-label">Confirmed fraud</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
     </section>
 
-    <section class="card">
-        <h2>Detection</h2>
-        <button type="button" id="run-detection-btn">Run Detection</button>
-        <div id="detection-result" class="panel is-hidden"></div>
-    </section>
-
-    <section class="card">
-        <h2>Alert Dashboard</h2>
-        <form id="filter-form" class="row">
-            <div><label for="f_status">Status</label>
-                <select id="f_status"><option value="">Any</option>
-                    <option>new</option><option>reviewed</option><option>dismissed</option><option>confirmed</option></select></div>
-            <div><label for="f_min">Min amount</label><input id="f_min" type="number" step="0.01"></div>
-            <div><label for="f_max">Max amount</label><input id="f_max" type="number" step="0.01"></div>
-            <div><label for="f_from">Date from</label><input id="f_from" type="date"></div>
-            <div><label for="f_to">Date to</label><input id="f_to" type="date"></div>
-            <div><label for="f_q">Search</label><input id="f_q" type="text" placeholder="recipient/category"></div>
-            <div><label for="f_sort">Sort by</label>
-                <select id="f_sort"><option value="status">Status</option><option value="transaction_amount">Amount</option>
-                    <option value="transaction_datetime" selected>Date</option></select></div>
-            <button type="submit">Search Alerts</button>
-        </form>
-        <div id="alerts-result"></div>
-
-        <h3>Alert Detail</h3>
-        <div class="row">
-            <div><label for="detail_id">Alert ID</label><input id="detail_id" type="number" min="1"></div>
-            <button type="button" id="view-detail-btn">View</button>
-            <select id="status-select">
-                <option value="new">new</option><option value="reviewed">reviewed</option>
-                <option value="dismissed">dismissed</option><option value="confirmed">confirmed</option>
-            </select>
-            <button type="button" id="update-status-btn">Update Status</button>
-            <button type="button" id="delete-alert-btn">Delete</button>
+    <section class="card" aria-labelledby="alerts-title">
+        <div class="card-head">
+            <div>
+                <h2 id="alerts-title">Alerts</h2>
+                <p class="muted">Transactions flagged by the detection rules. Select one to review it.</p>
+            </div>
+            <div class="card-actions">
+                <span class="muted" id="detect-scope"></span>
+                <button type="button" id="run-detection-btn">Run detection</button>
+            </div>
         </div>
-        <div id="detail-result" class="panel is-hidden"></div>
+
+        <div id="detection-result" class="is-hidden" aria-live="polite"></div>
+
+        <div class="segmented" id="status-filter" role="group" aria-label="Filter by status">
+            <button type="button" data-status="" aria-pressed="true">All <span class="seg-count"></span></button>
+            <button type="button" data-status="new" aria-pressed="false">New <span class="seg-count"></span></button>
+            <button type="button" data-status="reviewed" aria-pressed="false">Reviewed <span class="seg-count"></span></button>
+            <button type="button" data-status="confirmed" aria-pressed="false">Confirmed fraud <span class="seg-count"></span></button>
+            <button type="button" data-status="dismissed" aria-pressed="false">Dismissed <span class="seg-count"></span></button>
+        </div>
+
+        <form id="filter-form" class="toolbar" role="search" aria-label="Filter alerts">
+            <div class="field field-grow">
+                <label for="f_q">Search</label>
+                <input id="f_q" type="search" placeholder="Recipient or category" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="f_min">Min amount</label>
+                <div class="input-affix"><span>$</span><input id="f_min" type="number" min="0" step="0.01" inputmode="decimal"></div>
+            </div>
+            <div class="field">
+                <label for="f_max">Max amount</label>
+                <div class="input-affix"><span>$</span><input id="f_max" type="number" min="0" step="0.01" inputmode="decimal"></div>
+            </div>
+            <div class="field">
+                <label for="f_from">From</label>
+                <input id="f_from" type="date">
+            </div>
+            <div class="field">
+                <label for="f_to">To</label>
+                <input id="f_to" type="date">
+            </div>
+            <button type="button" class="btn-secondary" id="clear-filters">Clear</button>
+        </form>
+
+        <div class="table-wrap" id="alerts-wrap">
+            <div class="table-scroll">
+                <table class="data-table alerts-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Transaction</th>
+                            <th scope="col">Rule</th>
+                            <th scope="col" data-sort="transaction_datetime" aria-sort="descending"><button type="button" class="sort-btn">Date</button></th>
+                            <th scope="col" class="num" data-sort="transaction_amount"><button type="button" class="sort-btn">Amount</button></th>
+                            <th scope="col" data-sort="severity"><button type="button" class="sort-btn">Severity</button></th>
+                            <th scope="col" data-sort="status"><button type="button" class="sort-btn">Status</button></th>
+                            <th scope="col"><abbr title="AI explanation">AI</abbr></th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-body">
+                        <tr class="empty-row"><td colspan="7"><p class="empty-state">Loading alerts&hellip;</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="table-foot" id="alerts-count"></p>
+    </section>
+
+    <section class="card" aria-labelledby="rules-title">
+        <div class="card-head">
+            <div>
+                <h2 id="rules-title">Detection rules</h2>
+                <p class="muted" id="rules-summary">Rules decide which transactions raise an alert.</p>
+            </div>
+            <div class="card-actions">
+                <button type="button" class="btn-secondary" id="new-rule-btn">New rule</button>
+            </div>
+        </div>
+        <div id="rules-msg" aria-live="polite"></div>
+        <div class="table-scroll">
+            <table class="data-table rules-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Rule</th>
+                        <th scope="col">Flags</th>
+                        <th scope="col">Severity</th>
+                        <th scope="col" class="num">Alerts</th>
+                        <th scope="col">Enabled</th>
+                        <th scope="col"><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody id="rules-body">
+                    <tr class="empty-row"><td colspan="6"><p class="empty-state">Loading rules&hellip;</p></td></tr>
+                </tbody>
+            </table>
+        </div>
     </section>
 </main>
 
+<dialog id="alert-drawer" class="drawer" aria-labelledby="drawer-title">
+    <div class="drawer-head">
+        <div>
+            <span class="kicker" id="drawer-kicker">Alert</span>
+            <h2 id="drawer-title">Alert</h2>
+        </div>
+        <button type="button" class="btn-icon" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+    <div class="drawer-foot">
+        <button type="button" class="btn-danger" id="delete-alert-btn">Delete alert</button>
+        <button type="button" class="btn-secondary" data-close>Close</button>
+    </div>
+</dialog>
+
+<dialog id="rule-dialog" class="modal modal-wide" aria-labelledby="rule-dialog-title">
+    <form id="rule-form">
+        <div class="modal-head">
+            <h2 id="rule-dialog-title">New rule</h2>
+            <button type="button" class="btn-icon" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body form-grid">
+            <div class="field span-2">
+                <label for="rule_name">Rule name</label>
+                <input id="rule_name" type="text" maxlength="100" required placeholder="Large Transaction Alert">
+            </div>
+            <div class="field">
+                <label for="rule_type">Rule type</label>
+                <select id="rule_type">
+                    <option value="amount_over">Large amount</option>
+                    <option value="velocity">Rapid transactions</option>
+                    <option value="unusual_time">Unusual time of day</option>
+                    <option value="new_recipient_high_value">New recipient, high value</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="severity">Severity</label>
+                <select id="severity">
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <p class="hint span-2" id="rule-type-help"></p>
+
+            <div class="field span-2" data-for="amount_over new_recipient_high_value">
+                <label for="amount_threshold">Amount over</label>
+                <div class="input-affix"><span>$</span>
+                    <input id="amount_threshold" type="number" min="0" step="0.01" required placeholder="5000"></div>
+            </div>
+            <div class="field" data-for="velocity">
+                <label for="velocity_count">More than (transactions)</label>
+                <input id="velocity_count" type="number" min="1" step="1" required placeholder="5">
+            </div>
+            <div class="field" data-for="velocity">
+                <label for="velocity_minutes">Within (minutes)</label>
+                <input id="velocity_minutes" type="number" min="1" step="1" required placeholder="10">
+            </div>
+            <div class="field" data-for="unusual_time">
+                <label for="time_start">From</label>
+                <select id="time_start"></select>
+            </div>
+            <div class="field" data-for="unusual_time">
+                <label for="time_end">Until (not included)</label>
+                <select id="time_end"></select>
+            </div>
+
+            <p class="rule-preview span-2" id="rule-preview" aria-live="polite"></p>
+            <div class="span-2" id="rule-form-msg"></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" data-close>Cancel</button>
+            <button type="submit" id="rule-submit">Create rule</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="confirm-dialog" class="modal" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <form method="dialog">
+        <div class="modal-body">
+            <h2 id="confirm-title"></h2>
+            <p id="confirm-text"></p>
+        </div>
+        <div class="modal-actions">
+            <button value="cancel" class="btn-secondary" autofocus>Cancel</button>
+            <button value="confirm" class="btn-danger-solid" id="confirm-ok">Delete</button>
+        </div>
+    </form>
+</dialog>
+
+<script src="/static/fraud.js"></script>
 <script>
-const API = `http://${window.location.hostname}:5003`;
-let currentAlerts = [];
+let rules = null;               // GET /api/rules; also names each alert's rule
+let allAlerts = [];             // every alert: the overview tiles and per-rule counts
+let alerts = [];                // alerts matching the search filters; status is applied on top
+let alertsReady = false;
+let overviewStale = true;       // tiles and rule counts need the unfiltered list again
+let alertsRequest = 0;          // only the newest alerts request may render
+let statusFilter = "";
+let sort = { key: "transaction_datetime", dir: "desc" };
+let freshIds = new Set();       // created by the last detection run, highlighted
+let drawerAlert = null;         // the alert open in the drawer
+let editingRuleId = null;       // the rule open in the rule dialog; null when creating
 
-async function api(path, options = {}) {
-    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
-    const response = await fetch(`${API}${path}`, options);
-    const body = await response.json().catch(() => ({}));
-    return { ok: response.ok, status: response.status, body };
+const ruleById = (id) => (rules || []).find((rule) => Number(rule.rule_id) === Number(id));
+const emptyRow = (columns, html) => `<tr class="empty-row"><td colspan="${columns}">${html}</td></tr>`;
+
+// Re-rendering replaces the control that had focus; move focus to its twin.
+const FOCUS_KEYS = ["data-set-status", "data-toggle-rule", "data-edit-rule", "data-delete-rule"];
+
+function rerender(container, html) {
+    const active = document.activeElement;
+    const key = active && container.contains(active) && FOCUS_KEYS.find((attr) => active.hasAttribute(attr));
+    const value = key && active.getAttribute(key);
+    container.innerHTML = html;
+    if (key) {
+        const twin = container.querySelector(`[${key}="${CSS.escape(value)}"]`);
+        if (twin) twin.focus();
+    }
 }
 
-function show(elId, html) {
-    const el = document.getElementById(elId);
-    el.classList.remove("is-hidden");
-    el.innerHTML = html;
+function confirmDialog(title, text, action) {
+    const dialog = byId("confirm-dialog");
+    byId("confirm-title").textContent = title;
+    byId("confirm-text").textContent = text;
+    byId("confirm-ok").textContent = action;
+    dialog.returnValue = "";
+    dialog.showModal();
+    return new Promise((resolve) => {
+        dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true });
+    });
 }
 
-function hide(elId) {
-    document.getElementById(elId).classList.add("is-hidden");
+// Clicking the backdrop closes the drawer and the confirmation (as Cancel).
+["alert-drawer", "confirm-dialog"].forEach((id) => {
+    byId(id).addEventListener("click", (event) => {
+        if (event.target === event.currentTarget) event.currentTarget.close();
+    });
+});
+
+// ---------------------------------------------------------------- overview
+
+function renderOverview() {
+    const count = (status) => allAlerts.filter((a) => a.status === status).length;
+    const open = allAlerts.filter((a) => a.status === "new" || a.status === "reviewed");
+    const value = open.reduce((sum, a) => sum + (Number(a.transaction_amount) || 0), 0);
+    const largest = open.reduce((max, a) => Math.max(max, Number(a.transaction_amount) || 0), 0);
+    const tiles = [
+        ["Open alerts", open.length, `${count("new")} new · ${count("reviewed")} reviewed`],
+        ["High severity, open", open.filter((a) => a.severity === "high").length, `of ${plural(open.length, "open alert")}`],
+        ["Value under review", fmtMoneyShort(value), open.length ? `largest ${fmtMoneyShort(largest)}` : "nothing open"],
+        ["Confirmed fraud", count("confirmed"), `${count("dismissed")} dismissed as legitimate`],
+    ];
+    byId("kpis").innerHTML = tiles.map(([label, figure, sub]) => `
+        <div class="kpi"><span class="kpi-label">${label}</span>
+            <span class="kpi-value">${esc(figure)}</span><span class="kpi-sub">${esc(sub)}</span></div>`).join("");
 }
 
-// Every value from the API goes through esc() before it reaches innerHTML:
-// rule names and recipients are user input and explanations are model
-// output, so any of them can carry markup.
-function esc(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (c) => (
-        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// ------------------------------------------------------------------ alerts
+
+const FILTERS = { f_q: "q", f_min: "min_amount", f_max: "max_amount", f_from: "date_from", f_to: "date_to" };
+const SORT_DEFAULTS = { transaction_datetime: "desc", transaction_amount: "desc", severity: "desc", status: "asc" };
+const SORT_VALUES = {
+    transaction_datetime: (a) => String(a.transaction_datetime ?? ""),
+    transaction_amount: (a) => Number(a.transaction_amount) || 0,
+    severity: (a) => ["low", "medium", "high"].indexOf(a.severity),
+    status: (a) => (STATUSES.includes(a.status) ? STATUSES.indexOf(a.status) : STATUSES.length),
+};
+
+function sortAlerts(list) {
+    const value = SORT_VALUES[sort.key];
+    const direction = sort.dir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+        const x = value(a);
+        const y = value(b);
+        const order = typeof x === "string" ? x.localeCompare(y) : x - y;
+        return order * direction || Number(b.alert_id) - Number(a.alert_id);
+    });
 }
 
-function errorBox(error) {
-    return `<p>Request failed - is fraud-service running?</p><pre>${esc(error)}</pre>`;
+function filterParams() {
+    const params = new URLSearchParams();
+    Object.entries(FILTERS).forEach(([id, param]) => {
+        const value = byId(id).value.trim();
+        if (value) params.set(param, value);
+    });
+    return params.toString();
 }
 
-function errorText(result) {
-    return `<p>Error: ${esc(result.body.error || result.status)}</p>`;
+// Amount, date and search filters run on fraud-service; the status tabs then
+// split that result here, so each tab can show its count.
+async function loadAlerts({ withOverview = false } = {}) {
+    if (withOverview) overviewStale = true;
+    const request = ++alertsRequest;
+    const refreshOverview = overviewStale;
+    const params = filterParams();
+    byId("alerts-wrap").classList.add("is-loading");
+    try {
+        const [matching, all] = await Promise.all([
+            api(params ? `/api/alerts?${params}` : "/api/alerts"),
+            refreshOverview && params ? api("/api/alerts") : null,
+        ]);
+        if (request !== alertsRequest) return;
+        if (!matching.ok) {
+            byId("alerts-body").innerHTML = emptyRow(7, alertBox("error", esc(errorMessage(matching))));
+            return;
+        }
+        alerts = matching.body;
+        alertsReady = true;
+        if (refreshOverview && (!all || all.ok)) {
+            allAlerts = all ? all.body : alerts;
+            overviewStale = false;
+            renderOverview();
+            renderRules();
+        }
+        renderAlerts();
+    } catch (error) {
+        if (request === alertsRequest) byId("alerts-body").innerHTML = emptyRow(7, networkError(error));
+    } finally {
+        if (request === alertsRequest) byId("alerts-wrap").classList.remove("is-loading");
+    }
 }
 
-function severityBadge(sev) {
-    const known = ["low", "medium", "high"].includes(sev) ? sev : "low";
-    return `<span class="badge sev-${known}">${esc(sev)}</span>`;
+function emptyAlerts() {
+    if (!allAlerts.length) {
+        return `<div class="empty-state"><strong>No alerts yet</strong>
+            Run detection to scan transactions against the enabled rules.</div>`;
+    }
+    return `<div class="empty-state"><strong>No alerts match these filters</strong>
+        <button type="button" class="btn-secondary btn-small" data-clear-filters>Clear filters</button></div>`;
 }
 
-function rulesTable(rules) {
-    if (!Array.isArray(rules) || !rules.length) return "<p>No rules configured.</p>";
-    const rows = rules.map((r) => `
-        <tr>
-            <td>${esc(r.rule_id)}</td><td>${esc(r.rule_name)}</td><td>${esc(r.rule_type)}</td>
-            <td>${esc(r.threshold_value)}${r.threshold_secondary != null ? " / " + esc(r.threshold_secondary) : ""}</td>
-            <td>${severityBadge(r.severity)}</td>
-            <td>${r.enabled ? "Yes" : "No"}</td>
-            <td>
-                <button type="button" onclick="toggleRule(${Number(r.rule_id)}, ${r.enabled ? 0 : 1})">${r.enabled ? "Disable" : "Enable"}</button>
-                <button type="button" onclick="deleteRule(${Number(r.rule_id)})">Delete</button>
-            </td>
-        </tr>`).join("");
-    return `<div class="table-wrap"><table><tr><th>ID</th><th>Name</th><th>Type</th><th>Threshold</th><th>Severity</th><th>Enabled</th><th></th></tr>${rows}</table></div>`;
+function alertRow(a) {
+    const id = Number(a.alert_id);
+    const rule = ruleById(a.rule_id);
+    const when = dateParts(a.transaction_datetime);
+    const category = a.transaction_category ? titleCase(a.transaction_category) : "Uncategorised";
+    return `<tr class="is-clickable${freshIds.has(id) ? " is-fresh" : ""}" data-alert="${id}">
+        <td><button type="button" class="link-btn" aria-haspopup="dialog">${esc(a.transaction_recipient || "Unknown recipient")}</button>
+            <span class="cell-sub">#${id} · Customer ${esc(a.customer_id)} · ${esc(category)}</span></td>
+        <td>${esc(rule ? rule.rule_name : `Rule #${a.rule_id}`)}</td>
+        <td class="nowrap">${esc(when.date)}<span class="cell-sub">${esc(when.time)}</span></td>
+        <td class="num">${esc(fmtMoney(a.transaction_amount))}</td>
+        <td>${severityBadge(a.severity)}</td>
+        <td>${statusBadge(a.status)}</td>
+        <td>${a.ai_explanation
+            ? '<span class="ai-chip" title="AI explanation saved">AI<span class="sr-only"> explanation saved</span></span>'
+            : '<span class="muted" title="Not explained yet">–<span class="sr-only">Not explained yet</span></span>'}</td>
+    </tr>`;
 }
+
+function renderAlerts() {
+    if (!alertsReady) return;
+    document.querySelectorAll("#status-filter button").forEach((button) => {
+        const status = button.dataset.status;
+        button.setAttribute("aria-pressed", String(status === statusFilter));
+        button.querySelector(".seg-count").textContent =
+            status ? alerts.filter((a) => a.status === status).length : alerts.length;
+    });
+    document.querySelectorAll(".alerts-table th[data-sort]").forEach((th) => {
+        if (th.dataset.sort === sort.key) th.setAttribute("aria-sort", sort.dir === "asc" ? "ascending" : "descending");
+        else th.removeAttribute("aria-sort");
+    });
+
+    const visible = sortAlerts(statusFilter ? alerts.filter((a) => a.status === statusFilter) : alerts);
+    byId("alerts-body").innerHTML = visible.length ? visible.map(alertRow).join("") : emptyRow(7, emptyAlerts());
+    byId("alerts-count").textContent = allAlerts.length
+        ? `Showing ${visible.length} of ${plural(allAlerts.length, "alert")}` : "";
+}
+
+function clearFilters() {
+    byId("filter-form").reset();
+    statusFilter = "";
+    loadAlerts();
+}
+
+byId("status-filter").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-status]");
+    if (!button) return;
+    statusFilter = button.dataset.status;
+    renderAlerts();
+});
+
+document.querySelector(".alerts-table thead").addEventListener("click", (event) => {
+    const th = event.target.closest("th[data-sort]");
+    if (!th) return;
+    const key = th.dataset.sort;
+    sort = key === sort.key ? { key, dir: sort.dir === "asc" ? "desc" : "asc" } : { key, dir: SORT_DEFAULTS[key] };
+    renderAlerts();
+});
+
+byId("alerts-body").addEventListener("click", (event) => {
+    if (event.target.closest("[data-clear-filters]")) return clearFilters();
+    const row = event.target.closest("tr[data-alert]");
+    if (row) openAlert(Number(row.dataset.alert));
+});
+
+let filterTimer;
+byId("filter-form").addEventListener("input", () => {
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => loadAlerts(), 300);
+});
+byId("filter-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    clearTimeout(filterTimer);
+    loadAlerts();
+});
+byId("clear-filters").addEventListener("click", clearFilters);
+
+// ------------------------------------------------------------ alert drawer
+
+function openAlert(id) {
+    drawerAlert = [...alerts, ...allAlerts].find((a) => Number(a.alert_id) === id) || { alert_id: id };
+    renderDrawer();
+    const drawer = byId("alert-drawer");
+    if (!drawer.open) drawer.showModal();
+    refreshDrawer(id);
+}
+
+// The list row is shown at once; the detail request adds the rule's fields
+// and anything that changed since the list loaded.
+async function refreshDrawer(id) {
+    const stillOpen = () => drawerAlert && Number(drawerAlert.alert_id) === id;
+    try {
+        const result = await api(`/api/alerts/${id}`);
+        if (!stillOpen()) return;
+        if (!result.ok) return drawerMessage(alertBox("error", esc(errorMessage(result))));
+        drawerAlert = result.body;
+        renderDrawer();
+    } catch (error) {
+        if (stillOpen()) drawerMessage(networkError(error));
+    }
+}
+
+function drawerMessage(html) {
+    const message = byId("drawer-msg");
+    if (message) message.innerHTML = html;
+    else byId("drawer-body").innerHTML = html;
+}
+
+function renderDrawer() {
+    const a = drawerAlert;
+    const id = Number(a.alert_id);
+    const loaded = a.transaction_amount !== undefined;
+    byId("drawer-kicker").textContent = `Alert #${id}`;
+    byId("drawer-title").textContent = loaded ? a.transaction_recipient || "Unknown recipient" : "Loading…";
+    byId("delete-alert-btn").disabled = !loaded;
+    if (!loaded) {
+        byId("drawer-body").innerHTML = '<p class="thinking">Loading alert…</p>';
+        return;
+    }
+    // The detail response carries the rule's fields; a list row has rule_id only.
+    const rule = a.rule_type ? a : ruleById(a.rule_id);
+    const explained = Boolean(a.ai_explanation);
+    rerender(byId("drawer-body"), `
+        <p class="amount-figure">${esc(fmtMoney(a.transaction_amount))}</p>
+        <div class="badge-row">${severityBadge(a.severity)}${statusBadge(a.status)}</div>
+
+        <h3 class="section-title" id="status-picker-label">Update status</h3>
+        <div class="segmented status-picker" role="group" aria-labelledby="status-picker-label">
+            ${STATUSES.map((s) => `<button type="button" data-set-status="${s}" aria-pressed="${a.status === s}">
+                <span class="status status-${s}">${STATUS_LABELS[s]}</span></button>`).join("")}
+        </div>
+        <div id="drawer-msg" aria-live="polite"></div>
+
+        <h3 class="section-title">Why it was flagged</h3>
+        <div class="rule-box">${rule
+            ? `<strong>${esc(rule.rule_name)}</strong><p>${esc(describeRule(rule))}</p>`
+            : `<p>Rule #${esc(a.rule_id)}: its details are unavailable.</p>`}</div>
+
+        <h3 class="section-title">Transaction</h3>
+        <dl class="facts">
+            <dt>Date</dt><dd>${esc(fmtDate(a.transaction_datetime))}</dd>
+            <dt>Category</dt><dd>${esc(a.transaction_category ? titleCase(a.transaction_category) : "–")}</dd>
+            <dt>Customer</dt><dd>#${esc(a.customer_id)}</dd>
+            <dt>Transaction</dt><dd>#${esc(a.transaction_id)}</dd>
+            <dt>Alert raised</dt><dd>${esc(fmtDate(a.created_at))}</dd>
+        </dl>
+
+        <div class="section-row">
+            <h3 class="section-title">AI explanation</h3>
+            <a class="btn btn-ai btn-small" href="/tabs/ai-mode.html?alert=${id}">${explained ? "Regenerate" : "Explain"} in AI Mode</a>
+        </div>
+        ${explained
+            ? `<div class="ai-note">${prose(a.ai_explanation)}</div>
+               ${a.explanation_generated_at ? `<p class="hint">Generated ${esc(fmtDate(a.explanation_generated_at))}</p>` : ""}`
+            : '<p class="hint">Not explained yet. AI Mode asks the model why this transaction was flagged and saves the answer to the alert.</p>'}`);
+}
+
+byId("drawer-body").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-set-status]");
+    if (!button || !drawerAlert) return;
+    const status = button.dataset.setStatus;
+    if (status === drawerAlert.status) return;
+    const id = Number(drawerAlert.alert_id);
+    const group = [...button.parentElement.querySelectorAll("button")];
+    group.forEach((b) => { b.disabled = b !== button; });
+    try {
+        const result = await api(`/api/alerts/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
+        if (!drawerAlert || Number(drawerAlert.alert_id) !== id) return;
+        if (!result.ok) {
+            group.forEach((b) => { b.disabled = false; });
+            return drawerMessage(alertBox("error", esc(errorMessage(result))));
+        }
+        drawerAlert = { ...drawerAlert, status };
+        renderDrawer();
+        drawerMessage(`<p class="hint save-note">Status saved: ${esc(STATUS_LABELS[status])}.</p>`);
+        loadAlerts({ withOverview: true });
+    } catch (error) {
+        group.forEach((b) => { b.disabled = false; });
+        drawerMessage(networkError(error));
+    }
+});
+
+byId("delete-alert-btn").addEventListener("click", async () => {
+    const id = Number(drawerAlert.alert_id);
+    const confirmed = await confirmDialog(`Delete alert #${id}?`,
+        "The alert and its AI explanation will be removed. This can't be undone.", "Delete alert");
+    if (!confirmed) return;
+    try {
+        const result = await api(`/api/alerts/${id}`, { method: "DELETE" });
+        if (!result.ok) return drawerMessage(alertBox("error", esc(errorMessage(result))));
+        byId("alert-drawer").close();
+        freshIds.delete(id);
+        toast(`Alert #${id} deleted`);
+        loadAlerts({ withOverview: true });
+    } catch (error) {
+        drawerMessage(networkError(error));
+    }
+});
+
+// Rows are re-rendered while the drawer is open, so the browser cannot
+// always hand focus back to the row that opened it; do it here.
+byId("alert-drawer").addEventListener("close", () => {
+    const id = drawerAlert && Number(drawerAlert.alert_id);
+    drawerAlert = null;
+    const opener = document.querySelector(`#alerts-body tr[data-alert="${id}"] .link-btn`);
+    if (opener) opener.focus();
+});
+
+// ---------------------------------------------------------------- detection
+
+function newAlertItem(a) {
+    const rule = ruleById(a.rule_id);
+    return `<li><button type="button" data-open-alert="${Number(a.alert_id)}">
+        ${severityBadge(a.severity)}
+        <span class="grow">${esc(a.transaction_recipient || "Unknown recipient")}
+            <span class="cell-sub">${esc(rule ? rule.rule_name : `Rule #${a.rule_id}`)}</span></span>
+        <span class="num">${esc(fmtMoney(a.transaction_amount))}</span>
+    </button></li>`;
+}
+
+function detectionHtml(r) {
+    const found = Number(r.new_alert_count) || 0;
+    const listed = (r.new_alerts || []).slice(0, 5);
+    const skipped = r.rules_skipped || [];
+    const stats = [
+        [found, found === 1 ? "New alert" : "New alerts"],
+        [r.evaluated, r.source === "http" ? "Live transactions scanned" : "Sample transactions scanned"],
+        [r.rules_applied, "Rules applied"],
+        [r.skipped_duplicates, "Already alerted"],
+    ];
+    const notes = [
+        r.unscannable_transactions && ["warn", `${plural(r.unscannable_transactions, "transaction")} could not be scanned: no customer or amount.`],
+        r.explanations_skipped && ["warn", `${plural(r.explanations_skipped, "AI explanation")} unavailable. Explain them from AI Mode.`],
+        r.failed_writes && ["error", `${plural(r.failed_writes, "alert")} could not be saved.`],
+        skipped.length && ["error", `Rule${skipped.length === 1 ? "" : "s"} ${skipped.join(", ")} skipped: stored thresholds are not usable.`],
+    ].filter(Boolean);
+    return `<div class="detect-summary">
+        <div class="detect-head">
+            <h3>${found ? `Detection found ${plural(found, "new alert")}` : "Detection found no new alerts"}</h3>
+            <button type="button" class="btn-icon" data-dismiss-detection aria-label="Dismiss detection results">&times;</button>
+        </div>
+        <div class="mini-stats">${stats.map(([figure, label]) => `
+            <div class="mini-stat"><span class="mini-value">${esc(figure)}</span><span class="mini-label">${label}</span></div>`).join("")}
+        </div>
+        ${listed.length ? `<ul class="new-alerts">${listed.map(newAlertItem).join("")}</ul>` : ""}
+        ${found > listed.length ? `<p class="hint">${found - listed.length} more highlighted in the table below.</p>` : ""}
+        ${notes.length ? `<ul class="notes">${notes.map(([kind, text]) => `<li class="note-${kind}">${esc(text)}</li>`).join("")}</ul>` : ""}
+    </div>`;
+}
+
+async function runDetection() {
+    const panel = byId("detection-result");
+    try {
+        const result = await api("/api/detection/run", { method: "POST" });
+        panel.innerHTML = result.ok ? detectionHtml(result.body) : alertBox("error", esc(errorMessage(result)));
+        panel.classList.remove("is-hidden");
+        if (result.ok) {
+            freshIds = new Set((result.body.new_alerts || []).map((a) => Number(a.alert_id)));
+            await loadAlerts({ withOverview: true });
+        }
+    } catch (error) {
+        panel.innerHTML = networkError(error);
+        panel.classList.remove("is-hidden");
+    }
+}
+
+byId("run-detection-btn").addEventListener("click", (event) => withBusy(event.currentTarget, "Running…", runDetection));
+
+byId("detection-result").addEventListener("click", (event) => {
+    if (event.target.closest("[data-dismiss-detection]")) byId("detection-result").classList.add("is-hidden");
+    const item = event.target.closest("[data-open-alert]");
+    if (item) openAlert(Number(item.dataset.openAlert));
+});
+
+// -------------------------------------------------------------------- rules
 
 async function loadRules() {
     try {
         const result = await api("/api/rules");
-        show("rules-result", result.ok ? rulesTable(result.body) : errorText(result));
-    } catch (error) { show("rules-result", errorBox(error)); }
+        if (!result.ok) {
+            byId("rules-body").innerHTML = emptyRow(6, alertBox("error", esc(errorMessage(result))));
+            return;
+        }
+        rules = result.body;
+        renderRules();
+        renderAlerts();   // alert rows name their rule
+    } catch (error) {
+        byId("rules-body").innerHTML = emptyRow(6, networkError(error));
+    }
 }
 
-// Toggle and delete report failures (e.g. a rule that still has alerts)
-// instead of silently reloading an unchanged table.
-async function ruleAction(path, options) {
+function ruleRow(rule, alertCount) {
+    const id = Number(rule.rule_id);
+    const on = isEnabled(rule);
+    return `<tr${on ? "" : ' class="is-off"'}>
+        <td><span class="cell-main">${esc(rule.rule_name)}</span>
+            <span class="cell-sub">#${id} · ${esc(ruleTypeLabel(rule.rule_type))}</span></td>
+        <td>${esc(describeRule(rule))}</td>
+        <td>${severityBadge(rule.severity)}</td>
+        <td class="num">${alertCount}</td>
+        <td><label class="toggle-switch"><input type="checkbox" role="switch" data-toggle-rule="${id}"${on ? " checked" : ""}>
+            <span class="sr-only">Enable ${esc(rule.rule_name)}</span></label></td>
+        <td class="actions">
+            <button type="button" class="btn-secondary btn-small" data-edit-rule="${id}">Edit</button>
+            <button type="button" class="btn-danger btn-small" data-delete-rule="${id}">Delete</button>
+        </td>
+    </tr>`;
+}
+
+function renderRules() {
+    if (!rules) return;
+    const alertCounts = {};
+    allAlerts.forEach((a) => { alertCounts[a.rule_id] = (alertCounts[a.rule_id] || 0) + 1; });
+    const enabled = rules.filter(isEnabled).length;
+    byId("rules-summary").textContent = rules.length
+        ? `${enabled} of ${plural(rules.length, "rule")} enabled. Run detection applies every enabled rule.`
+        : "No rules yet.";
+    byId("detect-scope").textContent = plural(enabled, "enabled rule");
+    rerender(byId("rules-body"), rules.length
+        ? rules.map((rule) => ruleRow(rule, alertCounts[rule.rule_id] || 0)).join("")
+        : emptyRow(6, `<div class="empty-state"><strong>No rules yet</strong>
+            Create a rule to start flagging suspicious transactions.</div>`));
+}
+
+function rulesMessage(html) {
+    byId("rules-msg").innerHTML = html;
+}
+
+byId("rules-body").addEventListener("change", async (event) => {
+    const input = event.target.closest("[data-toggle-rule]");
+    if (!input) return;
+    const rule = ruleById(input.dataset.toggleRule);
+    const enabled = input.checked;
     try {
-        const result = await api(path, options);
-        if (!result.ok) return show("rules-msg", errorText(result));
-        hide("rules-msg");
+        const result = await api(`/api/rules/${rule.rule_id}`, {
+            method: "PUT", body: JSON.stringify({ enabled: enabled ? 1 : 0 }) });
+        if (!result.ok) {
+            input.checked = !enabled;
+            return rulesMessage(alertBox("error", esc(errorMessage(result))));
+        }
+        rulesMessage("");
+        rule.enabled = enabled ? 1 : 0;
+        renderRules();
+        toast(`${rule.rule_name} ${enabled ? "enabled" : "disabled"}`);
+    } catch (error) {
+        input.checked = !enabled;
+        rulesMessage(networkError(error));
+    }
+});
+
+byId("rules-body").addEventListener("click", (event) => {
+    const edit = event.target.closest("[data-edit-rule]");
+    if (edit) return openRuleDialog(ruleById(edit.dataset.editRule));
+    const remove = event.target.closest("[data-delete-rule]");
+    if (remove) deleteRule(ruleById(remove.dataset.deleteRule));
+});
+
+async function deleteRule(rule) {
+    const confirmed = await confirmDialog(`Delete “${rule.rule_name}”?`,
+        "Detection stops using this rule. This can't be undone.", "Delete rule");
+    if (!confirmed) return;
+    try {
+        // 409 when the rule still has alerts: fraud-service says what to do instead.
+        const result = await api(`/api/rules/${rule.rule_id}`, { method: "DELETE" });
+        if (!result.ok) return rulesMessage(alertBox("error", esc(errorMessage(result))));
+        rulesMessage("");
+        toast(`Rule “${rule.rule_name}” deleted`);
         loadRules();
-    } catch (error) { show("rules-msg", errorBox(error)); }
+    } catch (error) {
+        rulesMessage(networkError(error));
+    }
 }
 
-function toggleRule(ruleId, enabled) {
-    return ruleAction(`/api/rules/${ruleId}`, { method: "PUT", body: JSON.stringify({ enabled }) });
+// ------------------------------------------------------------- rule dialog
+
+function populateHours() {
+    [["time_start", 0], ["time_end", 5]].forEach(([id, initial]) => {
+        for (let hour = 0; hour < 24; hour += 1) {
+            byId(id).append(new Option(hourLabel(hour), String(hour), hour === initial, hour === initial));
+        }
+    });
 }
 
-function deleteRule(ruleId) {
-    return ruleAction(`/api/rules/${ruleId}`, { method: "DELETE" });
+// The condition fields depend on the rule type. Hidden ones are disabled too,
+// so their `required` does not block the form.
+function syncRuleFields() {
+    const type = byId("rule_type").value;
+    document.querySelectorAll("#rule-form [data-for]").forEach((field) => {
+        const shown = field.dataset.for.split(" ").includes(type);
+        field.classList.toggle("is-hidden", !shown);
+        field.querySelectorAll("input, select").forEach((input) => { input.disabled = !shown; });
+    });
+    byId("rule-type-help").textContent = RULE_TYPES[type].help;
+    updateRulePreview();
 }
 
-document.getElementById("rule-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const payload = {
-        rule_name: document.getElementById("rule_name").value,
-        rule_type: document.getElementById("rule_type").value,
-        threshold_value: document.getElementById("threshold_value").value,
-        threshold_secondary: document.getElementById("threshold_secondary").value || null,
-        severity: document.getElementById("severity").value,
-        enabled: 1,
+function ruleFromForm() {
+    const type = byId("rule_type").value;
+    const rule = {
+        rule_name: byId("rule_name").value.trim(),
+        rule_type: type,
+        severity: byId("severity").value,
+        threshold_secondary: null,
     };
-    try {
-        const result = await api("/api/rules", { method: "POST", body: JSON.stringify(payload) });
-        if (!result.ok) return show("rules-msg", errorText(result));
-        event.target.reset();
-        hide("rules-msg");
-        loadRules();
-    } catch (error) { show("rules-msg", errorBox(error)); }
-});
-
-function alertsTable(alerts) {
-    if (!Array.isArray(alerts) || !alerts.length) return "<p>No alerts found.</p>";
-    const rows = alerts.map((a) => `
-        <tr>
-            <td>${esc(a.alert_id)}</td><td>${esc(a.customer_id)}</td><td>${esc(a.transaction_id)}</td>
-            <td>$${esc(Number(a.transaction_amount).toLocaleString())}</td><td>${esc(a.transaction_recipient ?? "-")}</td>
-            <td>${esc(String(a.transaction_datetime ?? "").replace("T", " "))}</td>
-            <td>${severityBadge(a.severity)}</td><td>${esc(a.status)}</td>
-            <td>${a.ai_explanation ? "Yes" : "No"}</td>
-        </tr>`).join("");
-    return `<div class="table-wrap"><table><tr><th>ID</th><th>Customer</th><th>Txn</th><th>Amount</th><th>Recipient</th>
-        <th>Date/Time</th><th>Severity</th><th>Status</th><th>Explained</th></tr>${rows}</table></div>`;
+    if (type === "velocity") {
+        rule.threshold_value = byId("velocity_count").value;
+        rule.threshold_secondary = byId("velocity_minutes").value;
+    } else if (type === "unusual_time") {
+        rule.threshold_value = byId("time_start").value;
+        rule.threshold_secondary = byId("time_end").value;
+    } else {
+        rule.threshold_value = byId("amount_threshold").value;
+    }
+    return rule;
 }
 
-function sortAlerts(alerts, key) {
-    return [...alerts].sort((a, b) => {
-        if (key === "transaction_amount") return b.transaction_amount - a.transaction_amount;
-        if (key === "transaction_datetime") return String(b.transaction_datetime).localeCompare(String(a.transaction_datetime));
-        return String(a.status).localeCompare(String(b.status));
-    });
+function updateRulePreview() {
+    const rule = ruleFromForm();
+    const complete = rule.threshold_value !== "" && rule.threshold_secondary !== "";
+    byId("rule-preview").innerHTML = complete
+        ? `${esc(describeRule(rule))} raises a ${severityBadge(rule.severity)} alert.`
+        : "Fill in the condition to preview the rule.";
 }
 
-document.getElementById("filter-form").addEventListener("submit", async (event) => {
+function openRuleDialog(rule = null) {
+    editingRuleId = rule ? Number(rule.rule_id) : null;
+    byId("rule-form").reset();
+    byId("rule-form-msg").innerHTML = "";
+    byId("rule-dialog-title").textContent = rule ? `Edit rule #${editingRuleId}` : "New rule";
+    byId("rule-submit").textContent = rule ? "Save changes" : "Create rule";
+    if (rule) {
+        byId("rule_name").value = rule.rule_name;
+        byId("rule_type").value = rule.rule_type;
+        byId("severity").value = rule.severity;
+        const value = Number(rule.threshold_value);
+        const secondary = rule.threshold_secondary == null ? "" : Number(rule.threshold_secondary);
+        if (rule.rule_type === "velocity") {
+            byId("velocity_count").value = value;
+            byId("velocity_minutes").value = secondary;
+        } else if (rule.rule_type === "unusual_time") {
+            byId("time_start").value = String(value);
+            byId("time_end").value = String(secondary === "" ? 0 : secondary);
+        } else {
+            byId("amount_threshold").value = value;
+        }
+    }
+    syncRuleFields();
+    byId("rule-dialog").showModal();
+}
+
+byId("new-rule-btn").addEventListener("click", () => openRuleDialog());
+byId("rule_type").addEventListener("change", syncRuleFields);
+byId("rule-form").addEventListener("input", updateRulePreview);
+
+byId("rule-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const params = new URLSearchParams();
-    const map = { f_status: "status", f_min: "min_amount", f_max: "max_amount", f_from: "date_from", f_to: "date_to", f_q: "q" };
-    Object.entries(map).forEach(([elId, param]) => {
-        const value = document.getElementById(elId).value;
-        if (value) params.set(param, value);
+    const rule = ruleFromForm();
+    const message = byId("rule-form-msg");
+    if (rule.rule_type === "unusual_time" && rule.threshold_value === rule.threshold_secondary) {
+        message.innerHTML = alertBox("error", "The start and end hours must differ.");
+        return;
+    }
+    const editing = editingRuleId;
+    await withBusy(byId("rule-submit"), editing ? "Saving…" : "Creating…", async () => {
+        try {
+            const result = await api(editing ? `/api/rules/${editing}` : "/api/rules", {
+                method: editing ? "PUT" : "POST",
+                body: JSON.stringify(editing ? rule : { ...rule, enabled: 1 }),
+            });
+            if (!result.ok) {
+                message.innerHTML = alertBox("error", esc(errorMessage(result)));
+                return;
+            }
+            byId("rule-dialog").close();
+            toast(editing ? "Rule saved" : `Rule “${rule.rule_name}” created`);
+            loadRules();
+        } catch (error) {
+            message.innerHTML = networkError(error);
+        }
     });
-    try {
-        const result = await api(`/api/alerts?${params}`);
-        if (!result.ok) return show("alerts-result", errorText(result));
-        currentAlerts = result.body;
-        const sorted = sortAlerts(currentAlerts, document.getElementById("f_sort").value);
-        show("alerts-result", alertsTable(sorted));
-    } catch (error) { show("alerts-result", errorBox(error)); }
 });
 
-document.getElementById("f_sort").addEventListener("change", () => {
-    if (currentAlerts.length) show("alerts-result", alertsTable(sortAlerts(currentAlerts, document.getElementById("f_sort").value)));
-});
-
-async function viewDetail() {
-    const id = document.getElementById("detail_id").value;
-    try {
-        const result = await api(`/api/alerts/${encodeURIComponent(id)}`);
-        if (!result.ok) return show("detail-result", errorText(result));
-        const a = result.body;
-        show("detail-result", `
-            <p><b>Alert #${esc(a.alert_id)}</b> - ${severityBadge(a.severity)} - <b>${esc(a.status)}</b><br>
-            Rule: ${esc(a.rule_name ?? "-")} (${esc(a.rule_type ?? "-")}), threshold ${esc(a.threshold_value ?? "-")}${a.threshold_secondary != null ? " / " + esc(a.threshold_secondary) : ""}<br>
-            Customer ${esc(a.customer_id)} | Transaction ${esc(a.transaction_id)} | $${esc(Number(a.transaction_amount).toLocaleString())} to ${esc(a.transaction_recipient ?? "-")}<br>
-            Date: ${esc(a.transaction_datetime ?? "-")} | Category: ${esc(a.transaction_category ?? "-")}</p>
-            <p><b>AI Explanation:</b></p>
-            <pre>${esc(a.ai_explanation ?? "Not yet explained - use the AI Mode tab, or the on-demand explain endpoint.")}</pre>`);
-    } catch (error) { show("detail-result", errorBox(error)); }
-}
-
-document.getElementById("view-detail-btn").addEventListener("click", viewDetail);
-
-document.getElementById("update-status-btn").addEventListener("click", async () => {
-    const id = document.getElementById("detail_id").value;
-    const status = document.getElementById("status-select").value;
-    try {
-        const result = await api(`/api/alerts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ status }) });
-        result.ok ? viewDetail() : show("detail-result", errorText(result));
-    } catch (error) { show("detail-result", errorBox(error)); }
-});
-
-document.getElementById("delete-alert-btn").addEventListener("click", async () => {
-    const id = document.getElementById("detail_id").value;
-    try {
-        const result = await api(`/api/alerts/${encodeURIComponent(id)}`, { method: "DELETE" });
-        show("detail-result", result.ok ? `<p>Deleted alert ${esc(id)}.</p>` : errorText(result));
-    } catch (error) { show("detail-result", errorBox(error)); }
-});
-
-document.getElementById("run-detection-btn").addEventListener("click", async () => {
-    show("detection-result", "<p>Running detection...</p>");
-    try {
-        const result = await api("/api/detection/run", { method: "POST" });
-        if (!result.ok) return show("detection-result", errorText(result));
-        const r = result.body;
-        const skippedRules = r.rules_skipped || [];
-        show("detection-result", `
-            <p><b>${esc(r.new_alert_count)} new alert(s)</b> from ${esc(r.evaluated)} ${esc(r.source)} transactions scanned against ${esc(r.rules_applied)} rule(s).
-            ${r.skipped_duplicates ? `${esc(r.skipped_duplicates)} duplicate(s) skipped. ` : ""}
-            ${r.unscannable_transactions ? `${esc(r.unscannable_transactions)} transaction(s) could not be scanned. ` : ""}
-            ${r.explanations_skipped ? `${esc(r.explanations_skipped)} explanation(s) unavailable. ` : ""}
-            ${r.failed_writes ? `<b>${esc(r.failed_writes)} alert(s) could not be saved.</b> ` : ""}
-            ${skippedRules.length ? `<b>Rule(s) ${esc(skippedRules.join(", "))} skipped: stored thresholds are not usable.</b>` : ""}</p>
-            ${alertsTable(r.new_alerts)}`);
-    } catch (error) { show("detection-result", errorBox(error)); }
-});
-
+populateHours();
+checkService();
 loadRules();
+loadAlerts({ withOverview: true });
 </script>
 </body>
 </html>
