@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Accounts &amp; Customers Dashboard</title>
     <link rel="stylesheet" href="/css/styles.css?v=2">
+    <script src="/js/dashboard.js?v=2"></script>
 </head>
 <body>
 <main class="app-shell">
@@ -14,6 +15,93 @@
             <a class="view-tab" href="/ai-mode">AI Mode</a>
         </nav>
     </header>
+
+    <section class="summary-strip is-raised" id="acc-tiles" aria-label="Accounts overview">
+        <div class="stat"><span class="stat-label">Customers</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Accounts</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Total balance</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+        <div class="stat"><span class="stat-label">Closed accounts</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="customers-title">
+        <div class="card-head">
+            <div>
+                <h2 id="customers-title">Customers</h2>
+                <p class="muted">Select a customer to open their dashboard below.</p>
+            </div>
+        </div>
+        <form id="search-customer-form" class="toolbar" role="search" aria-label="Search customers">
+            <div class="field field-grow">
+                <label for="q">Search</label>
+                <input id="q" name="q" type="search" placeholder="Name, email, phone..." autocomplete="off">
+            </div>
+        </form>
+        <div class="table-wrap" id="customers-wrap">
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" data-sort="customer_id"><button type="button" class="sort-btn">ID</button></th>
+                            <th scope="col" data-sort="name"><button type="button" class="sort-btn">Name</button></th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Phone</th>
+                            <th scope="col" class="num" data-sort="accounts"><button type="button" class="sort-btn">Accounts</button></th>
+                        </tr>
+                    </thead>
+                    <tbody id="customers-body">
+                        <tr class="empty-row"><td colspan="5"><p class="empty-state">Loading customers&hellip;</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="table-foot" id="customers-count"></p>
+    </section>
+
+    <section class="card" aria-labelledby="accounts-title">
+        <div class="card-head">
+            <div>
+                <h2 id="accounts-title">Accounts</h2>
+                <p class="muted">Select an account to edit, close or delete it below.</p>
+            </div>
+        </div>
+        <div class="segmented" id="acc-status-tabs" role="group" aria-label="Filter by status">
+            <button type="button" data-value="" aria-pressed="true">All <span class="seg-count"></span></button>
+            <button type="button" data-value="ACTIVE" aria-pressed="false">Active <span class="seg-count"></span></button>
+            <button type="button" data-value="INACTIVE" aria-pressed="false">Inactive <span class="seg-count"></span></button>
+            <button type="button" data-value="CLOSED" aria-pressed="false">Closed <span class="seg-count"></span></button>
+        </div>
+        <form id="search-account-form" class="toolbar" role="search" aria-label="Search accounts">
+            <div class="field field-grow">
+                <label for="acc_q">Search</label>
+                <input id="acc_q" type="search" placeholder="Account number, type..." autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="acc_f_type">Type</label>
+                <select id="acc_f_type"><option value="">Any</option>
+                    <option>SAVINGS</option><option>CHECKING</option><option>CREDIT</option></select>
+            </div>
+        </form>
+        <div class="table-wrap" id="accounts-wrap">
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" data-sort="account_id"><button type="button" class="sort-btn">ID</button></th>
+                            <th scope="col" data-sort="account_number"><button type="button" class="sort-btn">Number</button></th>
+                            <th scope="col" data-sort="customer"><button type="button" class="sort-btn">Customer</button></th>
+                            <th scope="col" data-sort="account_type"><button type="button" class="sort-btn">Type</button></th>
+                            <th scope="col" class="num" data-sort="balance"><button type="button" class="sort-btn">Balance</button></th>
+                            <th scope="col" data-sort="status"><button type="button" class="sort-btn">Status</button></th>
+                        </tr>
+                    </thead>
+                    <tbody id="accounts-body">
+                        <tr class="empty-row"><td colspan="6"><p class="empty-state">Loading accounts&hellip;</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="table-foot" id="accounts-count"></p>
+    </section>
 
     <section class="card">
         <h2>Create Customer Profile</h2>
@@ -33,16 +121,6 @@
             <button type="submit">Create Customer</button>
         </form>
         <div id="create-customer-result" class="panel is-hidden"></div>
-    </section>
-
-    <section class="card">
-        <h2>Search &amp; Filter Customers</h2>
-        <form id="search-customer-form" class="row">
-            <div><label for="q">Free text</label>
-                <input id="q" name="q" type="text" placeholder="name, email, phone..."></div>
-            <button type="submit">Search Customers</button>
-        </form>
-        <div id="customers-result" class="panel is-hidden"></div>
     </section>
 
     <section class="card">
@@ -95,22 +173,6 @@
     </section>
 
     <section class="card">
-        <h2>Search &amp; Filter Accounts</h2>
-        <form id="search-account-form" class="row">
-            <div><label for="acc_q">Free text</label>
-                <input id="acc_q" type="text" placeholder="account number, type..."></div>
-            <div><label for="acc_f_status">Status</label>
-                <select id="acc_f_status"><option value="">Any</option>
-                    <option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></select></div>
-            <div><label for="acc_f_type">Type</label>
-                <select id="acc_f_type"><option value="">Any</option>
-                    <option>SAVINGS</option><option>CHECKING</option><option>CREDIT</option></select></div>
-            <button type="submit">Search Accounts</button>
-        </form>
-        <div id="accounts-result" class="panel is-hidden"></div>
-    </section>
-
-    <section class="card">
         <h2>Edit / Close / Delete Account</h2>
         <form id="edit-account-form" class="row">
             <div><label for="edit_account_id">Account ID</label>
@@ -151,16 +213,6 @@ function errorBox(error) {
     return `<p>Request failed.</p><pre>${error}</pre>`;
 }
 
-function customersTable(customers) {
-    if (!Array.isArray(customers) || !customers.length) return "<p>No customers found.</p>";
-    const rows = customers.map((c) => `
-        <tr>
-            <td>${c.customer_id}</td><td>${c.first_name} ${c.last_name}</td>
-            <td>${c.email}</td><td>${c.phone ?? "-"}</td><td>${c.address ?? "-"}</td>
-        </tr>`).join("");
-    return `<table><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th></tr>${rows}</table>`;
-}
-
 function accountsTable(accounts) {
     if (!Array.isArray(accounts) || !accounts.length) return "<p>No accounts found.</p>";
     const rows = accounts.map((a) => `
@@ -184,19 +236,204 @@ document.getElementById("create-customer-form").addEventListener("submit", async
         show("create-customer-result", result.ok
             ? `<p><b>Customer #${result.body.customer_id} created.</b></p>`
             : `<p>Error: ${result.body.error || result.status}</p>`);
-        if (result.ok) form.reset();
+        if (result.ok) { form.reset(); refreshLists(); }
     } catch (error) { show("create-customer-result", errorBox(error)); }
 });
 
-document.getElementById("search-customer-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const params = new URLSearchParams();
-    if (document.getElementById("q").value) params.set("q", document.getElementById("q").value);
+// ------------------------------------------------ customer and account lists
+// Both lists load when the page opens and follow their search boxes; the
+// tiles and per-customer account counts always cover every record.
+
+let allCustomers = [];
+let allAccounts = [];
+let customers = [];          // matching the customer search
+let accounts = [];           // matching the account search and type; the tabs split by status
+let customersRequest = 0;    // only the newest request of each list may render
+let accountsRequest = 0;
+let customersReady = false;  // nothing to draw until a list's own request has answered
+let accountsReady = false;
+
+const ACCOUNT_PILLS = { ACTIVE: "pill-ok", INACTIVE: "pill-warn", CLOSED: "pill-neutral" };
+const accountStatus = (a) => String(a.status || "").toUpperCase();
+const customerName = (c) => `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+const emptyRow = (columns, html) => `<tr class="empty-row"><td colspan="${columns}">${html}</td></tr>`;
+const failedRow = (columns, error) => emptyRow(columns,
+    `<p class="alert alert-error">Request failed - is accounts-service running? (${SB.esc(error.message || error)})</p>`);
+
+function balanceText(a) {
+    return a.currency && a.currency !== "AUD"
+        ? `${a.currency} ${Number(a.balance).toFixed(2)}` : SB.fmtMoney(a.balance);
+}
+
+function renderOverview() {
+    const count = (status) => allAccounts.filter((a) => accountStatus(a) === status).length;
+    const open = allAccounts.filter((a) => accountStatus(a) !== "CLOSED");
+    const holders = new Set(allAccounts.map((a) => String(a.customer_id))).size;
+    const balance = open.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+    SB.renderTiles(document.getElementById("acc-tiles"), [
+        { label: "Customers", value: allCustomers.length, sub: `${holders} with an account` },
+        { label: "Accounts", value: allAccounts.length, sub: `${count("ACTIVE")} active` },
+        { label: "Total balance", value: SB.fmtMoneyShort(balance), sub: `across ${SB.plural(open.length, "open account")}` },
+        { label: "Closed accounts", value: count("CLOSED"), sub: `${count("INACTIVE")} inactive` },
+    ]);
+}
+
+const customerSort = SB.sortable(document.querySelector("#customers-wrap thead"),
+    { key: "customer_id", dir: "asc" }, () => renderCustomers(), { accounts: "desc" });
+
+function renderCustomers() {
+    if (!customersReady) return;
+    const perCustomer = SB.countBy(allAccounts, (a) => String(a.customer_id));
+    const valueOf = {
+        customer_id: (c) => Number(c.customer_id),
+        name: (c) => customerName(c).toLowerCase(),
+        accounts: (c) => perCustomer[String(c.customer_id)] || 0,
+    }[customerSort.key];
+    const rows = SB.sortBy(customers, valueOf, customerSort.dir);
+    const q = document.getElementById("q").value.trim();
+    document.getElementById("customers-body").innerHTML = rows.length ? rows.map((c) => `
+        <tr class="is-clickable" data-customer="${Number(c.customer_id)}">
+            <td>#${SB.esc(c.customer_id)}</td>
+            <td><button type="button" class="link-btn">${SB.esc(customerName(c))}</button></td>
+            <td>${SB.esc(c.email)}</td>
+            <td class="nowrap">${SB.esc(c.phone || "–")}</td>
+            <td class="num">${perCustomer[String(c.customer_id)] || 0}</td>
+        </tr>`).join("")
+        : emptyRow(5, `<div class="empty-state"><strong>No customers ${q ? "match this search" : "yet"}</strong></div>`);
+    document.getElementById("customers-count").textContent =
+        `${SB.plural(rows.length, "customer")}${q ? ` matching "${q}"` : ""}`;
+}
+
+async function loadCustomers() {
+    const request = ++customersRequest;
+    const q = document.getElementById("q").value.trim();
+    const wrap = document.getElementById("customers-wrap");
+    wrap.classList.add("is-loading");
     try {
-        const result = await api(`/api/customers?${params}`);
-        result.ok ? show("customers-result", customersTable(result.body))
-                  : show("customers-result", `<p>Error: ${result.body.error || result.status}</p>`);
-    } catch (error) { show("customers-result", errorBox(error)); }
+        const result = await api(`/api/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+        if (request !== customersRequest) return;
+        if (!result.ok) {
+            document.getElementById("customers-body").innerHTML = emptyRow(5,
+                `<p class="alert alert-error">Error: ${SB.esc(result.body.error || result.status)}</p>`);
+            return;
+        }
+        customers = Array.isArray(result.body) ? result.body : [];
+        customersReady = true;
+        renderCustomers();
+    } catch (error) {
+        if (request === customersRequest) document.getElementById("customers-body").innerHTML = failedRow(5, error);
+    } finally {
+        if (request === customersRequest) wrap.classList.remove("is-loading");
+    }
+}
+
+const accountTabs = SB.tabs(document.getElementById("acc-status-tabs"), () => renderAccounts());
+const accountSort = SB.sortable(document.querySelector("#accounts-wrap thead"),
+    { key: "account_id", dir: "asc" }, () => renderAccounts(), { balance: "desc" });
+
+function renderAccounts() {
+    if (!accountsReady) return;
+    accountTabs.update(SB.countBy(accounts, accountStatus));
+    const names = Object.fromEntries(allCustomers.map((c) => [String(c.customer_id), customerName(c)]));
+    const valueOf = {
+        account_id: (a) => Number(a.account_id),
+        account_number: (a) => String(a.account_number),
+        customer: (a) => Number(a.customer_id),
+        account_type: (a) => String(a.account_type),
+        balance: (a) => Number(a.balance) || 0,
+        status: (a) => accountStatus(a),
+    }[accountSort.key];
+    const visible = accountTabs.value ? accounts.filter((a) => accountStatus(a) === accountTabs.value) : accounts;
+    const rows = SB.sortBy(visible, valueOf, accountSort.dir);
+    document.getElementById("accounts-body").innerHTML = rows.length ? rows.map((a) => {
+        const owner = names[String(a.customer_id)];
+        return `<tr class="is-clickable" data-account="${Number(a.account_id)}">
+            <td>#${SB.esc(a.account_id)}</td>
+            <td><button type="button" class="link-btn">${SB.esc(a.account_number)}</button></td>
+            <td>#${SB.esc(a.customer_id)}${owner ? `<span class="cell-sub">${SB.esc(owner)}</span>` : ""}</td>
+            <td>${SB.esc(SB.titleCase(a.account_type))}</td>
+            <td class="num">${SB.esc(balanceText(a))}</td>
+            <td><span class="pill ${ACCOUNT_PILLS[accountStatus(a)] || "pill-neutral"}">${SB.esc(SB.titleCase(a.status))}</span></td>
+        </tr>`;
+    }).join("")
+        : emptyRow(6, '<div class="empty-state"><strong>No accounts match these filters</strong></div>');
+    document.getElementById("accounts-count").textContent = `Showing ${rows.length} of ${SB.plural(accounts.length, "account")}`;
+}
+
+async function loadAccounts() {
+    const request = ++accountsRequest;
+    const params = new URLSearchParams();
+    if (document.getElementById("acc_q").value.trim()) params.set("q", document.getElementById("acc_q").value.trim());
+    if (document.getElementById("acc_f_type").value) params.set("account_type", document.getElementById("acc_f_type").value);
+    const wrap = document.getElementById("accounts-wrap");
+    wrap.classList.add("is-loading");
+    try {
+        const result = await api(`/api/accounts${params.toString() ? `?${params}` : ""}`);
+        if (request !== accountsRequest) return;
+        if (!result.ok) {
+            document.getElementById("accounts-body").innerHTML = emptyRow(6,
+                `<p class="alert alert-error">Error: ${SB.esc(result.body.error || result.status)}</p>`);
+            return;
+        }
+        accounts = Array.isArray(result.body) ? result.body : [];
+        accountsReady = true;
+        renderAccounts();
+    } catch (error) {
+        if (request === accountsRequest) document.getElementById("accounts-body").innerHTML = failedRow(6, error);
+    } finally {
+        if (request === accountsRequest) wrap.classList.remove("is-loading");
+    }
+}
+
+// Unfiltered lists for the tiles, the per-customer counts and owner names.
+async function loadOverview() {
+    try {
+        const [allC, allA] = await Promise.all([api("/api/customers"), api("/api/accounts")]);
+        if (!allC.ok || !allA.ok) return;
+        allCustomers = Array.isArray(allC.body) ? allC.body : [];
+        allAccounts = Array.isArray(allA.body) ? allA.body : [];
+        renderOverview();
+        renderCustomers();
+        renderAccounts();
+    } catch (error) { /* the lists below report the failure */ }
+}
+
+// After anything that changes customers or accounts.
+function refreshLists() {
+    loadOverview();
+    loadCustomers();
+    loadAccounts();
+}
+
+document.getElementById("search-customer-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadCustomers();
+});
+document.getElementById("q").addEventListener("input", SB.debounce(() => loadCustomers()));
+
+document.getElementById("search-account-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadAccounts();
+});
+document.getElementById("acc_q").addEventListener("input", SB.debounce(() => loadAccounts()));
+document.getElementById("acc_f_type").addEventListener("change", () => loadAccounts());
+
+// Selecting a row fills in the forms below for that customer or account.
+document.getElementById("customers-body").addEventListener("click", (event) => {
+    const row = event.target.closest("tr[data-customer]");
+    if (!row) return;
+    detailIdInput.value = row.dataset.customer;
+    document.getElementById("edit_customer_id").value = row.dataset.customer;
+    viewDashboard();
+    document.getElementById("detail-form").closest(".card").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+document.getElementById("accounts-body").addEventListener("click", (event) => {
+    const row = event.target.closest("tr[data-account]");
+    if (!row) return;
+    editAccountIdInput.value = row.dataset.account;
+    document.getElementById("edit-account-form").closest(".card").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("edit_account_type").focus({ preventScroll: true });
 });
 
 const detailIdInput = document.getElementById("detail_id");
@@ -222,6 +459,7 @@ document.getElementById("delete-customer-btn").addEventListener("click", async (
         show("detail-result", result.ok
             ? `<p>Deleted customer ${detailIdInput.value}.</p>`
             : `<p>Error: ${JSON.stringify(result.body)}</p>`);
+        if (result.ok) refreshLists();
     } catch (error) { show("detail-result", errorBox(error)); }
 });
 
@@ -239,6 +477,7 @@ document.getElementById("edit-customer-form").addEventListener("submit", async (
         show("edit-customer-result", result.ok
             ? `<p>Customer ${id} updated.</p>`
             : `<p>Error: ${result.body.error || result.status}</p>`);
+        if (result.ok) refreshLists();
     } catch (error) { show("edit-customer-result", errorBox(error)); }
 });
 
@@ -256,20 +495,8 @@ document.getElementById("create-account-form").addEventListener("submit", async 
         show("create-account-result", result.ok
             ? `<p><b>Account #${result.body.account_id} created and linked to customer ${payload.customer_id}.</b></p>`
             : `<p>Error: ${result.body.error || result.status}</p>`);
+        if (result.ok) refreshLists();
     } catch (error) { show("create-account-result", errorBox(error)); }
-});
-
-document.getElementById("search-account-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const params = new URLSearchParams();
-    if (document.getElementById("acc_q").value) params.set("q", document.getElementById("acc_q").value);
-    if (document.getElementById("acc_f_status").value) params.set("status", document.getElementById("acc_f_status").value);
-    if (document.getElementById("acc_f_type").value) params.set("account_type", document.getElementById("acc_f_type").value);
-    try {
-        const result = await api(`/api/accounts?${params}`);
-        result.ok ? show("accounts-result", accountsTable(result.body))
-                  : show("accounts-result", `<p>Error: ${result.body.error || result.status}</p>`);
-    } catch (error) { show("accounts-result", errorBox(error)); }
 });
 
 const editAccountIdInput = document.getElementById("edit_account_id");
@@ -285,6 +512,7 @@ document.getElementById("edit-account-form").addEventListener("submit", async (e
         show("edit-account-result", result.ok
             ? `<p>Account ${editAccountIdInput.value} updated.</p>`
             : `<p>Error: ${result.body.error || result.status}</p>`);
+        if (result.ok) refreshLists();
     } catch (error) { show("edit-account-result", errorBox(error)); }
 });
 
@@ -294,6 +522,7 @@ document.getElementById("close-account-btn").addEventListener("click", async () 
         show("edit-account-result", result.ok
             ? `<p>Account ${editAccountIdInput.value} closed.</p>`
             : `<p>Error: ${result.body.error || result.status}</p>`);
+        if (result.ok) refreshLists();
     } catch (error) { show("edit-account-result", errorBox(error)); }
 });
 
@@ -303,8 +532,11 @@ document.getElementById("delete-account-btn").addEventListener("click", async ()
         show("edit-account-result", result.ok
             ? `<p>Deleted account ${editAccountIdInput.value}.</p>`
             : `<p>Error: ${JSON.stringify(result.body)}</p>`);
+        if (result.ok) refreshLists();
     } catch (error) { show("edit-account-result", errorBox(error)); }
 });
+
+refreshLists();
 </script>
 </body>
 </html>
