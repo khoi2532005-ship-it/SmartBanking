@@ -1,26 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Accounts &amp; Customers Dashboard</title>
-    <link rel="stylesheet" href="/css/styles.css">
-    <style>
-        body { margin: 0; min-height: auto; background: transparent; }
-        .app-shell { max-width: none; padding: 0; }
-        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
-        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
-        th { background: #f0f3f7; }
-        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .row > div { display: flex; flex-direction: column; }
-        pre { white-space: pre-wrap; font-size: 0.8rem; }
-    </style>
+    <link rel="stylesheet" href="/css/styles.css?v=2">
 </head>
 <body>
 <main class="app-shell">
-    <nav class="row" style="margin-bottom: 1rem;">
-    <a href="/" class="btn">Normal</a>
-    <a href="/ai-mode" class="btn btn-secondary">AI Mode</a>
-    </nav>
+    <header class="topbar">
+        <nav class="view-tabs" aria-label="Accounts views">
+            <a class="view-tab is-active" href="/" aria-current="page">Normal</a>
+            <a class="view-tab" href="/ai-mode">AI Mode</a>
+        </nav>
+    </header>
+
     <section class="card">
         <h2>Create Customer Profile</h2>
         <form id="create-customer-form" class="row">
@@ -39,7 +33,9 @@
             <button type="submit">Create Customer</button>
         </form>
         <div id="create-customer-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Search &amp; Filter Customers</h2>
         <form id="search-customer-form" class="row">
             <div><label for="q">Free text</label>
@@ -47,16 +43,20 @@
             <button type="submit">Search Customers</button>
         </form>
         <div id="customers-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Customer Dashboard</h2>
         <form id="detail-form" class="row">
             <div><label for="detail_id">Customer ID</label>
                 <input id="detail_id" type="number" min="1" placeholder="1"></div>
             <button type="submit">View Dashboard</button>
-            <button type="button" id="delete-customer-btn">Delete Customer</button>
+            <button type="button" class="btn-danger" id="delete-customer-btn">Delete Customer</button>
         </form>
         <div id="detail-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Edit Customer</h2>
         <form id="edit-customer-form" class="row">
             <div><label for="edit_customer_id">Customer ID</label>
@@ -74,7 +74,9 @@
             <button type="submit">Update Customer</button>
         </form>
         <div id="edit-customer-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Create &amp; Link Bank Account</h2>
         <form id="create-account-form" class="row">
             <div><label for="acc_customer_id">Customer ID</label>
@@ -90,7 +92,9 @@
             <button type="submit">Create Account</button>
         </form>
         <div id="create-account-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Search &amp; Filter Accounts</h2>
         <form id="search-account-form" class="row">
             <div><label for="acc_q">Free text</label>
@@ -104,7 +108,9 @@
             <button type="submit">Search Accounts</button>
         </form>
         <div id="accounts-result" class="panel is-hidden"></div>
+    </section>
 
+    <section class="card">
         <h2>Edit / Close / Delete Account</h2>
         <form id="edit-account-form" class="row">
             <div><label for="edit_account_id">Account ID</label>
@@ -118,8 +124,8 @@
                 <select id="edit_status"><option value="">(unchanged)</option>
                     <option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></select></div>
             <button type="submit">Update Account</button>
-            <button type="button" id="close-account-btn">Close Account</button>
-            <button type="button" id="delete-account-btn">Delete Account</button>
+            <button type="button" class="btn-secondary" id="close-account-btn">Close Account</button>
+            <button type="button" class="btn-danger" id="delete-account-btn">Delete Account</button>
         </form>
         <div id="edit-account-result" class="panel is-hidden"></div>
     </section>

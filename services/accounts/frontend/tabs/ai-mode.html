@@ -1,36 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Account AI Insights</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css?v=2">
     <style>
-        body { margin: 0; min-height: auto; background: transparent; }
-        .app-shell { max-width: none; padding: 0; }
-        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .row > div { display: flex; flex-direction: column; }
-        pre { white-space: pre-wrap; font-size: 0.85rem; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; }
-        .badge-LOW { background: #d9f2df; color: #1e6b34; }
-        .badge-MEDIUM { background: #fdf0d0; color: #8a5a00; }
-        .badge-HIGH { background: #fbdada; color: #9c1c1c; }
-        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
-        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
-        th { background: #f0f3f7; }
-        .muted { color: var(--ink-soft, #666); font-size: 0.87rem; }
-        .panel.degraded { background: #fdf2e9; border-color: #d68910; }
-        .source-list { margin: 0.25rem 0 0; padding-left: 1.2rem; }
-        .examples .chip { cursor: pointer; border: 0; font: inherit; }
+        /* Risk levels from the backend: LOW / MEDIUM / HIGH. */
+        .badge-LOW { background: var(--ok-tint); color: var(--ok); }
+        .badge-MEDIUM { background: var(--warn-tint); color: var(--warn); }
+        .badge-HIGH { background: var(--over-tint); color: var(--over); }
+        .panel.degraded { background: var(--warn-tint); border-color: #f0d9ac; }
         .counts { display: flex; gap: 1.5rem; flex-wrap: wrap; }
         .counts table { width: auto; min-width: 12rem; }
     </style>
 </head>
 <body>
 <main class="app-shell">
-    <nav class="row" style="margin-bottom: 1rem;">
-    <a href="/" class="btn">Normal</a>
-    <a href="/ai-mode" class="btn btn-secondary">AI Mode</a>
-    </nav>
+    <header class="topbar">
+        <nav class="view-tabs" aria-label="Accounts views">
+            <a class="view-tab" href="/">Normal</a>
+            <a class="view-tab is-active" href="/ai-mode" aria-current="page">AI Mode</a>
+        </nav>
+    </header>
+
     <section class="card">
         <h2>AI Account Summary &amp; Risk Profile</h2>
         <form id="ai-form" class="row">
@@ -42,7 +35,7 @@
         </form>
         <div id="ai-result" class="panel is-hidden"></div>
 
-        <p style="font-size: 0.8rem;">
+        <p class="footnote">
             AI-Mode is powered by the model configured in <code>LLM_PROVIDER</code>
             (Ollama with Llama/Qwen, or Gemini for local dev). Make sure the provider
             in your <code>.env</code> is running.
@@ -50,7 +43,7 @@
     </section>
 
     <section class="card">
-        <h2>Account Counts <span class="muted">via MCP</span></h2>
+        <h2>Account Counts <span class="tag">MCP</span></h2>
         <p class="muted">accounts-service calls the <code>accounts_count</code> tool on the shared MCP server
             (Release 1). Read-only and aggregate-only: no account numbers or balances cross the boundary.</p>
         <form id="mcp-form" class="row">
@@ -63,20 +56,20 @@
     </section>
 
     <section class="card">
-        <h2>Ask about Accounts &amp; Customers <span class="muted">via RAG</span></h2>
+        <h2>Ask about Accounts &amp; Customers <span class="tag">RAG</span></h2>
         <p class="muted">accounts-service asks the shared RAG server, which answers only from SmartBank's
             approved documents, with source citations and a confidence category.</p>
         <form id="rag-form" class="row">
-            <div style="flex: 1 1 18rem; display: flex; flex-direction: column;">
+            <div class="grow">
                 <label for="rag_query">Question</label>
                 <input id="rag_query" maxlength="1000" required
                        placeholder="What database tables does the Accounts feature own?"></div>
             <button type="submit">Ask</button>
         </form>
-        <div class="chips examples" style="display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;margin-top:0.5rem;">Try:
-            <button type="button" class="chip" data-question="What database tables does the Accounts feature own?">database tables</button>
-            <button type="button" class="chip" data-question="What happens when an account is deleted versus closed?">delete vs close</button>
-            <button type="button" class="chip" data-question="What will the ASX 200 close at tomorrow?">off-topic question</button>
+        <div class="chips examples">Try:
+            <button type="button" class="chip-btn" data-question="What database tables does the Accounts feature own?">database tables</button>
+            <button type="button" class="chip-btn" data-question="What happens when an account is deleted versus closed?">delete vs close</button>
+            <button type="button" class="chip-btn" data-question="What will the ASX 200 close at tomorrow?">off-topic question</button>
         </div>
         <div id="rag-result" class="panel is-hidden"></div>
     </section>
@@ -112,8 +105,8 @@ document.getElementById("summary-btn").addEventListener("click", async () => {
         const result = await api(`/api/ai/customers/${customerId()}/summary`);
         if (!result.ok) return show(`<p>Error: ${result.body.error || result.status}</p>`);
         const t = result.body.totals;
-        show(`<p><b>Account Summary</b></p><pre>${result.body.summary}</pre>
-             <p style="font-size:0.8rem;">${t.active_count} active account(s), total balance $${Number(t.total_balance).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>`);
+        show(`<div class="ai-note"><span class="ai-label">Account Summary</span><pre>${result.body.summary}</pre></div>
+             <p class="provenance">${t.active_count} active account(s), total balance $${Number(t.total_balance).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>`);
     } catch (error) { show(errorBox(error)); }
 });
 
@@ -124,7 +117,7 @@ document.getElementById("risk-btn").addEventListener("click", async () => {
         if (!result.ok) return show(`<p>Error: ${result.body.error || result.status}</p>`);
         const r = result.body;
         show(`<p><b>Risk Level:</b> <span class="badge badge-${r.risk_level}">${r.risk_level}</span></p>
-             <pre>${r.explanation}</pre>
+             <div class="ai-note"><pre>${r.explanation}</pre></div>
              <ul>${r.checks.map((c) => `<li>${c.passed ? "PASS" : "FAIL"} - ${c.detail}</li>`).join("")}</ul>`);
     } catch (error) { show(errorBox(error)); }
 });
