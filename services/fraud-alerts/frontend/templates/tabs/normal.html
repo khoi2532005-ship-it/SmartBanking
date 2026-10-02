@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fraud Alerts - SmartBank</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css?v=2">
     <link rel="stylesheet" href="/static/fraud.css">
 </head>
 <body>
@@ -19,13 +19,6 @@
 
     <div id="offline-banner" class="alert alert-error is-hidden" role="alert"></div>
 
-    <section class="kpis" id="kpis" aria-label="Alert overview">
-        <div class="kpi"><span class="kpi-label">Open alerts</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
-        <div class="kpi"><span class="kpi-label">High severity, open</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
-        <div class="kpi"><span class="kpi-label">Value under review</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
-        <div class="kpi"><span class="kpi-label">Confirmed fraud</span><span class="kpi-value">–</span><span class="kpi-sub">&nbsp;</span></div>
-    </section>
-
     <section class="card" aria-labelledby="alerts-title">
         <div class="card-head">
             <div>
@@ -36,6 +29,13 @@
                 <span class="muted" id="detect-scope"></span>
                 <button type="button" id="run-detection-btn">Run detection</button>
             </div>
+        </div>
+
+        <div class="summary-strip" id="kpis" aria-label="Alert overview">
+            <div class="stat"><span class="stat-label">Open alerts</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+            <div class="stat"><span class="stat-label">High severity, open</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+            <div class="stat"><span class="stat-label">Value under review</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
+            <div class="stat"><span class="stat-label">Confirmed fraud</span><span class="stat-value">–</span><span class="stat-sub">&nbsp;</span></div>
         </div>
 
         <div id="detection-result" class="is-hidden" aria-live="polite"></div>
@@ -280,8 +280,8 @@ function renderOverview() {
         ["Confirmed fraud", count("confirmed"), `${count("dismissed")} dismissed as legitimate`],
     ];
     byId("kpis").innerHTML = tiles.map(([label, figure, sub]) => `
-        <div class="kpi"><span class="kpi-label">${label}</span>
-            <span class="kpi-value">${esc(figure)}</span><span class="kpi-sub">${esc(sub)}</span></div>`).join("");
+        <div class="stat"><span class="stat-label">${label}</span>
+            <span class="stat-value">${esc(figure)}</span><span class="stat-sub">${esc(sub)}</span></div>`).join("");
 }
 
 // ------------------------------------------------------------------ alerts
