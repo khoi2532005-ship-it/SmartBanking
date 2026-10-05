@@ -93,6 +93,13 @@ jobs:
           check_url "http://localhost:5002/api/health"
           check_url "http://localhost:5012/"
 
+      - name: Verify MCP and RAG modes are disabled in CI
+        run: |
+          mcp=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5002/api/mcp/tools)
+          rag=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"query":"ci check"}' http://localhost:5002/api/rag/answer)
+          echo "mcp=$mcp rag=$rag"
+          [ "$mcp" = "403" ] && [ "$rag" = "403" ]
+
       - name: Stop services
         if: always()
         run: docker-compose down -v
