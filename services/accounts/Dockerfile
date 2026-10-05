@@ -6,6 +6,8 @@ COPY services/accounts/database/requirements.txt database-requirements.txt
 COPY services/accounts/backend/ backend/
 COPY services/accounts/database/ database/
 COPY services/accounts/frontend/ frontend/
+COPY shared/frontend/css frontend/css
+COPY shared/frontend/js frontend/js
 COPY services/accounts/run.py run.py
 COPY prompts/ prompts/
 
