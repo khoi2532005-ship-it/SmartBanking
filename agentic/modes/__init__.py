@@ -16,6 +16,8 @@ from agentic.modes.fraud import FraudMode
 from agentic.modes.loans import LoansMode
 from agentic.modes.accounts import AccountsMode
 from agentic.modes.transactions import TransactionsMode
+from agentic.modes.mcp_validation import MCPValidationMode
+from agentic.modes.rag_validation import RAGValidationMode
 
 # Implemented modes, in menu order.
 MODES: dict[str, Mode] = {
@@ -26,6 +28,9 @@ MODES: dict[str, Mode] = {
         LoansMode(),
         TransactionsMode(),
         AccountsMode(),
+        # Release 1: the shared MCP and RAG servers, validated through the same loop.
+        MCPValidationMode(),
+        RAGValidationMode(),
     )
 }
 

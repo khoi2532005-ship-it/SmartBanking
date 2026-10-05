@@ -89,7 +89,11 @@ Transactions API contract is not final.
 ## Database
 
 `budgeting_and_insights.db`, owned solely by `budgets-db-api`. Seeded at image
-build time by `init_db.py`.
+build time by `init_db.py`. The seeded budgets are a fixed demo period,
+**September 2026** (plus three August lines for history): the tab defaults to
+it, the CI smoke test names it, and the loop's budgeting mode falls back to it
+when the current month is empty. API calls without `month`/`year` use the
+current month and answer an empty month as empty.
 
 | Table | Columns | Seeded |
 |---|---|---|
@@ -159,10 +163,13 @@ MCP SDK. Checks: `python -m tests.test_agent_clients` from `backend/`.
 ### HTMX fragments
 
 `/ui/*` returns HTML fragments for the frontend to swap in. The `/api/*` JSON
-endpoints are the contract other features consume. Release 1 adds
-`GET /ui/mcp/tools`, `POST /ui/mcp/tool` and `POST /ui/rag/query`, which
-render the MCP tool result, and the grounded answer with citations and a
-confidence badge or the insufficient-context state.
+endpoints are the contract other features consume. Release 1 adds two panels
+to the tab, backed by `GET /ui/mcp/status`, `GET /ui/mcp/tools`,
+`POST /ui/mcp/tool`, `GET /ui/rag/status` and `POST /ui/rag/query`: the
+structured MCP tool result, and the grounded answer with citations and a
+confidence badge or the distinct insufficient-context state. Each panel's
+status line says whether its server is reachable, inactive (flag off) or
+down, and the controls stay in place in every state.
 
 ## Budget status
 

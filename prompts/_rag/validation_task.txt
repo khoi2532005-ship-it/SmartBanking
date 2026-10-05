@@ -1,0 +1,11 @@
+Write the RAG server entry for the evaluation record from the evidence below.
+
+Reply in exactly five lines, in this order and format, with nothing before or after:
+
+Index: <chunks> chunks from <sources> documents, retrieval mode <mode>
+Retrieval: mean P@5 <value>, mean R@5 <value>, <hits> of <total> benchmark questions found a relevant chunk in the top 5
+Grounded answer: confidence <category>, citations <every cited chunk id, comma-separated>
+Off-topic: <count> questions returned insufficient context with no citations and no model call
+Verdict: <passed>/<run> checks passed, <skipped> skipped - <PASS or FAIL>
+
+A skipped check was not run and is not a pass: <run> counts only the checks that ran, and <skipped> is stated separately (0 if none). Copy chunk ids, categories and figures from the evidence. Do not round, reword or omit them.

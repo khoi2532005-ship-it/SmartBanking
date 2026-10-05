@@ -50,6 +50,24 @@
         .insight-history p { margin: 0; font-size: 0.9rem; }
         .source-note { margin-bottom: 0; }
         .unbudgeted { margin: 0.5rem 0 0; }
+        /* Release 1: shared MCP and RAG server panels */
+        .status-line { display: flex; gap: 0.5rem; align-items: center;
+                       flex-wrap: wrap; margin: 0.25rem 0 0.9rem;
+                       font-size: 0.87rem; color: var(--ink-soft); }
+        .status-line .status-text { flex: 1 1 240px; min-width: 0; }
+        .status-line .badge { margin-left: 0; }
+        .status-line .btn-small { margin-left: auto; }
+        .rag-form .grow { flex: 1 1 320px; }
+        .rag-form .grow input { width: 100%; }
+        .chips { margin: 0.6rem 0 0; }
+        .chip-btn { border: 1px solid transparent; cursor: pointer; font: inherit;
+                    font-size: 0.78rem; font-weight: 600; line-height: 1.4; }
+        .chip-btn:hover { background: var(--brand-tint); border-color: var(--brand);
+                          color: var(--brand-dark); }
+        .rag-answer { border-left: 4px solid var(--ok); padding-left: 0.75rem; }
+        .rag-insufficient { border-left: 4px solid var(--warn); padding-left: 0.75rem; }
+        .insight-card h4 { margin: 0.7rem 0 0.2rem; font-size: 0.78rem;
+                           text-transform: uppercase; letter-spacing: 0.04em; }
     </style>
 </head>
 <body>
@@ -189,6 +207,103 @@
         <div id="history-panel" class="panel is-hidden"></div>
     </section>
 
+    <section class="card">
+        <h2>Budget summary <span class="muted">via MCP</span></h2>
+        <p class="status-line">
+            <span id="mcp-status" class="status-text"
+                  hx-get="/ui/mcp/status"
+                  hx-trigger="load"
+                  hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/mcp/status"
+                    hx-target="#mcp-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
+
+        <div class="row">
+            <div>
+                <button type="button" class="btn btn-ai"
+                        hx-post="/ui/mcp/tool"
+                        hx-target="#mcp-panel"
+                        hx-swap="innerHTML"
+                        hx-include="#period-form"
+                        hx-indicator="#mcp-spinner">Run budgeting_summary</button>
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary"
+                        hx-get="/ui/mcp/tools"
+                        hx-target="#mcp-tools-panel"
+                        hx-swap="innerHTML"
+                        hx-indicator="#mcp-spinner">Registered tools</button>
+            </div>
+            <div>
+                <span id="mcp-spinner" class="htmx-indicator spinner">
+                    Calling...
+                </span>
+            </div>
+        </div>
+
+        <div id="mcp-panel" class="panel">
+            <p class="empty">No tool call made yet.</p>
+        </div>
+
+        <div id="mcp-tools-panel" class="panel is-hidden"></div>
+    </section>
+
+    <section class="card">
+        <h2>Ask the project documents <span class="muted">via RAG</span></h2>
+        <p class="status-line">
+            <span id="rag-status" class="status-text"
+                  hx-get="/ui/rag/status"
+                  hx-trigger="load"
+                  hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/rag/status"
+                    hx-target="#rag-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
+
+        <form class="row rag-form" id="rag-form"
+              hx-post="/ui/rag/query"
+              hx-target="#rag-panel"
+              hx-swap="innerHTML"
+              hx-indicator="#rag-spinner">
+            <div class="grow">
+                <label for="rag-query">Question</label>
+                <input id="rag-query" name="query" type="text" maxlength="1000" required
+                       placeholder="e.g. What does NEAR_LIMIT mean for a budget?">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-ai">Ask</button>
+            </div>
+            <div>
+                <span id="rag-spinner" class="htmx-indicator spinner">
+                    Asking...
+                </span>
+            </div>
+        </form>
+
+        <div class="chips">
+            Try:
+            <button type="button" class="chip chip-btn"
+                    data-question="What does NEAR_LIMIT mean for a budget?">Budget status</button>
+            <button type="button" class="chip chip-btn"
+                    data-question="Which feature is the source of record for customers and accounts?">Source of record</button>
+            <button type="button" class="chip chip-btn"
+                    data-question="Which tools does the shared MCP server expose?">MCP tools</button>
+            <button type="button" class="chip chip-btn"
+                    data-question="What is the weather in Sydney today?">Off-topic</button>
+        </div>
+
+        <div id="rag-panel" class="panel">
+            <p class="empty">No question asked yet.</p>
+        </div>
+    </section>
+
 </main>
 
 <script>
@@ -202,11 +317,21 @@ document.body.addEventListener("htmx:configRequest", (event) => {
     }
 });
 
-// Reveal the history panel the first time it is populated.
+// Reveal hidden panels the first time they are populated.
+const REVEAL_ON_SWAP = new Set(["history-panel", "mcp-tools-panel"]);
 document.body.addEventListener("htmx:afterSwap", (event) => {
-    if (event.detail.target.id === "history-panel") {
+    if (REVEAL_ON_SWAP.has(event.detail.target.id)) {
         event.detail.target.classList.remove("is-hidden");
     }
+});
+
+// Example questions for the RAG panel: fill the box and submit the form.
+document.body.addEventListener("click", (event) => {
+    const chip = event.target.closest(".chip-btn");
+    if (!chip) return;
+    document.getElementById("rag-query").value = chip.dataset.question;
+    const form = document.getElementById("rag-form");
+    form.requestSubmit ? form.requestSubmit() : htmx.trigger(form, "submit");
 });
 
 // Clear the create form once a budget has been created successfully.

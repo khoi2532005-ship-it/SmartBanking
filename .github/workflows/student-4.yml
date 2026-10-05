@@ -16,6 +16,8 @@ on:
       - 'mcp_server/**'
       - 'rag_server/**'
       - 'prompts/_rag/**'
+      - 'prompts/_mcp/**'
+      - 'agentic/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
       - 'requirements-rag.txt'
@@ -30,6 +32,8 @@ on:
       - 'mcp_server/**'
       - 'rag_server/**'
       - 'prompts/_rag/**'
+      - 'prompts/_mcp/**'
+      - 'agentic/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
       - 'requirements-rag.txt'
@@ -90,7 +94,9 @@ jobs:
         env:
           MCP_ENABLED: "false"
           RAG_ENABLED: "false"
-        run: python -m tests.test_agent_clients
+        run: |
+          python -m tests.test_agent_clients
+          python -m tests.test_budget_routes
 
       # Pure-function tests for the shared MCP and RAG servers. They need no
       # running server, no ChromaDB and no API key: MCP and RAG stay disabled
@@ -99,7 +105,7 @@ jobs:
         run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
 
       - name: Run shared MCP and RAG unit tests
-        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py -q
+        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py -q
 
   # =====================================================================
   # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200
@@ -142,8 +148,15 @@ jobs:
           probe "backend-api"      "http://localhost:5004/api/health"
           probe "frontend"         "http://localhost:3004/tabs/budgets.html"
           probe "budget-crud"      "http://localhost:5004/api/budgets"
-          probe "budget-summary"   "http://localhost:5004/api/budgets/summary?customer_id=1"
+          # The seed is a fixed demo period (September 2026); the current month may
+          # legitimately have no budgets, so the summary checks name the period.
+          probe "budget-summary"   "http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026"
+          probe "budget-summary-now" "http://localhost:5004/api/budgets/summary?customer_id=1"
           probe "htmx-fragment"    "http://localhost:5004/ui/budgets?customer_id=1"
+          # Release 1 panel fragments answer 200 even with MCP/RAG disabled
+          probe "htmx-mcp-status"  "http://localhost:5004/ui/mcp/status"
+          probe "htmx-mcp-tools"   "http://localhost:5004/ui/mcp/tools"
+          probe "htmx-rag-status"  "http://localhost:5004/ui/rag/status"
 
       - name: Verify seeded records and budget calculations
         run: |
@@ -154,11 +167,12 @@ jobs:
             exit 1
           fi
 
-          curl -s "http://localhost:5004/api/budgets/summary?customer_id=1" \
+          curl -s "http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026" \
             | python3 -c '
           import json, sys
           s = json.load(sys.stdin)
-          assert s["budgets"], "summary returned no budgets"
+          assert s["budgets"], "summary returned no budgets for the seeded period 09/2026"
+          assert (s["month"], s["year"]) == (9, 2026), (s["month"], s["year"])
           for line in s["budgets"]:
               assert line["status"] in ("OVER_BUDGET", "NEAR_LIMIT", "ON_TRACK"), line
           print("summary OK:", s["totals"])
@@ -174,6 +188,20 @@ jobs:
           assert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"]
           assert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"]
           print("mcp:", h["mcp"]); print("rag:", h["rag"])'
+
+          # The panel status lines render the inactive state, never a broken swap
+          curl -s http://localhost:5004/ui/mcp/status | grep -q "Inactive" \
+            || { echo "FAIL /ui/mcp/status did not report the inactive state"; exit 1; }
+          curl -s http://localhost:5004/ui/rag/status | grep -q "Inactive" \
+            || { echo "FAIL /ui/rag/status did not report the inactive state"; exit 1; }
+
+          # The frontend tab carries both Release 1 panels
+          page=$(curl -s http://localhost:3004/tabs/budgets.html)
+          for needle in 'hx-post="/ui/mcp/tool"' 'hx-get="/ui/mcp/tools"' 'hx-post="/ui/rag/query"'; do
+            printf '%s' "$page" | grep -qF "$needle" \
+              || { echo "FAIL frontend tab lacks $needle"; exit 1; }
+          done
+          echo "panels present in the frontend; status fragments report the inactive state"
 
       - name: Container status
         if: always()
@@ -245,7 +273,8 @@ jobs:
           | budgeting-database-service | \`GET http://localhost:5014/\` |
           | budgeting-service | \`GET http://localhost:5004/api/health\` |
           | budgeting-service | \`GET http://localhost:5004/api/budgets\` |
-          | budgeting-service | \`GET http://localhost:5004/api/budgets/summary\` |
+          | budgeting-service | \`GET http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026\` (seeded period) |
+          | budgeting-service | \`GET http://localhost:5004/ui/mcp/status\`, \`GET http://localhost:5004/ui/rag/status\` (inactive in CI) |
           | budgeting-frontend-service | \`GET http://localhost:3004/tabs/budgets.html\` |
           MD
 

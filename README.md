@@ -40,6 +40,40 @@ Fallback local LLM: `docker compose --profile local-llm up -d` and set
 
 Stop everything: `docker compose down -v`
 
+## Release 1 demo run sheet
+
+Four terminals, in this order. The commands are the same on Windows
+(PowerShell) and macOS; only the venv activation differs.
+
+```powershell
+# once, from the repo root
+py -3.12 -m venv .venv                       # macOS: python3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1                 # macOS: source .venv/bin/activate
+pip install -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-rag.txt
+copy .env.example .env                       # then set GEMINI_API_KEY (macOS: cp)
+
+# terminal 1 - shared MCP server, host process on 8100
+python -m mcp_server.server
+
+# terminal 2 - shared RAG server, host process on 8200 (builds the index the first time)
+python -m rag_server.server
+
+# terminal 3 - the five features + home page; containers reach 1 and 2 via host.docker.internal
+docker compose up --build -d
+
+# terminal 4 - the agentic loop, once 1 to 3 are up
+python agentic_loop.py                       # menu: any feature, or the two validation modes
+python agentic_loop.py --mode mcp_validation
+python agentic_loop.py --mode rag_validation
+```
+
+Seeded demo data is September 2026: the budgeting tab opens on it and the
+loop's budgeting mode finds it by itself when the current month is empty.
+Windows may ask once to let Python accept connections on 8100 and 8200; allow
+it, or the containers cannot reach the two servers. Feature tabs then show
+the MCP and RAG panels live; with the servers off, the panels say so and the
+rest of each feature keeps working.
+
 ## Run the agentic loop
 
 The shared `Plan -> Act -> Observe -> Adapt` workflow for the whole application
@@ -51,6 +85,8 @@ pip install -r requirements-agentic.txt
 python agentic_loop.py                 # menu - use this to demo
 python agentic_loop.py --mode fraud    # one feature
 python agentic_loop.py --all --quiet   # CI; exit code only
+python agentic_loop.py --mode mcp_validation   # Release 1: shared MCP server test record
+python agentic_loop.py --mode rag_validation   # Release 1: shared RAG server evaluation
 ```
 
 Runs append evidence to `docs/evidence/` for the technical report.
@@ -96,4 +132,7 @@ python -m rag_server.validate --evidence # also saves docs/evidence/rag-validati
 
 Containers reach it at `http://host.docker.internal:8200`. To add a source,
 drop a `.md` file with a front-matter block in `rag_server/corpus/` and
-`POST /refresh`.
+rebuild the index on the host with `python -m rag_server.validate --refresh`
+(a restart also rebuilds it when the corpus changed). A rebuild touches the
+index every feature is querying, so feature UIs, backend proxies and loop runs
+never trigger one.

@@ -1,4 +1,4 @@
-"""accounts_count - Accounts & Customers (William). SCAFFOLD - owner to confirm.
+"""accounts_count - Accounts & Customers (William). Confirmed against the live API.
 
 Capability brief
     Question   How many accounts exist, and in what states?
@@ -9,9 +9,11 @@ Capability brief
                no customer names cross the boundary.
     Non-goals  Does not open, close or edit accounts.
 
-William: the counting below uses the `status` and `account_type` fields your
-API returns today. Adjust the field names or add a filter if your contract
-changes; keep the tool read-only and aggregate-only.
+Confirmed by William (2026-09-29): the `status` and `account_type` fields
+match the live accounts-service response exactly (ACTIVE/INACTIVE/CLOSED and
+CHECKING/SAVINGS/CREDIT), and a round trip against the real service (all
+customers, one customer, and a non-existent customer_id) returns correct
+aggregate counts. No changes needed.
 """
 
 from __future__ import annotations

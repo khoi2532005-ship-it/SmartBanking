@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify
 from services import database_api
 from services.explain import generate_explanation
 from services.rule_engine import evaluate
-from services.transactions_source import fetch_transactions
+from services.transactions_source import SourceUnavailable, fetch_transactions
 
 detection_bp = Blueprint("detection", __name__)
 
@@ -29,16 +29,27 @@ def run_detection():
 
     logger.info("Plan: evaluating %d enabled rules", len(rules))
 
-    # Act: load transactions (seed by default, or live Transactions API with a
-    # seed fallback if unreachable), evaluate against the rules, insert new
-    # alerts, explain a few of them.
-    transactions, degraded = fetch_transactions()
-    logger.info("Act: scanning %d transactions (degraded=%s)", len(transactions), degraded)
+    # Act: load transactions (the seed fixture, or the live Transactions API
+    # with customers resolved through Accounts), evaluate them against the
+    # rules, insert new alerts, explain a few of them.
+    try:
+        transactions, source, unscannable = fetch_transactions()
+    except SourceUnavailable as exc:
+        # Adapt: there is nothing trustworthy to scan, so stop before writing
+        # anything and say why.
+        logger.warning("Adapt: detection stopped before writing any alerts - %s", exc)
+        return jsonify({"error": f"Detection did not run: {exc}. No alerts were written."}), 503
+    logger.info("Act: scanning %d %s transactions (%d unscannable rows left out)",
+                len(transactions), source, unscannable)
 
-    hits = evaluate(transactions, rules)
+    skipped_rules = []
+    hits = evaluate(transactions, rules, skipped_rules)
+    if skipped_rules:
+        logger.warning("Adapt: skipped rule(s) %s - their stored thresholds are not usable", skipped_rules)
 
     new_alerts = []
     skipped_duplicates = 0
+    failed_writes = 0
     explanations_skipped = 0
 
     for rule, txn in hits:
@@ -56,18 +67,20 @@ def run_detection():
 
         try:
             response = database_api.create_alert_response(payload)
+            if response.status_code == 409:
+                skipped_duplicates += 1
+                continue
+            response.raise_for_status()
+            alert_id = response.json()["alert_id"]
         except Exception as exc:
+            # Count it and keep going - one failed insert used to raise out of
+            # the loop as a 500 after earlier alerts had already been written.
+            failed_writes += 1
             logger.warning(
                 "Act: failed to create alert for rule %s / txn %s: %s",
                 rule["rule_id"], txn["transaction_id"], exc,
             )
             continue
-
-        if response.status_code == 409:
-            skipped_duplicates += 1
-            continue
-        response.raise_for_status()
-        alert_id = response.json()["alert_id"]
         full_alert = {**payload, "alert_id": alert_id}
 
         if len(new_alerts) < AUTO_EXPLAIN_LIMIT:
@@ -88,13 +101,19 @@ def run_detection():
         new_alerts.append(full_alert)
 
     result = {
+        "source": source,
         "evaluated": len(transactions),
+        "unscannable_transactions": unscannable,
         "rules_applied": len(rules),
+        "rules_skipped": skipped_rules,
         "new_alerts": new_alerts,
         "new_alert_count": len(new_alerts),
         "skipped_duplicates": skipped_duplicates,
+        "failed_writes": failed_writes,
         "explanations_skipped": explanations_skipped,
-        "degraded": degraded,
     }
-    logger.info("Observe/Adapt: %s", result)
+    logger.info(
+        "Observe: %d new alert(s), %d duplicate(s) skipped, %d failed write(s), %d explanation(s) unavailable",
+        len(new_alerts), skipped_duplicates, failed_writes, explanations_skipped,
+    )
     return jsonify(result)

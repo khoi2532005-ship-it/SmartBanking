@@ -303,6 +303,110 @@ def test_null_or_missing_body_falls_back_to_defaults():
         assert c.post("/api/mcp/tool").status_code == 503
 
 
+# ---------------------------------------------------------------------------
+# Release 1 panels - status fragments and the frontend wiring
+# ---------------------------------------------------------------------------
+
+FRONTEND_TAB = BASE_DIR.parent / "frontend" / "tabs" / "budgets.html"
+
+
+def test_status_fragments_render_the_inactive_state_without_network():
+    with _env(MCP_ENABLED="false", RAG_ENABLED="false"):
+        c = _client()
+        for path in ("/ui/mcp/status", "/ui/rag/status"):
+            r = c.get(path)
+            assert r.status_code == 200, (path, r.status_code)
+            assert b"Inactive" in r.data and b"_ENABLED=false" in r.data, path
+
+
+def test_status_fragments_render_unreachable_with_the_start_hint():
+    with _env(MCP_ENABLED="true", RAG_ENABLED="true", MCP_SERVER_URL=DEAD_PORT_URL, RAG_SERVER_URL=DEAD_PORT_URL):
+        c = _client()
+        r = c.get("/ui/mcp/status")
+        assert r.status_code == 200 and b"Unreachable" in r.data
+        assert b"python -m mcp_server.server" in r.data
+        r = c.get("/ui/rag/status")
+        assert r.status_code == 200 and b"Unreachable" in r.data
+        assert b"python -m rag_server.server" in r.data
+
+
+def test_rag_question_length_is_capped_before_any_call():
+    too_long = "x" * (rag_client.MAX_QUERY_CHARS + 1)
+    with _env(RAG_ENABLED="true", RAG_SERVER_URL=DEAD_PORT_URL):
+        c = _client()
+        r = c.post("/ui/rag/query", data={"query": too_long})
+        assert r.status_code == 200 and b"1000 characters" in r.data
+        r = c.post("/api/rag/query", json={"query": too_long})
+        assert r.status_code == 400 and "1000" in r.get_json()["error"]
+
+
+GROUNDED_ANSWER = {
+    "query": "What does NEAR_LIMIT mean for a budget?",
+    "answer": "A budget is NEAR_LIMIT when spending reaches 80% of the monthly limit "
+              "without exceeding it [budgeting-feature#002].",
+    "citations": [{"chunk_id": "budgeting-feature#002", "source_id": "budgeting-feature",
+                   "title": "Budgeting & Spending Insights", "authority_tier": 1}],
+    "confidence_category": "High",
+    "insufficient_context": False,
+    "retrieval_summary": {"k": 5, "retrieved_count": 5, "relevant_count": 3,
+                          "retrieval_mode": "hybrid", "top_chunk": "budgeting-feature#002"},
+    "generation": {"model": "gemini / test"},
+}
+
+
+def test_rag_fragment_renders_grounded_answer_with_badge_and_citation_chips():
+    """The grounded state: confidence badge from the evidence, the [chunk#nnn]
+    marker in the prose turned into a chip, and the citation list."""
+    original = rag_client._request
+    rag_client._request = lambda method, path, body=None: (200, dict(GROUNDED_ANSWER))
+    try:
+        with _env(RAG_ENABLED="true"):
+            c = _client()
+            r = c.post("/ui/rag/query", data={"query": GROUNDED_ANSWER["query"]})
+    finally:
+        rag_client._request = original
+    assert r.status_code == 200
+    page = r.data.decode()
+    assert 'class="insight-card rag-answer"' in page and "rag-insufficient" not in page
+    assert 'badge-ok">Confidence: High' in page
+    assert page.count('<span class="chip">budgeting-feature#002</span>') == 2   # prose marker + citation list
+    assert "Citations (1)" in page and "tier 1" in page
+    assert "[budgeting-feature#002]" not in page                                # marker replaced, not duplicated
+    assert "retrieved 5" in page and "relevant 3" in page and "mode hybrid" in page
+
+
+def test_rag_status_fragment_escapes_server_supplied_values():
+    """Counts and mode come from the RAG server's JSON; render them as text, never markup."""
+    original = rag_client.status
+    rag_client.status = lambda: {"enabled": True, "url": "http://x:8200", "reachable": True,
+                                 "index": {"chunks": "<b>65</b>", "sources": 9, "retrieval_mode": "<i>hybrid</i>"},
+                                 "model": "<script>m</script>"}
+    try:
+        with _env(RAG_ENABLED="true"):
+            page = _client().get("/ui/rag/status").get_data(as_text=True)
+    finally:
+        rag_client.status = original
+    assert "<b>" not in page and "<i>" not in page and "<script>" not in page
+    assert "&lt;b&gt;65&lt;/b&gt;" in page and "&lt;i&gt;hybrid&lt;/i&gt;" in page
+
+
+def test_frontend_tab_wires_every_release_1_fragment():
+    """The panels use only fragment endpoints that exist on this backend."""
+    html = FRONTEND_TAB.read_text(encoding="utf-8")
+    for needle in (
+        'hx-get="/ui/mcp/status"', 'hx-post="/ui/mcp/tool"', 'hx-get="/ui/mcp/tools"',
+        'hx-get="/ui/rag/status"', 'hx-post="/ui/rag/query"',
+        'id="mcp-panel"', 'id="mcp-tools-panel"', 'id="rag-panel"',
+        'name="query"', 'hx-include="#period-form"',
+    ):
+        assert needle in html, needle
+
+    from app import app
+    ui_rules = {r.rule for r in app.url_map.iter_rules() if r.rule.startswith("/ui/")}
+    for path in ("/ui/mcp/status", "/ui/mcp/tool", "/ui/mcp/tools", "/ui/rag/status", "/ui/rag/query"):
+        assert path in ui_rules, path
+
+
 def _run():
     tests = [(n, o) for n, o in sorted(globals().items()) if n.startswith("test_") and callable(o)]
     failures = []

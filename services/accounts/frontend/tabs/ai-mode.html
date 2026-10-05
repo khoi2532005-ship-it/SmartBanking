@@ -17,6 +17,12 @@
         table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
         th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
         th { background: #f0f3f7; }
+        .muted { color: var(--ink-soft, #666); font-size: 0.87rem; }
+        .panel.degraded { background: #fdf2e9; border-color: #d68910; }
+        .source-list { margin: 0.25rem 0 0; padding-left: 1.2rem; }
+        .examples .chip { cursor: pointer; border: 0; font: inherit; }
+        .counts { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+        .counts table { width: auto; min-width: 12rem; }
     </style>
 </head>
 <body>
@@ -37,6 +43,38 @@
             (Ollama with Llama/Qwen, or Gemini for local dev). Make sure the provider
             in your <code>.env</code> is running.
         </p>
+    </section>
+
+    <section class="card">
+        <h2>Account Counts <span class="muted">via MCP</span></h2>
+        <p class="muted">accounts-service calls the <code>accounts_count</code> tool on the shared MCP server
+            (Release 1). Read-only and aggregate-only: no account numbers or balances cross the boundary.</p>
+        <form id="mcp-form" class="row">
+            <div><label for="mcp_customer">Customer ID</label>
+                <input id="mcp_customer" type="number" min="1" placeholder="all customers"></div>
+            <button type="submit">Count accounts</button>
+            <button type="button" id="mcp-tools" class="btn-secondary">Registered tools</button>
+        </form>
+        <div id="mcp-result" class="panel is-hidden"></div>
+    </section>
+
+    <section class="card">
+        <h2>Ask about Accounts &amp; Customers <span class="muted">via RAG</span></h2>
+        <p class="muted">accounts-service asks the shared RAG server, which answers only from SmartBank's
+            approved documents, with source citations and a confidence category.</p>
+        <form id="rag-form" class="row">
+            <div style="flex: 1 1 18rem; display: flex; flex-direction: column;">
+                <label for="rag_query">Question</label>
+                <input id="rag_query" maxlength="1000" required
+                       placeholder="What database tables does the Accounts feature own?"></div>
+            <button type="submit">Ask</button>
+        </form>
+        <div class="chips examples" style="display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;margin-top:0.5rem;">Try:
+            <button type="button" class="chip" data-question="What database tables does the Accounts feature own?">database tables</button>
+            <button type="button" class="chip" data-question="What happens when an account is deleted versus closed?">delete vs close</button>
+            <button type="button" class="chip" data-question="What will the ASX 200 close at tomorrow?">off-topic question</button>
+        </div>
+        <div id="rag-result" class="panel is-hidden"></div>
     </section>
 </main>
 
@@ -101,6 +139,135 @@ document.getElementById("history-btn").addEventListener("click", async () => {
 });
 
 document.getElementById("ai-form").addEventListener("submit", (e) => e.preventDefault());
+
+function esc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (c) => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function showPanel(elId, html, degraded) {
+    const el = document.getElementById(elId);
+    el.classList.remove("is-hidden");
+    el.classList.toggle("degraded", !!degraded);
+    el.innerHTML = html;
+}
+
+function requestFailed(error) {
+    return `<p>Request failed - is accounts-service running?</p><pre>${esc(error)}</pre>`;
+}
+
+function errorHtml(result) {
+    return `<p>${esc(result.body.error || `HTTP ${result.status}`)}</p>`;
+}
+
+function spread(groups) {
+    const entries = Object.entries(groups || {});
+    return entries.length ? entries.map(([name, count]) => `${esc(name)} ${esc(count)}`).join(", ") : "none";
+}
+
+function countTable(title, groups) {
+    const rows = Object.entries(groups || {})
+        .map(([name, count]) => `<tr><td>${esc(name)}</td><td>${esc(count)}</td></tr>`).join("");
+    return `<table><tr><th>${esc(title)}</th><th>Accounts</th></tr>${rows || "<tr><td colspan=\"2\">none</td></tr>"}</table>`;
+}
+
+function toolResultHtml(body) {
+    const r = body.result || {};
+    const who = r.customer_id != null ? `customer ${esc(r.customer_id)}` : "all customers";
+    const source = r.source || {};
+    return `<p><strong>${esc(r.account_count)}</strong> account(s) for ${who}</p>
+        <div class="counts">${countTable("Status", r.by_status)}${countTable("Type", r.by_type)}</div>
+        <p class="muted">Structured result from MCP tool <code>${esc(body.tool)}</code>
+            at <code>${esc(body.server)}</code>, arguments <code>${esc(JSON.stringify(body.arguments || {}))}</code>.
+            Source of record: ${esc(source.feature)} <code>${esc(source.endpoint)}</code>.</p>`;
+}
+
+document.getElementById("mcp-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {};
+    const customer = document.getElementById("mcp_customer").value.trim();
+    if (customer) payload.customer_id = customer;
+    showPanel("mcp-result", "<p>Asking the MCP server...</p>", false);
+    try {
+        const result = await api("/api/mcp/tool", { method: "POST", body: JSON.stringify(payload) });
+        showPanel("mcp-result", result.ok ? toolResultHtml(result.body) : errorHtml(result), false);
+    } catch (error) {
+        showPanel("mcp-result", requestFailed(error), false);
+    }
+});
+
+document.getElementById("mcp-tools").addEventListener("click", async () => {
+    showPanel("mcp-result", "<p>Listing tools...</p>", false);
+    try {
+        const result = await api("/api/mcp/tools");
+        if (!result.ok) return showPanel("mcp-result", errorHtml(result), false);
+        const items = (result.body.tools || []).map((t) => `
+            <li><code>${esc(t.name)}</code> - ${esc(t.description)}
+                <span class="muted">(arguments: ${esc((t.arguments || []).join(", ") || "none")})</span></li>`).join("");
+        showPanel("mcp-result", `<p>${esc(result.body.tool_count)} tools registered on <code>${esc(result.body.server)}</code>:</p>
+            <ul class="source-list">${items}</ul>`, false);
+    } catch (error) {
+        showPanel("mcp-result", requestFailed(error), false);
+    }
+});
+
+const CONFIDENCE_BADGES = { High: "badge-ok", Medium: "badge-near", Low: "badge-over" };
+
+function confidenceBadge(category) {
+    const cls = CONFIDENCE_BADGES[category] || "";
+    return `<span class="badge ${cls}">Confidence: ${esc(category)}</span>`;
+}
+
+function answerHtml(text) {
+    return esc(text).replace(/\[([a-z0-9-]+#\d{3})\]/g, '<span class="chip">$1</span>');
+}
+
+function retrievalLine(r) {
+    const s = r.retrieval_summary || {};
+    const model = (r.generation || {}).model || "not called";
+    return `<p class="muted">Retrieval: ${esc(s.relevant_count)} of ${esc(s.retrieved_count)} retrieved chunks relevant,
+        top chunk <code>${esc(s.top_chunk)}</code>, ${esc(s.retrieval_mode)} search. Model: ${esc(model)}.</p>`;
+}
+
+function ragAnswerHtml(r) {
+    if (r.insufficient_context) {
+        return `<p>${esc(r.answer)}</p>
+            <p>${confidenceBadge(r.confidence_category)}
+               <span class="muted">No approved document was relevant enough, so nothing was generated or cited.</span></p>
+            ${retrievalLine(r)}`;
+    }
+    const sources = (r.citations || []).map((c) => `
+        <li><span class="chip">${esc(c.chunk_id)}</span> ${esc(c.title)}${c.heading ? ` - ${esc(c.heading)}` : ""}</li>`).join("");
+    return `<p>${confidenceBadge(r.confidence_category)}</p>
+        <p>${answerHtml(r.answer)}</p>
+        <p><strong>Sources</strong></p><ul class="source-list">${sources}</ul>
+        ${retrievalLine(r)}`;
+}
+
+async function askRag(question) {
+    showPanel("rag-result", "<p>Retrieving and generating...</p>", false);
+    try {
+        const result = await api("/api/rag/query", { method: "POST", body: JSON.stringify({ query: question }) });
+        if (result.ok) return showPanel("rag-result", ragAnswerHtml(result.body), false);
+        const summary = result.body.retrieval_summary;
+        const retrieved = summary ? `<p class="muted">${esc(summary.retrieved_count)} chunks were retrieved before the failure.</p>` : "";
+        showPanel("rag-result", errorHtml(result) + retrieved, false);
+    } catch (error) {
+        showPanel("rag-result", requestFailed(error), false);
+    }
+}
+
+document.getElementById("rag-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    askRag(document.getElementById("rag_query").value.trim());
+});
+
+document.querySelectorAll(".examples [data-question]").forEach((button) => {
+    button.addEventListener("click", () => {
+        document.getElementById("rag_query").value = button.dataset.question;
+        askRag(button.dataset.question);
+    });
+});
 </script>
 </body>
 </html>

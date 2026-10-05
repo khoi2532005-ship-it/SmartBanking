@@ -124,7 +124,15 @@ def run_checks(url: str) -> list[Record]:
             f"spending_source={s.get('spending_source')}"
         )
         rec.passed = ok and s.get("budget_count", 0) > 0
-        rec.detail = {"structured_keys": sorted(s.keys())}
+        totals = s.get("totals") or {}
+        rec.detail = {
+            "structured_keys": sorted(s.keys()),
+            "budget_count": s.get("budget_count"),
+            "total_spent": totals.get("total_spent"),
+            "total_limit": totals.get("total_limit"),
+            "spending_source": s.get("spending_source"),
+            "over_budget_categories": s.get("over_budget_categories"),
+        }
     records.append(rec)
 
     # 4 - domain-invalid ---------------------------------------------------
@@ -206,9 +214,10 @@ def print_report(url: str, records: list[Record]) -> None:
         print(f"        tool:      {r.tool}  {json.dumps(r.arguments) if r.arguments else ''}")
         print(f"        expected:  {r.expected}")
         print(f"        observed:  {r.observed}")
-    passed = sum(1 for r in records if r.passed)
+    skipped = sum(1 for r in records if r.skipped)
+    passed = sum(1 for r in records if r.passed and not r.skipped)
     print(rule)
-    print(f"  {passed}/{len(records)} checks passed")
+    print(f"  {passed}/{len(records) - skipped} checks passed, {skipped} skipped")
     print(rule)
 
 
