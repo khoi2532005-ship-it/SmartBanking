@@ -29,6 +29,13 @@ def ai_mode_tab():
 def tabs(filename):
     return send_from_directory(TABS_DIR, filename)
 
+@app.get("/css/<path:filename>")
+def shared_css(filename):
+    return send_from_directory(os.path.join(TABS_DIR, "..", "css"), filename)
+
+@app.get("/js/<path:filename>")
+def shared_js(filename):
+    return send_from_directory(os.path.join(TABS_DIR, "..", "js"), filename)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3001, debug=False)
