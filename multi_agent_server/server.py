@@ -3,7 +3,7 @@
 Runs on the host, never as a Compose service; containers reach it at
 MULTI_AGENT_SERVER_URL. Starting a workflow answers at once; the orchestrator
 then runs the stages in the background and the caller polls the status. The
-Planner stage is in place; Worker, Reviewer and the human gate follow.
+Planner and Worker stages are in place; the Reviewer and the human gate follow.
 
     python -m multi_agent_server.server
 
@@ -13,6 +13,7 @@ Planner stage is in place; Worker, Reviewer and the human gate follow.
     GET  /workflow/<id>                the full record
     GET  /workflow/<id>/status         the compact view the UI polls
     GET  /workflow/<id>/plan           the Planner's plan (null until planned)
+    GET  /workflow/<id>/result         the Worker's evidence and result (null until executed)
 """
 
 from __future__ import annotations
@@ -116,6 +117,13 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
             return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
         return jsonify({"workflow_id": workflow.workflow_id, "state": workflow.state, "plan": workflow.plan})
 
+    @app.get("/workflow/<workflow_id>/result")
+    def get_result(workflow_id: str):
+        workflow = store.get(workflow_id)
+        if workflow is None:
+            return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
+        return jsonify({"workflow_id": workflow.workflow_id, "state": workflow.state, "result": workflow.result})
+
     return app
 
 
@@ -154,7 +162,7 @@ def _banner(app: Flask) -> None:
     print(rule)
     print("  SmartBank Multi-Agent Server (Release 2) - host process, not a container")
     print(f"  listening:  {config.local_url()}")
-    print(f"  pipeline:   {' -> '.join(ext['orchestrator'].stage_names)} (worker, reviewer, human review follow)")
+    print(f"  pipeline:   {' -> '.join(ext['orchestrator'].stage_names)} (reviewer, human review follow)")
     print(f"  workflows:  {ext['store'].count()} loaded from {ext['store'].directory}")
     print(f"  audit:      {ext['audit'].history_path}")
     print(f"              {ext['audit'].coordination_path}")

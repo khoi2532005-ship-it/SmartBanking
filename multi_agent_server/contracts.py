@@ -4,7 +4,9 @@ A contract is checked by code, not by another model. The Planner's plan is
 validated against the endpoint catalogue and the workflow context before the
 Worker ever sees it, so a plan that names an unknown endpoint, an undeclared
 parameter or another customer is rejected with the reasons, and the model
-gets one chance to correct it.
+gets one chance to correct it. The Worker's result is checked the same way:
+every finding must name its analysis task and the api tasks it rests on, and
+every figure in it must appear in the collected evidence.
 """
 
 from __future__ import annotations
@@ -185,3 +187,134 @@ def _validate_api_task(raw: dict[str, Any], task: dict[str, Any], feature: str,
         if name not in clean:
             errors.append(f"{label}: {path} requires {name}")
     task["endpoint"], task["params"] = path, clean
+
+
+# ---------------------------------------------------------------- Worker result
+
+MAX_STATEMENT_CHARS = 600
+MAX_ANSWER_CHARS = 2000
+# Small whole numbers (months, ranks, "2 of 7 budgets") are not checked; dollar
+# amounts, percentages and counts above this must come from the evidence.
+SMALL_NUMBER = 12
+_NUMBER = re.compile(r"(?<![A-Za-z\d.])-?\$?\d[\d,]*(?:\.\d+)?%?")
+
+
+def numbers_in_text(text: str) -> list[tuple[float, int]]:
+    """Every number written in `text` as (value, decimals written)."""
+    found = []
+    for match in _NUMBER.finditer(text or ""):
+        raw = match.group(0).replace("$", "").replace(",", "").rstrip("%")
+        if not raw or raw == "-":
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            continue
+        decimals = len(raw.split(".")[1]) if "." in raw else 0
+        found.append((value, decimals))
+    return found
+
+
+def numbers_in_data(data: Any, into: set[float] | None = None) -> set[float]:
+    """Every numeric value inside nested JSON data (numbers and numeric strings)."""
+    into = set() if into is None else into
+    if isinstance(data, bool):
+        return into
+    if isinstance(data, (int, float)):
+        into.add(float(data))
+    elif isinstance(data, str):
+        stripped = data.strip().replace(",", "")
+        try:
+            into.add(float(stripped))
+        except ValueError:
+            pass
+    elif isinstance(data, dict):
+        for value in data.values():
+            numbers_in_data(value, into)
+    elif isinstance(data, (list, tuple)):
+        for value in data:
+            numbers_in_data(value, into)
+    return into
+
+
+def ungrounded_numbers(text: str, allowed: set[float]) -> list[str]:
+    """Numbers written in `text` that no evidence value equals or rounds to."""
+    missing = []
+    for value, decimals in numbers_in_text(text):
+        if decimals == 0 and abs(value) <= SMALL_NUMBER:
+            continue
+        if any(abs(candidate - value) < 1e-9 or abs(round(candidate, decimals) - value) < 1e-9
+               for candidate in allowed):
+            continue
+        written = f"{value:.{decimals}f}" if decimals else f"{int(value)}"
+        if written not in missing:
+            missing.append(written)
+    return missing
+
+
+def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return the normalised Worker result, or raise ContractError listing every problem."""
+    errors: list[str] = []
+    analysis_ids = [t["id"] for t in plan.get("tasks", []) if t["kind"] == "analysis"]
+    ok_ids = [r["task_id"] for r in evidence if r["status"] == "ok"]
+    failed_ids = [r["task_id"] for r in evidence if r["status"] != "ok"]
+    allowed = set()
+    for record in evidence:
+        if record["status"] == "ok":
+            numbers_in_data(record["summary"], allowed)
+            numbers_in_data(record["params"], allowed)
+
+    raw_findings = result.get("findings")
+    if raw_findings is None:
+        raw_findings = []
+    if not isinstance(raw_findings, list):
+        errors.append("findings must be a list")
+        raw_findings = []
+    findings: list[dict[str, Any]] = []
+    covered: set[str] = set()
+    for index, raw in enumerate(raw_findings, start=1):
+        label = f"finding {index}"
+        if not isinstance(raw, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        task_id = str(raw.get("task_id") or "").strip()
+        if task_id not in analysis_ids:
+            errors.append(f"{label}: task_id {task_id!r} is not an analysis task in the plan {analysis_ids}")
+        statement = str(raw.get("statement") or "").strip()
+        if not statement:
+            errors.append(f"{label}: statement is required")
+        elif len(statement) > MAX_STATEMENT_CHARS:
+            errors.append(f"{label}: statement must be {MAX_STATEMENT_CHARS} characters or fewer")
+        refs = _string_list(raw.get("evidence"))
+        if not refs:
+            errors.append(f"{label}: evidence must list at least one api task id")
+            refs = []
+        for ref in refs:
+            if ref in failed_ids:
+                errors.append(f"{label}: evidence task {ref} did not succeed, so it cannot support a finding")
+            elif ref not in ok_ids:
+                errors.append(f"{label}: evidence task {ref!r} is not an api task of the plan {ok_ids}")
+        for number in ungrounded_numbers(statement, allowed):
+            errors.append(f"{label}: the number {number} is not in the evidence; copy figures exactly from it or leave them out")
+        covered.add(task_id)
+        findings.append({"task_id": task_id, "statement": statement, "evidence": refs})
+
+    for task_id in analysis_ids:
+        if task_id not in covered:
+            errors.append(f"analysis task {task_id} has no finding")
+
+    answer = str(result.get("answer") or "").strip()
+    if not answer:
+        errors.append("answer is required")
+    elif len(answer) > MAX_ANSWER_CHARS:
+        errors.append(f"answer must be {MAX_ANSWER_CHARS} characters or fewer")
+    for number in ungrounded_numbers(answer, allowed):
+        errors.append(f"answer: the number {number} is not in the evidence; copy figures exactly from it or leave them out")
+
+    gaps = _string_list(result.get("gaps"))
+    if gaps is None:
+        errors.append("gaps must be a list of strings")
+
+    if errors:
+        raise ContractError(errors)
+    return {"findings": findings, "answer": answer, "gaps": gaps or []}
