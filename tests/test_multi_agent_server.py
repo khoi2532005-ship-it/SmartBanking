@@ -21,7 +21,7 @@ pytest.importorskip("flask")
 
 from agentic import llm  # noqa: E402
 from agentic.llm import LLMUnavailable  # noqa: E402
-from multi_agent_server import catalogue, config, evidence  # noqa: E402
+from multi_agent_server import catalogue, config, evidence, review as review_cli, run as run_cli, terminal  # noqa: E402
 from multi_agent_server.agents import planner, reviewer, worker  # noqa: E402
 from multi_agent_server.contracts import (  # noqa: E402
     ContractError, numbers_in_text, parse_json_object, ungrounded_numbers, validate_plan, validate_result,
@@ -190,8 +190,9 @@ def test_health_reports_roles_models_pipeline_and_audit_paths(client):
     assert body["roles"] == ["planner", "worker", "reviewer"]
     assert set(body["models"]) == {"planner", "worker", "reviewer"}
     assert body["features"] == list(config.FEATURES)
-    assert body["pipeline"] == ["planner", "worker", "reviewer"]
-    assert body["max_revisions"] == 1
+    assert body["pipeline"] == ["planner", "worker", "reviewer", "human"]
+    assert body["max_revisions"] == 1 and body["pending"] == 0
+    assert body["decisions"] == ["accept", "partially_accept", "reject"]
     assert body["audit"]["workflow_history"].endswith("workflow_history.jsonl")
     assert body["audit"]["coordination_audit"].endswith("coordination_audit.jsonl")
     assert body["workflows"] == 0
@@ -227,18 +228,20 @@ def test_unknown_feature_lists_the_allowed_ones(client):
 
 # ---------------------------------------------------------------- planner stage
 
-def test_valid_run_goes_plan_work_review_to_reviewed(client, ask, api, tmp_path):
+def test_valid_run_goes_plan_work_review_to_the_human_gate(client, ask, api, tmp_path):
     response = client.post("/workflow", json=VALID)
     assert response.status_code == 202
     body = response.get_json()
     workflow_id = body["workflow_id"]
     assert workflow_id.startswith("wf_") and len(workflow_id) == 11
-    assert body["state"] == State.REVIEWED
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
     assert body["has_plan"] is True and body["has_result"] is True and body["has_review"] is True
     assert body["links"] == {"self": f"/workflow/{workflow_id}", "status": f"/workflow/{workflow_id}/status"}
-    assert [s["role"] for s in body["stages"]] == ["planner", "worker", "reviewer"]
-    assert all(s["status"] == "completed" and s["fallback"] is False and s["attempt"] == 1 for s in body["stages"])
-    assert body["revisions"] == 0
+    assert [s["role"] for s in body["stages"]] == ["planner", "worker", "reviewer", "human"]
+    assert all(s["status"] == "completed" and s["fallback"] is False and s["attempt"] == 1 for s in body["stages"][:3])
+    assert body["stages"][3] == {"role": "human", "attempt": 1, "status": "running", "model": "human",
+                                 "duration_seconds": None, "fallback": False}
+    assert body["revisions"] == 0 and body["decision"] is None and body["released"] is False
 
     # the Planner saw the request, the context and only the budgeting catalogue
     assert len(ask.calls) == 3
@@ -254,7 +257,7 @@ def test_valid_run_goes_plan_work_review_to_reviewed(client, ask, api, tmp_path)
 
     plan_body = client.get(f"/workflow/{workflow_id}/plan").get_json()
     plan = plan_body["plan"]
-    assert plan_body["state"] == State.REVIEWED
+    assert plan_body["state"] == State.AWAITING_HUMAN_REVIEW
     assert plan["objective"] == GOOD_PLAN["objective"]
     assert [t["id"] for t in plan["tasks"]] == ["t1", "t2", "t3"]
     assert plan["tasks"][0]["params"] == CONTEXT
@@ -269,7 +272,7 @@ def test_valid_run_goes_plan_work_review_to_reviewed(client, ask, api, tmp_path)
 
     result_body = client.get(f"/workflow/{workflow_id}/result").get_json()
     result = result_body["result"]
-    assert result_body["state"] == State.REVIEWED
+    assert result_body["state"] == State.AWAITING_HUMAN_REVIEW
     records = result["evidence"]
     assert [r["task_id"] for r in records] == ["t1", "t2"]
     assert records[0]["status"] == "ok" and records[0]["http_status"] == 200
@@ -303,7 +306,7 @@ def test_valid_run_goes_plan_work_review_to_reviewed(client, ask, api, tmp_path)
 
     review_body = client.get(f"/workflow/{workflow_id}/review").get_json()
     review = review_body["review"]
-    assert review_body["state"] == State.REVIEWED and review_body["revisions"] == 0
+    assert review_body["state"] == State.AWAITING_HUMAN_REVIEW and review_body["revisions"] == 0
     assert review["verdict"] == "accept" and review["escalated"] is False
     assert review["criteria"] == GOOD_REVIEW["criteria"] and review["defects"] == []
     assert review["risks"] == GOOD_REVIEW["risks"] and review["revision_notes"] == []
@@ -317,21 +320,38 @@ def test_valid_run_goes_plan_work_review_to_reviewed(client, ask, api, tmp_path)
     assert full["stages"][1]["output"] == {"tasks_total": 2, "tasks_ok": 2, "tasks_failed": 0,
                                            "finding_count": 1, "source": "model", "calls": 1}
     assert full["stages"][2]["output"] == {"verdict": "accept", "defects": 0, "risks": 1, "source": "model", "calls": 1}
-    assert all(s["duration_seconds"] is not None for s in full["stages"])
+    assert all(s["duration_seconds"] is not None for s in full["stages"][:3])
+    assert full["final_response"] is None
+
+    # the completion gate in HTTP form: no response before the decision
+    withheld = client.get(f"/workflow/{workflow_id}/response")
+    assert withheld.status_code == 409
+    assert withheld.get_json()["awaiting_decision"] is True and withheld.get_json()["state"] == State.AWAITING_HUMAN_REVIEW
+    assert withheld.get_json()["links"]["decision"] == f"/workflow/{workflow_id}/decision"
+    pending = client.get("/workflows/pending").get_json()
+    assert pending["count"] == 1 and pending["options"] == ["accept", "partially_accept", "reject"]
+    assert pending["workflows"][0]["workflow_id"] == workflow_id and pending["workflows"][0]["review_verdict"] == "accept"
+    assert pending["workflows"][0]["request"] == VALID["request"] and pending["workflows"][0]["escalated"] is False
+    assert client.get("/health").get_json()["pending"] == 1
 
     history, coordination = _audit(tmp_path)
     assert [r["event"] for r in history] == [
         "workflow_created", "state_changed", "stage_started", "stage_completed", "state_changed",
         "state_changed", "stage_started", "stage_completed", "state_changed",
-        "state_changed", "stage_started", "stage_completed", "state_changed"]
+        "state_changed", "stage_started", "stage_completed", "state_changed",
+        "state_changed", "stage_started"]
     assert [(r["detail"].get("from"), r["detail"].get("to")) for r in history if r["event"] == "state_changed"] == [
         ("created", "planning"), ("planning", "planned"), ("planned", "working"), ("working", "executed"),
-        ("executed", "reviewing"), ("reviewing", "reviewed")]
+        ("executed", "reviewing"), ("reviewing", "reviewed"), ("reviewed", "awaiting_human_review")]
     started = [r for r in history if r["event"] == "stage_started"]
-    assert [r["role"] for r in started] == ["planner", "worker", "reviewer"]
+    assert [r["role"] for r in started] == ["planner", "worker", "reviewer", "human"]
     assert all(r["model"] and r["detail"]["timeout_seconds"] > 0 for r in started)
     assert [r["decision"] for r in coordination] == [
-        "request_accepted", "plan_accepted", "handoff", "result_accepted", "handoff", "verdict_recorded", "review_accepted"]
+        "request_accepted", "plan_accepted", "handoff", "result_accepted", "handoff", "verdict_recorded",
+        "review_accepted", "handoff", "awaiting_decision"]
+    assert coordination[7]["detail"] == {"from": "reviewer", "to": "human", "contract": "review", "verdict": "accept",
+                                         "escalated": False, "open_defects": 0, "risks": 1}
+    assert coordination[8]["detail"] == {"options": ["accept", "partially_accept", "reject"], "released": False}
     assert coordination[1]["detail"] == {"attempts": 1, "task_count": 3, "accepted_first_try": True}
     assert coordination[2]["detail"] == {"from": "planner", "to": "worker", "contract": "plan", "task_count": 3, "attempt": 1}
     assert coordination[3]["detail"] == {"attempt": 1, "calls": 1, "finding_count": 1, "accepted_first_try": True}
@@ -347,7 +367,7 @@ def test_off_contract_plan_gets_one_correction(tmp_path, api):
     ask = ScriptedAsk(BAD_PLAN, GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "model" and plan["meta"]["attempts"] == 2
     assert plan["meta"]["accepted_first_try"] is False
@@ -373,9 +393,9 @@ def test_two_off_contract_plans_fall_back_and_say_so(tmp_path, api):
     ask = ScriptedAsk(BAD_PLAN, "not even json", GOOD_RESULT, two_criteria)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
     assert body["stages"][0] == {**body["stages"][0], "status": "completed", "fallback": True}
-    assert [s["fallback"] for s in body["stages"][1:]] == [False, False]   # Worker and Reviewer ran the fallback plan normally
+    assert [s["fallback"] for s in body["stages"][1:3]] == [False, False]  # Worker and Reviewer ran the fallback plan normally
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "fallback"
     assert "rejected by the contract 2 times" in plan["meta"]["fallback_reason"]
@@ -396,8 +416,8 @@ def test_unavailable_model_falls_back_without_failing(tmp_path, api):
     ask = ScriptedAsk(LLMUnavailable("GEMINI_API_KEY is not set"))
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED
-    assert [s["fallback"] for s in body["stages"]] == [True, True, True]
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
+    assert [s["fallback"] for s in body["stages"]] == [True, True, True, False]   # the human gate is never a fallback
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "fallback"
     assert "model unavailable: GEMINI_API_KEY is not set" in plan["meta"]["fallback_reason"]
@@ -414,7 +434,8 @@ def test_unavailable_model_falls_back_without_failing(tmp_path, api):
     fallbacks = [r for r in coordination if r["decision"] == "fallback_applied"]
     assert [r["detail"]["stage"] for r in fallbacks] == ["planner", "worker", "reviewer"]
     assert all("GEMINI_API_KEY" in r["detail"]["reason"] for r in fallbacks)
-    assert coordination[-1]["decision"] == "escalated_to_human" and "GEMINI_API_KEY" in coordination[-1]["detail"]["reason"]
+    escalated = next(r for r in coordination if r["decision"] == "escalated_to_human")
+    assert "GEMINI_API_KEY" in escalated["detail"]["reason"]
 
 
 def test_slow_stages_are_timed_out_and_fall_back(tmp_path, api):
@@ -423,8 +444,8 @@ def test_slow_stages_are_timed_out_and_fall_back(tmp_path, api):
         return json.dumps(GOOD_PLAN)
     client = make_app(tmp_path, slow, stage_timeout=0.05).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED
-    assert [(s["status"], s["fallback"]) for s in body["stages"]] == [("timed_out", True)] * 3
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
+    assert [(s["status"], s["fallback"]) for s in body["stages"]] == [("timed_out", True)] * 3 + [("running", False)]
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "fallback" and "planner did not answer within 0.05s" in plan["meta"]["fallback_reason"]
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
@@ -458,7 +479,8 @@ def test_per_role_model_override_reaches_the_call(tmp_path, monkeypatch, api):
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
     assert [c["model"] for c in ask.calls] == ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-pro-review"]
-    assert [s["model"].split("/ ")[1] for s in body["stages"]] == ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-pro-review"]
+    assert [s["model"].split("/ ")[1] for s in body["stages"][:3]] == ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-pro-review"]
+    assert body["stages"][3]["model"] == "human"
     models = client.get("/health").get_json()["models"]
     assert models == {"planner": "gemini-2.5-pro", "worker": "gemini-2.5-flash", "reviewer": "gemini-2.5-pro-review"}
 
@@ -469,7 +491,7 @@ def test_ungrounded_result_gets_one_correction(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, BAD_RESULT, GOOD_RESULT, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED and body["stages"][1]["fallback"] is False
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["stages"][1]["fallback"] is False
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert result["meta"]["source"] == "model" and result["meta"]["attempts"] == 2
     assert result["meta"]["accepted_first_try"] is False
@@ -489,7 +511,7 @@ def test_two_bad_results_fall_back_to_findings_from_the_evidence(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, BAD_RESULT, "no json here", GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
     assert body["stages"][1]["status"] == "completed" and body["stages"][1]["fallback"] is True
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert result["meta"]["source"] == "fallback"
@@ -541,7 +563,7 @@ def test_partial_api_failure_continues_with_gaps(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, only_t1, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert [r["status"] for r in result["evidence"]] == ["ok", "error"]
     assert result["meta"]["attempts"] == 2
@@ -562,9 +584,9 @@ def test_revise_sends_the_worker_back_once_with_the_notes(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW, GOOD_RESULT, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED and body["revisions"] == 1
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["revisions"] == 1
     assert [(s["role"], s["attempt"]) for s in body["stages"]] == [
-        ("planner", 1), ("worker", 1), ("reviewer", 1), ("worker", 2), ("reviewer", 2)]
+        ("planner", 1), ("worker", 1), ("reviewer", 1), ("worker", 2), ("reviewer", 2), ("human", 1)]
     assert len(ask.calls) == 5
 
     second_work = ask.calls[3]["user"]
@@ -588,35 +610,39 @@ def test_revise_sends_the_worker_back_once_with_the_notes(tmp_path, api):
     assert [(r["detail"].get("from"), r["detail"].get("to")) for r in history if r["event"] == "state_changed"] == [
         ("created", "planning"), ("planning", "planned"), ("planned", "working"), ("working", "executed"),
         ("executed", "reviewing"), ("reviewing", "revising"), ("revising", "working"), ("working", "executed"),
-        ("executed", "reviewing"), ("reviewing", "reviewed")]
+        ("executed", "reviewing"), ("reviewing", "reviewed"), ("reviewed", "awaiting_human_review")]
     decisions = [r["decision"] for r in coordination]
     assert decisions == ["request_accepted", "plan_accepted", "handoff", "result_accepted", "handoff", "verdict_recorded",
-                         "revision_requested", "handoff", "result_accepted", "handoff", "verdict_recorded", "review_accepted"]
+                         "revision_requested", "handoff", "result_accepted", "handoff", "verdict_recorded", "review_accepted",
+                         "handoff", "awaiting_decision"]
     requested = coordination[6]["detail"]
     assert requested == {"revision": 1, "max_revisions": 1, "notes": REVISE_REVIEW["revision_notes"],
                          "defects": REVISE_REVIEW["defects"]}
     assert coordination[7]["detail"] == {"from": "reviewer", "to": "worker", "contract": "plan + revision_notes",
                                          "task_count": 3, "attempt": 2}
-    assert coordination[-1]["detail"]["revisions"] == 1
+    assert coordination[11]["detail"]["revisions"] == 1
 
 
 def test_second_revise_escalates_to_the_human(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW, GOOD_RESULT, REVISE_REVIEW)   # the Reviewer keeps asking
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED and body["revisions"] == 1
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["revisions"] == 1
     assert [(s["role"], s["attempt"]) for s in body["stages"]] == [
-        ("planner", 1), ("worker", 1), ("reviewer", 1), ("worker", 2), ("reviewer", 2)]
+        ("planner", 1), ("worker", 1), ("reviewer", 1), ("worker", 2), ("reviewer", 2), ("human", 1)]
     assert len(ask.calls) == 5                                      # bounded: no third worker attempt
     review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
     assert review["verdict"] == "revise" and review["escalated"] is True
     assert review["escalation_reason"] == "revision limit reached (1)"
     assert review["defects"] == REVISE_REVIEW["defects"] and review["revision_notes"] == REVISE_REVIEW["revision_notes"]
     _history, coordination = _audit(tmp_path)
-    assert coordination[-1]["decision"] == "escalated_to_human"
-    assert coordination[-1]["detail"] == {"reason": "revision limit reached (1)", "revisions": 1,
-                                          "open_defects": REVISE_REVIEW["defects"], "notes": REVISE_REVIEW["revision_notes"]}
+    escalated = next(r for r in coordination if r["decision"] == "escalated_to_human")
+    assert escalated["detail"] == {"reason": "revision limit reached (1)", "revisions": 1,
+                                   "open_defects": REVISE_REVIEW["defects"], "notes": REVISE_REVIEW["revision_notes"]}
     assert [r["decision"] for r in coordination].count("revision_requested") == 1
+    gate = coordination[-2]
+    assert gate["decision"] == "handoff" and gate["detail"]["to"] == "human" and gate["detail"]["escalated"] is True
+    assert client.get("/workflows/pending").get_json()["workflows"][0]["escalated"] is True
 
 
 def test_zero_revisions_escalates_at_the_first_revise(tmp_path, api):
@@ -624,8 +650,8 @@ def test_zero_revisions_escalates_at_the_first_revise(tmp_path, api):
     client = make_app(tmp_path, ask, max_revisions=0).test_client()
     assert client.get("/health").get_json()["max_revisions"] == 0
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED and body["revisions"] == 0
-    assert [s["role"] for s in body["stages"]] == ["planner", "worker", "reviewer"]
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["revisions"] == 0
+    assert [s["role"] for s in body["stages"]] == ["planner", "worker", "reviewer", "human"]
     review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
     assert review["escalated"] is True and review["escalation_reason"] == "revision limit reached (0)"
 
@@ -635,7 +661,7 @@ def test_completion_gate_rejects_accept_with_unmet_criteria(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, gated, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED and body["revisions"] == 0
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["revisions"] == 0
     review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
     assert review["verdict"] == "accept" and review["meta"]["attempts"] == 2
     errors = review["meta"]["rejections"][0]
@@ -650,7 +676,7 @@ def test_two_bad_reviews_escalate_instead_of_inventing_a_verdict(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, "not json", {"verdict": "maybe"})
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.REVIEWED and body["revisions"] == 0
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["revisions"] == 0
     assert body["stages"][2]["fallback"] is True and body["stages"][2]["status"] == "completed"
     review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
     assert review["verdict"] == reviewer.ESCALATE and review["escalated"] is True
@@ -658,8 +684,8 @@ def test_two_bad_reviews_escalate_instead_of_inventing_a_verdict(tmp_path, api):
     assert len(review["meta"]["rejections"]) == 2
     assert review["summary"].startswith("The Reviewer could not evaluate the result")
     _history, coordination = _audit(tmp_path)
-    assert [r["decision"] for r in coordination][-4:] == ["review_rejected", "review_rejected", "fallback_applied", "escalated_to_human"]
-    assert coordination[-2]["detail"]["stage"] == "reviewer"
+    assert [r["decision"] for r in coordination][-6:-2] == ["review_rejected", "review_rejected", "fallback_applied", "escalated_to_human"]
+    assert coordination[-4]["detail"]["stage"] == "reviewer"
 
 
 def test_review_checks_flag_mock_spending_and_fallback_results(tmp_path, api):
@@ -717,6 +743,226 @@ def test_revision_notes_reach_the_worker_prompt(client, ask):
     assert "The Reviewer sent the previous result back" in user
     assert "- Name the over-budget categories explicitly" in user
     assert "rejected by the handoff contract" not in user
+
+
+# ---------------------------------------------------------------- human decision and final response
+
+def _start(client):
+    return client.post("/workflow", json=VALID).get_json()["workflow_id"]
+
+
+def test_accept_releases_the_response_and_closes_the_audit(client, tmp_path):
+    workflow_id = _start(client)
+    response = client.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept", "by": "Bao"})
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["state"] == State.ACCEPTED and body["released"] is True
+    assert body["decision"]["decision"] == "accept" and body["decision"]["by"] == "Bao" and body["decision"]["note"] == ""
+    assert body["decision"]["decided_at"].endswith("+00:00")
+    final = body["final_response"]
+    assert final["released"] is True and final["answer"] == GOOD_RESULT["answer"]
+    assert final["findings"] == GOOD_RESULT["findings"] and final["correction_note"] == ""
+    assert final["review_verdict"] == "accept" and final["review_summary"] == GOOD_REVIEW["summary"]
+    assert final["risks"] == GOOD_REVIEW["risks"] and final["gaps"] == []
+    assert [e["endpoint"] for e in final["evidence_sources"]] == ["/api/budgets/summary", "/api/transactions/spending"]
+    assert all(e["url"].startswith("http") and e["status"] == "ok" for e in final["evidence_sources"])
+    assert final["decided_by"] == "Bao" and final["released_at"] == body["decision"]["decided_at"]
+    assert final["revisions"] == 0 and len(final["models"]) == 1
+
+    released = client.get(f"/workflow/{workflow_id}/response")
+    assert released.status_code == 200 and released.get_json() == final
+    assert client.get("/workflows/pending").get_json()["count"] == 0
+    assert client.get(f"/workflow/{workflow_id}/status").get_json()["released"] is True
+
+    full = client.get(f"/workflow/{workflow_id}").get_json()
+    human = full["stages"][3]
+    assert human["role"] == "human" and human["status"] == "completed" and human["duration_seconds"] is not None
+    assert human["output"] == {"decision": "accept", "note": "", "by": "Bao", "released": True}
+
+    history, coordination = _audit(tmp_path)
+    assert [r["event"] for r in history][-4:] == ["stage_completed", "state_changed", "workflow_completed", ][-3:] or True
+    tail = [r["event"] for r in history][-3:]
+    assert tail == ["stage_completed", "state_changed", "workflow_completed"]
+    assert history[-3]["role"] == "human" and history[-3]["detail"]["decision"] == "accept"
+    assert history[-2]["detail"] == {"from": "awaiting_human_review", "to": "accepted"}
+    assert history[-1]["detail"] == {"decision": "accept", "released": True, "revisions": 0, "stages": 4}
+    assert [r["decision"] for r in coordination][-2:] == ["human_decision", "response_released"]
+    assert coordination[-2]["actor"] == "human"
+    assert coordination[-2]["detail"] == {"decision": "accept", "note": "", "by": "Bao", "review_verdict": "accept", "revisions": 0}
+    assert coordination[-1]["detail"] == {"decision": "accept", "with_correction": False}
+
+    again = client.post(f"/workflow/{workflow_id}/decision", json={"decision": "reject"})
+    assert again.status_code == 409 and again.get_json()["state"] == State.ACCEPTED
+
+
+def test_partial_accept_releases_with_the_correction_note(client, tmp_path):
+    workflow_id = _start(client)
+    body = client.post(f"/workflow/{workflow_id}/decision",
+                       json={"decision": "partially accept", "note": "Say the figures are from September only"}).get_json()
+    assert body["state"] == State.PARTIALLY_ACCEPTED and body["released"] is True
+    final = body["final_response"]
+    assert final["decision"] == "partially_accept" and final["answer"] == GOOD_RESULT["answer"]
+    assert final["correction_note"] == "Say the figures are from September only"
+    assert final["decided_by"] == "api"
+    _history, coordination = _audit(tmp_path)
+    assert coordination[-1]["decision"] == "response_released"
+    assert coordination[-1]["detail"] == {"decision": "partially_accept", "with_correction": True}
+
+
+def test_reject_withholds_the_answer_but_keeps_the_trail(client, tmp_path):
+    workflow_id = _start(client)
+    body = client.post(f"/workflow/{workflow_id}/decision",
+                       json={"decision": "reject", "note": "Figures come from mock data"}).get_json()
+    assert body["state"] == State.REJECTED and body["released"] is False
+    final = body["final_response"]
+    assert final["released"] is False and final["answer"] is None and final["findings"] == [] and final["gaps"] == []
+    assert final["correction_note"] == "Figures come from mock data" and final["released_at"] is None
+    assert final["review_summary"] == GOOD_REVIEW["summary"]              # the trail stays readable
+    assert len(final["evidence_sources"]) == 2
+    response = client.get(f"/workflow/{workflow_id}/response")
+    assert response.status_code == 200 and response.get_json()["released"] is False
+    full = client.get(f"/workflow/{workflow_id}").get_json()
+    assert full["result"]["answer"] == GOOD_RESULT["answer"]              # the record itself is not erased
+    history, coordination = _audit(tmp_path)
+    assert coordination[-1]["decision"] == "response_withheld"
+    assert history[-1]["detail"]["released"] is False
+
+
+@pytest.mark.parametrize("body, status, word", [
+    ({"decision": "maybe"}, 400, "decision must be one of"),
+    ({}, 400, "decision must be one of"),
+    ({"decision": "accept", "note": "x" * 1001}, 400, "1000 characters"),
+    ("[1]", 400, "JSON object"),
+])
+def test_bad_decisions_are_400_and_change_nothing(client, body, status, word):
+    workflow_id = _start(client)
+    if isinstance(body, str):
+        response = client.post(f"/workflow/{workflow_id}/decision", data=body, content_type="application/json")
+    else:
+        response = client.post(f"/workflow/{workflow_id}/decision", json=body)
+    assert response.status_code == status and word in response.get_json()["error"]
+    assert response.get_json()["options"] == ["accept", "partially_accept", "reject"]
+    assert client.get(f"/workflow/{workflow_id}/status").get_json()["state"] == State.AWAITING_HUMAN_REVIEW
+
+
+def test_decision_on_a_failed_workflow_is_409(tmp_path, api):
+    api.down = {"/api/budgets/summary", "/api/transactions/spending"}
+    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN)).test_client()
+    workflow_id = _start(client)
+    response = client.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"})
+    assert response.status_code == 409 and response.get_json()["state"] == State.FAILED
+    assert client.get(f"/workflow/{workflow_id}/response").status_code == 409
+    assert client.get(f"/workflow/{workflow_id}/response").get_json()["awaiting_decision"] is False
+
+
+def test_escalated_workflow_still_waits_for_the_human(tmp_path, api):
+    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW, GOOD_RESULT, REVISE_REVIEW)).test_client()
+    workflow_id = _start(client)
+    pending = client.get("/workflows/pending").get_json()["workflows"][0]
+    assert pending["escalated"] is True and pending["review_verdict"] == "revise"
+    body = client.post(f"/workflow/{workflow_id}/decision", json={"decision": "reject", "note": "not good enough"}).get_json()
+    assert body["state"] == State.REJECTED and body["final_response"]["review_verdict"] == "revise"
+
+
+# ---------------------------------------------------------------- terminal runners
+
+class Inputs:
+    def __init__(self, *answers):
+        self.answers = list(answers)
+
+    def __call__(self, prompt):
+        if not self.answers:
+            raise EOFError
+        return self.answers.pop(0)
+
+
+def test_review_runner_prompts_and_records_the_decision(client, tmp_path):
+    workflow_id = _start(client)
+    lines = []
+    code = review_cli.main([], client=terminal.FlaskClientAdapter(client), input_fn=Inputs("x", "p", "Mention the period"),
+                           out=lines.append)
+    text = "\n".join(lines)
+    flat = " ".join(text.split())                                      # the renderer wraps long lines
+    assert code == 0
+    assert "1 workflow(s) awaiting human review" in text
+    assert workflow_id in text and VALID["request"] in flat
+    assert "Plan:" in text and "Evidence:" in text and "Finding:" in text and "Answer:" in text and "Review:" in text
+    assert GOOD_RESULT["answer"] in flat and "accept [source model, attempt 1, criteria met 1/1]" in flat
+    assert "Please answer A, P, R or S" in text                       # the bad key was re-asked
+    assert "-> partially_accepted; response released" in text
+    assert "Correction: Mention the period" in flat
+    status = client.get(f"/workflow/{workflow_id}/status").get_json()
+    assert status["state"] == State.PARTIALLY_ACCEPTED and status["decision"]["by"] == "terminal"
+    assert status["decision"]["note"] == "Mention the period"
+
+
+def test_review_runner_skip_and_flags(client):
+    first = _start(client)
+    lines = []
+    assert review_cli.main([], client=terminal.FlaskClientAdapter(client), input_fn=Inputs("s"), out=lines.append) == 0
+    assert "skipped" in "\n".join(lines)
+    assert client.get(f"/workflow/{first}/status").get_json()["state"] == State.AWAITING_HUMAN_REVIEW
+
+    lines = []
+    code = review_cli.main(["--id", first, "--decision", "reject", "--note", "wrong month", "--by", "tutor"],
+                           client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+    assert code == 0 and "-> rejected; response withheld" in "\n".join(lines)
+    status = client.get(f"/workflow/{first}/status").get_json()
+    assert status["state"] == State.REJECTED and status["decision"] == {**status["decision"], "by": "tutor", "note": "wrong month"}
+
+    lines = []
+    code = review_cli.main(["--id", first], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+    assert code == 1 and "nothing to decide" in "\n".join(lines)
+    lines = []
+    assert review_cli.main([], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append) == 0
+    assert "0 workflow(s) awaiting human review" in "\n".join(lines)
+
+
+def test_run_runner_starts_follows_and_decides(client):
+    lines = []
+    code = run_cli.main(["--feature", "budgeting", "--request", "How did September go?", "--customer", "1",
+                         "--month", "9", "--year", "2026"],
+                        client=terminal.FlaskClientAdapter(client), input_fn=Inputs("a", ""), out=lines.append,
+                        sleep=lambda s: None)
+    text = "\n".join(lines)
+    flat = " ".join(text.split())
+    assert code == 0
+    assert "Started wf_" in text and "following the stages" in text
+    assert "  planner  attempt 1  completed  " in text and "  worker   attempt 1  completed  " in text
+    assert "  reviewer attempt 1  completed  " in text
+    assert "Awaiting your decision. The response is not released until you decide." in text
+    assert "Decision accept: response released at" in text and GOOD_RESULT["answer"] in flat
+    listed = client.get("/workflows?state=accepted").get_json()
+    assert len(listed) == 1 and listed[0]["decision"]["by"] == "terminal"
+
+
+def test_run_runner_reports_a_failed_workflow(tmp_path, api):
+    api.down = {"/api/budgets/summary", "/api/transactions/spending"}
+    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN)).test_client()
+    lines = []
+    code = run_cli.main(["--request", "x", "--month", "9", "--year", "2026"], client=terminal.FlaskClientAdapter(client),
+                        input_fn=Inputs(), out=lines.append, sleep=lambda s: None)
+    text = "\n".join(lines)
+    assert code == 2 and "workflow failed: worker: no feature API answered" in text
+    assert "Error:" in text and "  worker   attempt 1  failed  " in text
+
+
+def test_run_runner_can_leave_the_decision_for_later(client):
+    lines = []
+    code = run_cli.main(["--request", "x", "--month", "9", "--year", "2026"], client=terminal.FlaskClientAdapter(client),
+                        input_fn=Inputs("s"), out=lines.append, sleep=lambda s: None)
+    assert code == 0 and "decide later with: python -m multi_agent_server.review --id wf_" in "\n".join(lines)
+    assert client.get("/workflows/pending").get_json()["count"] == 1
+
+
+def test_runners_explain_an_unreachable_server(monkeypatch):
+    lines = []
+    code = review_cli.main(["--url", "http://127.0.0.1:9"], input_fn=Inputs(), out=lines.append)
+    assert code == 1 and "cannot reach the Multi-Agent Server at http://127.0.0.1:9" in lines[-1]
+    assert "python -m multi_agent_server.server" in lines[-1]
+    lines = []
+    code = run_cli.main(["--url", "http://127.0.0.1:9", "--request", "x"], input_fn=Inputs(), out=lines.append)
+    assert code == 1 and "cannot reach" in lines[-1]
 
 
 # ---------------------------------------------------------------- evidence summaries
@@ -931,9 +1177,14 @@ def test_llm_ask_passes_the_model_override(monkeypatch):
 
 def test_unknown_workflow_is_a_json_404(client):
     for path in ("/workflow/wf_deadbeef", "/workflow/wf_deadbeef/status", "/workflow/wf_deadbeef/plan",
-                 "/workflow/wf_deadbeef/result", "/workflow/wf_deadbeef/review"):
+                 "/workflow/wf_deadbeef/result", "/workflow/wf_deadbeef/review", "/workflow/wf_deadbeef/response"):
         response = client.get(path)
         assert response.status_code == 404 and "unknown workflow" in response.get_json()["error"]
+
+
+def test_decision_on_unknown_workflow_is_404(client):
+    response = client.post("/workflow/wf_deadbeef/decision", json={"decision": "accept"})
+    assert response.status_code == 404 and "unknown workflow" in response.get_json()["error"]
 
 
 def test_unknown_route_is_json_not_html(client):
@@ -947,7 +1198,7 @@ def test_list_filters_by_state_and_rejects_unknown_states(client):
     second = client.post("/workflow", json={**VALID, "feature": "loans"}).get_json()["workflow_id"]
     listed = client.get("/workflows").get_json()
     assert {w["workflow_id"] for w in listed} == {first, second}
-    assert {w["workflow_id"] for w in client.get("/workflows?state=reviewed").get_json()} == {first, second}
+    assert {w["workflow_id"] for w in client.get("/workflows?state=awaiting_human_review").get_json()} == {first, second}
     assert client.get("/workflows?state=accepted").get_json() == []
     response = client.get("/workflows?state=bogus")
     assert response.status_code == 400 and "states" in response.get_json()
@@ -961,11 +1212,16 @@ def test_workflows_survive_a_restart(tmp_path, api):
     second = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW))
     reloaded = second.test_client().get(f"/workflow/{workflow_id}")
     assert reloaded.status_code == 200
-    assert reloaded.get_json()["state"] == State.REVIEWED
+    assert reloaded.get_json()["state"] == State.AWAITING_HUMAN_REVIEW
     assert reloaded.get_json()["plan"]["objective"] == GOOD_PLAN["objective"]
     assert reloaded.get_json()["result"]["answer"] == GOOD_RESULT["answer"]
     assert reloaded.get_json()["review"]["verdict"] == "accept"
-    assert [s["fallback"] for s in reloaded.get_json()["stages"]] == [False, False, False]
+    assert [s["fallback"] for s in reloaded.get_json()["stages"]] == [False, False, False, False]
+    # the human decision works on the reloaded workflow: the gate survives a restart
+    decided = second.test_client().post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"})
+    assert decided.status_code == 200 and decided.get_json()["state"] == State.ACCEPTED
+    assert second.test_client().get(f"/workflow/{workflow_id}/response").status_code == 200
+    assert second.test_client().get("/health").get_json()["pending"] == 0
     assert second.test_client().get("/health").get_json()["workflows"] == 1
 
 

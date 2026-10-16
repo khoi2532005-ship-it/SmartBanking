@@ -2,19 +2,23 @@
 
 Runs on the host, never as a Compose service; containers reach it at
 MULTI_AGENT_SERVER_URL. Starting a workflow answers at once; the orchestrator
-then runs the stages in the background and the caller polls the status. The
-Planner, Worker and Reviewer stages are in place; the human gate follows.
+then runs the stages in the background and the caller polls the status. After
+the Reviewer the workflow waits in awaiting_human_review; the final response
+exists only once a person has decided.
 
     python -m multi_agent_server.server
 
     GET  /health                       server, roles, models, audit paths
     POST /workflow                     start a workflow -> 202 {workflow_id, state}
     GET  /workflows[?state=...]        list workflows
+    GET  /workflows/pending            workflows waiting for a human decision
     GET  /workflow/<id>                the full record
     GET  /workflow/<id>/status         the compact view the UI polls
     GET  /workflow/<id>/plan           the Planner's plan (null until planned)
     GET  /workflow/<id>/result         the Worker's evidence and result (null until executed)
     GET  /workflow/<id>/review         the Reviewer's verdict, defects and risks (null until reviewed)
+    POST /workflow/<id>/decision       {"decision": accept | partially_accept | reject, "note"?: str}
+    GET  /workflow/<id>/response       the final response; 409 until the decision is made
 """
 
 from __future__ import annotations
@@ -27,8 +31,8 @@ from werkzeug.exceptions import HTTPException
 
 from multi_agent_server import config
 from multi_agent_server.audit import AuditLog
-from multi_agent_server.models import State
-from multi_agent_server.orchestrator import Orchestrator
+from multi_agent_server.models import DECISIONS, State
+from multi_agent_server.orchestrator import InvalidDecision, Orchestrator, WrongState
 from multi_agent_server.store import WorkflowStore, is_valid_state
 
 
@@ -66,7 +70,9 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
             "stage_timeout_seconds": config.STAGE_TIMEOUT,
             "max_revisions": orchestrator.max_revisions,
             "pipeline": orchestrator.stage_names,
+            "decisions": list(DECISIONS),
             "workflows": store.count(),
+            "pending": len(store.list(State.AWAITING_HUMAN_REVIEW)),
             "audit": {
                 "workflow_history": str(audit.history_path),
                 "coordination_audit": str(audit.coordination_path),
@@ -90,6 +96,22 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
             "status": f"/workflow/{workflow.workflow_id}/status",
         }
         return jsonify(body), 202
+
+    @app.get("/workflows/pending")
+    def list_pending():
+        pending = []
+        for workflow in store.list(State.AWAITING_HUMAN_REVIEW):
+            review = workflow.review or {}
+            pending.append({
+                **workflow.summary(),
+                "request": workflow.request,
+                "context": workflow.context,
+                "review_verdict": review.get("verdict"),
+                "escalated": bool(review.get("escalated")),
+                "links": {"self": f"/workflow/{workflow.workflow_id}",
+                          "decision": f"/workflow/{workflow.workflow_id}/decision"},
+            })
+        return jsonify({"count": len(pending), "options": list(DECISIONS), "workflows": pending})
 
     @app.get("/workflows")
     def list_workflows():
@@ -134,6 +156,40 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
         return jsonify({"workflow_id": workflow.workflow_id, "state": workflow.state,
                         "revisions": workflow.revisions, "review": workflow.review})
 
+    @app.post("/workflow/<workflow_id>/decision")
+    def post_decision(workflow_id: str):
+        workflow = store.get(workflow_id)
+        if workflow is None:
+            return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "JSON object body required", "options": list(DECISIONS)}), 400
+        try:
+            orchestrator.decide(workflow, data.get("decision"), data.get("note") or "", str(data.get("by") or "api"))
+        except InvalidDecision as exc:
+            return jsonify({"error": str(exc), "options": list(DECISIONS)}), 400
+        except WrongState as exc:
+            return jsonify({"error": str(exc), "state": workflow.state}), 409
+        body = workflow.summary()
+        body["final_response"] = workflow.final_response
+        return jsonify(body)
+
+    @app.get("/workflow/<workflow_id>/response")
+    def get_response(workflow_id: str):
+        workflow = store.get(workflow_id)
+        if workflow is None:
+            return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
+        if workflow.final_response is None:
+            # The completion gate in HTTP form: nothing to read until a person has decided.
+            return jsonify({
+                "error": "no response yet: the workflow has not been decided by a human",
+                "workflow_id": workflow.workflow_id, "state": workflow.state,
+                "awaiting_decision": workflow.state == State.AWAITING_HUMAN_REVIEW,
+                "links": {"status": f"/workflow/{workflow.workflow_id}/status",
+                          "decision": f"/workflow/{workflow.workflow_id}/decision"},
+            }), 409
+        return jsonify(workflow.final_response)
+
     return app
 
 
@@ -172,7 +228,7 @@ def _banner(app: Flask) -> None:
     print(rule)
     print("  SmartBank Multi-Agent Server (Release 2) - host process, not a container")
     print(f"  listening:  {config.local_url()}")
-    print(f"  pipeline:   {' -> '.join(ext['orchestrator'].stage_names)} (human review follows)")
+    print(f"  pipeline:   {' -> '.join(ext['orchestrator'].stage_names)} (then the human decision)")
     print(f"  workflows:  {ext['store'].count()} loaded from {ext['store'].directory}")
     print(f"  audit:      {ext['audit'].history_path}")
     print(f"              {ext['audit'].coordination_path}")

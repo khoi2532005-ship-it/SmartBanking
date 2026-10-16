@@ -4,8 +4,9 @@ The orchestrator owns the state machine; the agents own their reasoning.
 Every transition and stage outcome goes to workflow_history.jsonl and every
 coordination decision (contract checks, retries, fallbacks, handoffs) to
 coordination_audit.jsonl, so a run can be reconstructed from the two files
-alone. Stages arrive one per commit: planner, worker and reviewer now; the
-human gate follows.
+alone. The last stage is the human gate: the workflow waits in
+awaiting_human_review and the final response is only built when a person
+accepts, partially accepts or rejects it.
 """
 
 from __future__ import annotations
@@ -17,10 +18,21 @@ from typing import Any, Callable
 from multi_agent_server import config, evidence
 from multi_agent_server.agents import base, planner, reviewer, worker
 from multi_agent_server.audit import AuditLog
-from multi_agent_server.models import StageRecord, State, Workflow, now_iso
+from multi_agent_server.models import (
+    DECISIONS, MAX_NOTE_CHARS, StageRecord, State, Workflow, now_iso, seconds_between,
+)
 from multi_agent_server.store import WorkflowStore
 
 Stage = Callable[[Workflow], None]
+HUMAN = "human"
+
+
+class InvalidDecision(ValueError):
+    """The decision is malformed (status 400 at the API)."""
+
+
+class WrongState(RuntimeError):
+    """The workflow is not waiting for a decision (status 409 at the API)."""
 
 
 class InlineExecutor:
@@ -41,7 +53,8 @@ class Orchestrator:
         self.stage_timeout = config.STAGE_TIMEOUT if stage_timeout is None else stage_timeout
         self.max_revisions = config.MAX_REVISIONS if max_revisions is None else max_revisions
         self.stages: list[tuple[str, Stage]] = [
-            ("planner", self.run_planner), ("worker", self.run_worker), ("reviewer", self.run_reviewer)]
+            ("planner", self.run_planner), ("worker", self.run_worker), ("reviewer", self.run_reviewer),
+            (HUMAN, self.run_human_gate)]
 
     @property
     def stage_names(self) -> list[str]:
@@ -263,6 +276,97 @@ class Orchestrator:
                                "calls": outcome.attempts},
                        fallback=outcome.source == "fallback", fallback_reason=outcome.fallback_reason)
         return outcome
+
+    # ---- stage: human gate --------------------------------------------------
+
+    def run_human_gate(self, workflow: Workflow) -> None:
+        """Park the workflow for the person. Nothing is released until they decide."""
+        review = workflow.review or {}
+        self.transition(workflow, State.AWAITING_HUMAN_REVIEW)
+        self.audit.coordination(workflow, "handoff", detail={
+            "from": reviewer.ROLE, "to": HUMAN, "contract": "review",
+            "verdict": review.get("verdict"), "escalated": bool(review.get("escalated")),
+            "open_defects": len(review.get("defects", [])), "risks": len(review.get("risks", [])),
+        })
+        self.audit.coordination(workflow, "awaiting_decision", detail={
+            "options": list(DECISIONS), "released": False,
+        })
+        self.begin_stage(workflow, HUMAN, model=HUMAN)
+
+    def decide(self, workflow: Workflow, decision: str, note: str = "", by: str = "api") -> Workflow:
+        """Apply the person's decision and build the final response."""
+        decision = str(decision or "").strip().lower().replace(" ", "_").replace("-", "_")
+        if decision not in DECISIONS:
+            raise InvalidDecision(f"decision must be one of {list(DECISIONS)}")
+        note = str(note or "").strip()
+        if len(note) > MAX_NOTE_CHARS:
+            raise InvalidDecision(f"note must be {MAX_NOTE_CHARS} characters or fewer")
+        if workflow.state != State.AWAITING_HUMAN_REVIEW:
+            raise WrongState(f"workflow {workflow.workflow_id} is {workflow.state}, not awaiting_human_review")
+
+        decided_at = now_iso()
+        workflow.decision = {"decision": decision, "note": note, "by": by or "api", "decided_at": decided_at}
+        workflow.final_response = self.build_final_response(workflow)
+        record = next((s for s in reversed(workflow.stages) if s.role == HUMAN and s.status == "running"), None)
+        if record is not None:
+            record.finished_at = decided_at
+            record.status = "completed"
+            record.output = {"decision": decision, "note": note, "by": workflow.decision["by"],
+                             "released": workflow.final_response["released"]}
+            record.duration_seconds = seconds_between(record.started_at, decided_at)
+            self.audit.history(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
+                **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
+                "fallback": False, "fallback_reason": "", "error": ""})
+        self.audit.coordination(workflow, "human_decision", actor=HUMAN, detail={
+            "decision": decision, "note": note, "by": workflow.decision["by"],
+            "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions,
+        })
+        self.transition(workflow, DECISIONS[decision])
+        released = workflow.final_response["released"]
+        self.audit.coordination(workflow, "response_released" if released else "response_withheld", detail={
+            "decision": decision, "with_correction": bool(note) and decision == "partially_accept",
+        })
+        self.audit.history(workflow, "workflow_completed", detail={
+            "decision": decision, "released": released, "revisions": workflow.revisions,
+            "stages": len(workflow.stages),
+        })
+        return workflow
+
+    @staticmethod
+    def build_final_response(workflow: Workflow) -> dict[str, Any]:
+        """What the caller receives after the decision; nothing before it.
+
+        Accept releases the Worker's answer. Partially accept releases it with
+        the person's correction attached. Reject releases nothing but the
+        reason, and keeps the audit trail.
+        """
+        decision = workflow.decision or {}
+        result = workflow.result or {}
+        review = workflow.review or {}
+        kind = decision.get("decision")
+        released = kind in ("accept", "partially_accept")
+        return {
+            "workflow_id": workflow.workflow_id,
+            "feature": workflow.feature,
+            "request": workflow.request,
+            "decision": kind,
+            "released": released,
+            "released_at": decision.get("decided_at") if released else None,
+            "decided_by": decision.get("by"),
+            "answer": result.get("answer") if released else None,
+            "findings": result.get("findings", []) if released else [],
+            "correction_note": decision.get("note") or "",
+            "review_verdict": review.get("verdict"),
+            "review_summary": review.get("summary"),
+            "risks": review.get("risks", []),
+            "gaps": result.get("gaps", []) if released else [],
+            "evidence_sources": [
+                {"task_id": r["task_id"], "endpoint": r["endpoint"], "url": r["url"], "status": r["status"]}
+                for r in result.get("evidence", [])
+            ],
+            "revisions": workflow.revisions,
+            "models": sorted({s.model for s in workflow.stages if s.model and s.role != HUMAN}),
+        }
 
     @staticmethod
     def _revision_feedback(workflow: Workflow) -> str:

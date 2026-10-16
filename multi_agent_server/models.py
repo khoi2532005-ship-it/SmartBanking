@@ -34,8 +34,25 @@ class State:
     TERMINAL = (ACCEPTED, PARTIALLY_ACCEPTED, REJECTED, FAILED)
 
 
+# The human's three answers (Lecture 10) and the state each one ends in.
+DECISIONS = {
+    "accept": State.ACCEPTED,
+    "partially_accept": State.PARTIALLY_ACCEPTED,
+    "reject": State.REJECTED,
+}
+MAX_NOTE_CHARS = 1000
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def seconds_between(start_iso: str, end_iso: str) -> float | None:
+    """Elapsed seconds between two stored timestamps (the human stage can span a restart)."""
+    try:
+        return round((datetime.fromisoformat(end_iso) - datetime.fromisoformat(start_iso)).total_seconds(), 3)
+    except (TypeError, ValueError):
+        return None
 
 
 def new_workflow_id() -> str:
@@ -103,5 +120,6 @@ class Workflow:
             "has_result": self.result is not None,
             "has_review": self.review is not None,
             "decision": self.decision,
+            "released": bool(self.final_response and self.final_response.get("released")),
             "error": self.error,
         }
