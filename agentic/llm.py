@@ -54,10 +54,13 @@ def _settings() -> dict[str, str]:
     }
 
 
-def describe(*, review: bool = False) -> str:
-    """One line for the run header and the evidence log."""
+def describe(*, review: bool = False, model: str | None = None) -> str:
+    """One line for the run header and the evidence log.
+
+    `model` names an override, as the Multi-Agent Server passes per role.
+    """
     s = _settings()
-    return f"{_provider()} / {s['review_model' if review else 'model']}"
+    return f"{_provider()} / {model or s['review_model' if review else 'model']}"
 
 
 _client: OpenAI | None = None
@@ -78,8 +81,13 @@ def _get_client() -> OpenAI:
 
 
 def ask(system_prompt: str, user_prompt: str, *, review: bool = False,
-        max_tokens: int = 1000, temperature: float = 0.2) -> str:
+        max_tokens: int = 1000, temperature: float = 0.2,
+        model: str | None = None) -> str:
     """Single chat call. Raises LLMUnavailable on any provider-side failure.
+
+    `model` overrides the configured model for this one call; the Multi-Agent
+    Server uses it to give the Planner, Worker and Reviewer their own models
+    while sharing this client and its credentials.
 
     `max_tokens` is deliberately generous: newer Gemini models spend part of
     the budget on hidden reasoning before the visible answer, and a tight cap
@@ -89,7 +97,7 @@ def ask(system_prompt: str, user_prompt: str, *, review: bool = False,
     s = _settings()
     try:
         response = _get_client().chat.completions.create(
-            model=s["review_model"] if review else s["model"],
+            model=model or (s["review_model"] if review else s["model"]),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -100,6 +108,6 @@ def ask(system_prompt: str, user_prompt: str, *, review: bool = False,
     except LLMUnavailable:
         raise
     except Exception as exc:  # provider SDK raises a wide range of errors
-        raise LLMUnavailable(f"{describe()} call failed: {exc}") from exc
+        raise LLMUnavailable(f"{describe(review=review, model=model)} call failed: {exc}") from exc
 
     return (response.choices[0].message.content or "").strip()

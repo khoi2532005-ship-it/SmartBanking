@@ -16,6 +16,7 @@ from typing import Any
 class State:
     CREATED = "created"
     PLANNING = "planning"
+    PLANNED = "planned"
     WORKING = "working"
     REVIEWING = "reviewing"
     REVISING = "revising"
@@ -25,9 +26,9 @@ class State:
     REJECTED = "rejected"
     FAILED = "failed"
 
-    ALL = (CREATED, PLANNING, WORKING, REVIEWING, REVISING, AWAITING_HUMAN_REVIEW,
+    ALL = (CREATED, PLANNING, PLANNED, WORKING, REVIEWING, REVISING, AWAITING_HUMAN_REVIEW,
            ACCEPTED, PARTIALLY_ACCEPTED, REJECTED, FAILED)
-    RUNNING = (PLANNING, WORKING, REVIEWING, REVISING)
+    RUNNING = (PLANNING, PLANNED, WORKING, REVIEWING, REVISING)
     TERMINAL = (ACCEPTED, PARTIALLY_ACCEPTED, REJECTED, FAILED)
 
 
@@ -51,6 +52,8 @@ class StageRecord:
     output: dict[str, Any] = field(default_factory=dict)
     error: str = ""
     duration_seconds: float | None = None
+    fallback: bool = False            # the stage answered with its deterministic fallback
+    fallback_reason: str = ""
 
 
 @dataclass
@@ -90,8 +93,8 @@ class Workflow:
             "updated_at": self.updated_at,
             "revisions": self.revisions,
             "stages": [
-                {"role": s.role, "attempt": s.attempt, "status": s.status,
-                 "model": s.model, "duration_seconds": s.duration_seconds}
+                {"role": s.role, "attempt": s.attempt, "status": s.status, "model": s.model,
+                 "duration_seconds": s.duration_seconds, "fallback": s.fallback}
                 for s in self.stages
             ],
             "has_plan": self.plan is not None,

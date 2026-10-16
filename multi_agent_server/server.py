@@ -1,10 +1,9 @@
 """Shared Multi-Agent Server: Planner -> Worker -> Reviewer -> Human Review.
 
 Runs on the host, never as a Compose service; containers reach it at
-MULTI_AGENT_SERVER_URL. This is the skeleton: configuration, the workflow
-store, the two audit files and the HTTP surface from Lecture 10's API flow.
-The agents and the orchestrator that advance a workflow through the stages
-arrive in the following commits.
+MULTI_AGENT_SERVER_URL. Starting a workflow answers at once; the orchestrator
+then runs the stages in the background and the caller polls the status. The
+Planner stage is in place; Worker, Reviewer and the human gate follow.
 
     python -m multi_agent_server.server
 
@@ -13,6 +12,7 @@ arrive in the following commits.
     GET  /workflows[?state=...]        list workflows
     GET  /workflow/<id>                the full record
     GET  /workflow/<id>/status         the compact view the UI polls
+    GET  /workflow/<id>/plan           the Planner's plan (null until planned)
 """
 
 from __future__ import annotations
@@ -26,14 +26,21 @@ from werkzeug.exceptions import HTTPException
 from multi_agent_server import config
 from multi_agent_server.audit import AuditLog
 from multi_agent_server.models import State
+from multi_agent_server.orchestrator import Orchestrator
 from multi_agent_server.store import WorkflowStore, is_valid_state
 
 
-def create_app(data_dir: Path | None = None, audit_dir: Path | None = None) -> Flask:
+def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
+               executor: Any | None = None, ask: Any | None = None,
+               stage_timeout: float | None = None) -> Flask:
+    """`executor` and `ask` are injection points for tests and the validate
+    script: an inline executor runs the stages before POST /workflow answers,
+    and `ask` replaces the model call."""
     app = Flask(__name__)
     store = WorkflowStore(Path(data_dir or config.DATA_DIR))
     audit = AuditLog(Path(audit_dir or config.AUDIT_DIR))
-    app.extensions["multi_agent"] = {"store": store, "audit": audit}
+    orchestrator = Orchestrator(store, audit, executor=executor, ask=ask, stage_timeout=stage_timeout)
+    app.extensions["multi_agent"] = {"store": store, "audit": audit, "orchestrator": orchestrator}
 
     @app.errorhandler(Exception)
     def handle_exception(exc):
@@ -55,6 +62,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None) -> F
             "features": list(config.FEATURES),
             "stage_timeout_seconds": config.STAGE_TIMEOUT,
             "max_revisions": config.MAX_REVISIONS,
+            "pipeline": orchestrator.stage_names,
             "workflows": store.count(),
             "audit": {
                 "workflow_history": str(audit.history_path),
@@ -72,6 +80,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None) -> F
                       detail={"request": workflow.request, "context": workflow.context})
         audit.coordination(workflow, "request_accepted",
                            detail={"feature": workflow.feature, "stages": ["planner", "worker", "reviewer", "human"]})
+        orchestrator.start(workflow)
         body = workflow.summary()
         body["links"] = {
             "self": f"/workflow/{workflow.workflow_id}",
@@ -100,6 +109,13 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None) -> F
             return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
         return jsonify(workflow.summary())
 
+    @app.get("/workflow/<workflow_id>/plan")
+    def get_plan(workflow_id: str):
+        workflow = store.get(workflow_id)
+        if workflow is None:
+            return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
+        return jsonify({"workflow_id": workflow.workflow_id, "state": workflow.state, "plan": workflow.plan})
+
     return app
 
 
@@ -127,6 +143,8 @@ def _validate_request(data: Any) -> tuple[dict[str, Any], dict[str, Any] | None]
             if value < low or (high is not None and value > high):
                 return {}, {"error": f"context.{key} must be between {low} and {high or 'any'}"}
             context[key] = value
+    if "customer_id" not in context:
+        return {}, {"error": "context.customer_id is required: every workflow is about one customer"}
     return {"feature": feature, "request": text, "context": context}, None
 
 
@@ -136,7 +154,7 @@ def _banner(app: Flask) -> None:
     print(rule)
     print("  SmartBank Multi-Agent Server (Release 2) - host process, not a container")
     print(f"  listening:  {config.local_url()}")
-    print(f"  roles:      {', '.join(config.ROLES)} -> human review")
+    print(f"  pipeline:   {' -> '.join(ext['orchestrator'].stage_names)} (worker, reviewer, human review follow)")
     print(f"  workflows:  {ext['store'].count()} loaded from {ext['store'].directory}")
     print(f"  audit:      {ext['audit'].history_path}")
     print(f"              {ext['audit'].coordination_path}")
