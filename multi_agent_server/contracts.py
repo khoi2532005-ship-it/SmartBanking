@@ -6,7 +6,9 @@ Worker ever sees it, so a plan that names an unknown endpoint, an undeclared
 parameter or another customer is rejected with the reasons, and the model
 gets one chance to correct it. The Worker's result is checked the same way:
 every finding must name its analysis task and the api tasks it rests on, and
-every figure in it must appear in the collected evidence.
+every figure in it must appear in the collected evidence. The Reviewer's
+verdict is bound by a completion gate: "accept" needs every criterion met and
+no high-severity defect, otherwise the contract demands "revise" with notes.
 """
 
 from __future__ import annotations
@@ -318,3 +320,121 @@ def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list
     if errors:
         raise ContractError(errors)
     return {"findings": findings, "answer": answer, "gaps": gaps or []}
+
+
+# ---------------------------------------------------------------- Reviewer verdict
+
+VERDICTS = ("accept", "revise")
+SEVERITIES = ("high", "medium", "low")
+MAX_NOTE_CHARS = 600
+
+
+def validate_review(review: dict[str, Any], plan: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return the normalised review, or raise ContractError listing every problem.
+
+    The completion gate lives here: a verdict of accept with an unmet criterion
+    or a high-severity defect is a contract violation, not a judgement call.
+    """
+    errors: list[str] = []
+    criteria_count = len(plan.get("success_criteria", []))
+    allowed = set()
+    for record in evidence:
+        if record["status"] == "ok":
+            numbers_in_data(record["summary"], allowed)
+            numbers_in_data(record["params"], allowed)
+
+    verdict = str(review.get("verdict") or "").strip().lower()
+    if verdict not in VERDICTS:
+        errors.append(f"verdict must be one of {list(VERDICTS)}")
+
+    summary = str(review.get("summary") or "").strip()
+    if not summary:
+        errors.append("summary is required")
+    elif len(summary) > MAX_NOTE_CHARS:
+        errors.append(f"summary must be {MAX_NOTE_CHARS} characters or fewer")
+    for number in ungrounded_numbers(summary, allowed):
+        errors.append(f"summary: the number {number} is not in the evidence; quote figures exactly or leave them out")
+
+    raw_criteria = review.get("criteria")
+    if not isinstance(raw_criteria, list):
+        errors.append("criteria must be a list with one entry per success criterion")
+        raw_criteria = []
+    criteria: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    unmet: list[int] = []
+    for position, raw in enumerate(raw_criteria, start=1):
+        label = f"criteria entry {position}"
+        if not isinstance(raw, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        index = _as_int(raw.get("index"))
+        if index is None or not 1 <= index <= criteria_count:
+            errors.append(f"{label}: index must be between 1 and {criteria_count}")
+            continue
+        if index in seen:
+            errors.append(f"{label}: criterion {index} is judged twice")
+            continue
+        seen.add(index)
+        met = raw.get("met")
+        if not isinstance(met, bool):
+            errors.append(f"{label}: met must be true or false")
+            met = False
+        if not met:
+            unmet.append(index)
+        note = str(raw.get("note") or "").strip()[:MAX_NOTE_CHARS]
+        for number in ungrounded_numbers(note, allowed):
+            errors.append(f"{label}: the number {number} is not in the evidence")
+        criteria.append({"index": index, "met": met, "note": note})
+    missing = [i for i in range(1, criteria_count + 1) if i not in seen]
+    if missing:
+        errors.append(f"criteria must judge every success criterion; missing {missing}")
+    criteria.sort(key=lambda c: c["index"])
+
+    raw_defects = review.get("defects")
+    if raw_defects is None:
+        raw_defects = []
+    if not isinstance(raw_defects, list):
+        errors.append("defects must be a list")
+        raw_defects = []
+    defects: list[dict[str, Any]] = []
+    for position, raw in enumerate(raw_defects, start=1):
+        label = f"defect {position}"
+        if not isinstance(raw, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        severity = str(raw.get("severity") or "").strip().lower()
+        if severity not in SEVERITIES:
+            errors.append(f"{label}: severity must be one of {list(SEVERITIES)}")
+        note = str(raw.get("note") or "").strip()
+        if not note:
+            errors.append(f"{label}: note is required")
+        for number in ungrounded_numbers(note, allowed):
+            errors.append(f"{label}: the number {number} is not in the evidence")
+        defects.append({"severity": severity, "about": str(raw.get("about") or "").strip(), "note": note[:MAX_NOTE_CHARS]})
+
+    risks = _string_list(review.get("risks"))
+    if risks is None:
+        errors.append("risks must be a list of strings")
+        risks = []
+    notes = _string_list(review.get("revision_notes"))
+    if notes is None:
+        errors.append("revision_notes must be a list of strings")
+        notes = []
+    for text in risks + notes:
+        for number in ungrounded_numbers(text, allowed):
+            errors.append(f"the number {number} is not in the evidence: {text[:60]!r}")
+
+    high = [d for d in defects if d["severity"] == "high"]
+    if verdict == "accept":
+        if unmet:
+            errors.append(f"verdict accept is not allowed while criteria {unmet} are unmet; return revise with revision_notes")
+        if high:
+            errors.append("verdict accept is not allowed with a high-severity defect; return revise with revision_notes")
+        notes = []
+    elif verdict == "revise" and not notes:
+        errors.append("verdict revise requires at least one revision note the Worker can act on")
+
+    if errors:
+        raise ContractError(errors)
+    return {"verdict": verdict, "summary": summary, "criteria": criteria, "defects": defects,
+            "risks": risks, "revision_notes": notes}

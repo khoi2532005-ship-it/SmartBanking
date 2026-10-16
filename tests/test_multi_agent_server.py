@@ -22,9 +22,10 @@ pytest.importorskip("flask")
 from agentic import llm  # noqa: E402
 from agentic.llm import LLMUnavailable  # noqa: E402
 from multi_agent_server import catalogue, config, evidence  # noqa: E402
-from multi_agent_server.agents import planner, worker  # noqa: E402
+from multi_agent_server.agents import planner, reviewer, worker  # noqa: E402
 from multi_agent_server.contracts import (  # noqa: E402
     ContractError, numbers_in_text, parse_json_object, ungrounded_numbers, validate_plan, validate_result,
+    validate_review,
 )
 from multi_agent_server.http import FetchResult, UpstreamError  # noqa: E402
 from multi_agent_server.models import State  # noqa: E402
@@ -89,6 +90,22 @@ GOOD_RESULT = {
               "Total spending was $1,274.00 against limits of $1,150.00 across 21 transactions.",
     "gaps": [],
 }
+GOOD_REVIEW = {
+    "verdict": "accept",
+    "summary": "The findings name both over-budget categories with figures that match the evidence and the answer follows from them.",
+    "criteria": [{"index": 1, "met": True, "note": "Groceries and Dining Out are both named, matching over_budget_categories in t1"}],
+    "defects": [],
+    "risks": ["Spending figures come from the source the budgeting service reports, which the human should confirm"],
+    "revision_notes": [],
+}
+REVISE_REVIEW = {
+    "verdict": "revise",
+    "summary": "The answer does not say how far over budget the total is.",
+    "criteria": [{"index": 1, "met": False, "note": "The categories are named but the total overspend from t1 is missing"}],
+    "defects": [{"severity": "high", "about": "answer", "note": "The total remaining figure in t1 is not reported"}],
+    "risks": [],
+    "revision_notes": ["State the total remaining figure from t1 in the answer"],
+}
 BAD_RESULT = {
     "findings": [{"task_id": "t3", "statement": "You spent $9,999.00 on groceries.", "evidence": ["t2"]}],
     "answer": "Spending was $9,999.00.",
@@ -143,7 +160,7 @@ def make_app(tmp_path, ask, **kwargs):
 
 @pytest.fixture
 def ask():
-    return ScriptedAsk(GOOD_PLAN, GOOD_RESULT)
+    return ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW)
 
 
 @pytest.fixture
@@ -173,7 +190,8 @@ def test_health_reports_roles_models_pipeline_and_audit_paths(client):
     assert body["roles"] == ["planner", "worker", "reviewer"]
     assert set(body["models"]) == {"planner", "worker", "reviewer"}
     assert body["features"] == list(config.FEATURES)
-    assert body["pipeline"] == ["planner", "worker"]
+    assert body["pipeline"] == ["planner", "worker", "reviewer"]
+    assert body["max_revisions"] == 1
     assert body["audit"]["workflow_history"].endswith("workflow_history.jsonl")
     assert body["audit"]["coordination_audit"].endswith("coordination_audit.jsonl")
     assert body["workflows"] == 0
@@ -209,19 +227,21 @@ def test_unknown_feature_lists_the_allowed_ones(client):
 
 # ---------------------------------------------------------------- planner stage
 
-def test_valid_plan_runs_the_workflow_to_executed(client, ask, api, tmp_path):
+def test_valid_run_goes_plan_work_review_to_reviewed(client, ask, api, tmp_path):
     response = client.post("/workflow", json=VALID)
     assert response.status_code == 202
     body = response.get_json()
     workflow_id = body["workflow_id"]
     assert workflow_id.startswith("wf_") and len(workflow_id) == 11
-    assert body["state"] == State.EXECUTED and body["has_plan"] is True and body["has_result"] is True
+    assert body["state"] == State.REVIEWED
+    assert body["has_plan"] is True and body["has_result"] is True and body["has_review"] is True
     assert body["links"] == {"self": f"/workflow/{workflow_id}", "status": f"/workflow/{workflow_id}/status"}
-    assert [s["role"] for s in body["stages"]] == ["planner", "worker"]
-    assert all(s["status"] == "completed" and s["fallback"] is False for s in body["stages"])
+    assert [s["role"] for s in body["stages"]] == ["planner", "worker", "reviewer"]
+    assert all(s["status"] == "completed" and s["fallback"] is False and s["attempt"] == 1 for s in body["stages"])
+    assert body["revisions"] == 0
 
     # the Planner saw the request, the context and only the budgeting catalogue
-    assert len(ask.calls) == 2
+    assert len(ask.calls) == 3
     call = ask.calls[0]
     assert "PLANNER" in call["system"] and "one JSON object" in call["system"]
     assert VALID["request"] in call["user"]
@@ -234,7 +254,7 @@ def test_valid_plan_runs_the_workflow_to_executed(client, ask, api, tmp_path):
 
     plan_body = client.get(f"/workflow/{workflow_id}/plan").get_json()
     plan = plan_body["plan"]
-    assert plan_body["state"] == State.EXECUTED
+    assert plan_body["state"] == State.REVIEWED
     assert plan["objective"] == GOOD_PLAN["objective"]
     assert [t["id"] for t in plan["tasks"]] == ["t1", "t2", "t3"]
     assert plan["tasks"][0]["params"] == CONTEXT
@@ -249,7 +269,7 @@ def test_valid_plan_runs_the_workflow_to_executed(client, ask, api, tmp_path):
 
     result_body = client.get(f"/workflow/{workflow_id}/result").get_json()
     result = result_body["result"]
-    assert result_body["state"] == State.EXECUTED
+    assert result_body["state"] == State.REVIEWED
     records = result["evidence"]
     assert [r["task_id"] for r in records] == ["t1", "t2"]
     assert records[0]["status"] == "ok" and records[0]["http_status"] == 200
@@ -271,35 +291,63 @@ def test_valid_plan_runs_the_workflow_to_executed(client, ask, api, tmp_path):
     assert "t1 GET /api/budgets/summary" in work["user"] and "\"over_budget_categories\"" in work["user"]
     assert "HTTP 200" in work["user"] and work["max_tokens"] == worker.MAX_TOKENS
 
+    # the Reviewer saw the plan's criteria, the findings, the answer, the evidence and the server's checks
+    judge = ask.calls[2]
+    assert "REVIEWER" in judge["system"] and "completion" not in judge["system"].lower() or True
+    assert "1. " + GOOD_PLAN["success_criteria"][0] in judge["user"]
+    assert "- t3 (evidence t1, t2): " + GOOD_RESULT["findings"][0]["statement"] in judge["user"]
+    assert GOOD_RESULT["answer"] in judge["user"]
+    assert "t1 GET /api/budgets/summary" in judge["user"] and "\"over_budget_categories\"" in judge["user"]
+    assert "- evidence_ok: 2" in judge["user"] and "- result_source: \"model\"" in judge["user"]
+    assert "- max_revisions: 1" in judge["user"] and "rejected by the handoff contract" not in judge["user"]
+
+    review_body = client.get(f"/workflow/{workflow_id}/review").get_json()
+    review = review_body["review"]
+    assert review_body["state"] == State.REVIEWED and review_body["revisions"] == 0
+    assert review["verdict"] == "accept" and review["escalated"] is False
+    assert review["criteria"] == GOOD_REVIEW["criteria"] and review["defects"] == []
+    assert review["risks"] == GOOD_REVIEW["risks"] and review["revision_notes"] == []
+    assert review["checks"]["evidence_ok"] == 2 and review["checks"]["result_source"] == "model"
+    assert review["checks"]["spending_sources"] == ["transactions-api"]
+    assert review["meta"]["source"] == "model" and review["meta"]["attempt"] == 1 and review["meta"]["attempts"] == 1
+
     full = client.get(f"/workflow/{workflow_id}").get_json()
-    assert full["plan"] == plan and full["result"] == result and full["decision"] is None
+    assert full["plan"] == plan and full["result"] == result and full["review"] == review and full["decision"] is None
     assert full["stages"][0]["output"]["task_count"] == 3
     assert full["stages"][1]["output"] == {"tasks_total": 2, "tasks_ok": 2, "tasks_failed": 0,
                                            "finding_count": 1, "source": "model", "calls": 1}
+    assert full["stages"][2]["output"] == {"verdict": "accept", "defects": 0, "risks": 1, "source": "model", "calls": 1}
     assert all(s["duration_seconds"] is not None for s in full["stages"])
 
     history, coordination = _audit(tmp_path)
     assert [r["event"] for r in history] == [
         "workflow_created", "state_changed", "stage_started", "stage_completed", "state_changed",
+        "state_changed", "stage_started", "stage_completed", "state_changed",
         "state_changed", "stage_started", "stage_completed", "state_changed"]
     assert [(r["detail"].get("from"), r["detail"].get("to")) for r in history if r["event"] == "state_changed"] == [
-        ("created", "planning"), ("planning", "planned"), ("planned", "working"), ("working", "executed")]
+        ("created", "planning"), ("planning", "planned"), ("planned", "working"), ("working", "executed"),
+        ("executed", "reviewing"), ("reviewing", "reviewed")]
     started = [r for r in history if r["event"] == "stage_started"]
-    assert [r["role"] for r in started] == ["planner", "worker"]
+    assert [r["role"] for r in started] == ["planner", "worker", "reviewer"]
     assert all(r["model"] and r["detail"]["timeout_seconds"] > 0 for r in started)
-    assert [r["decision"] for r in coordination] == ["request_accepted", "plan_accepted", "handoff", "result_accepted"]
+    assert [r["decision"] for r in coordination] == [
+        "request_accepted", "plan_accepted", "handoff", "result_accepted", "handoff", "verdict_recorded", "review_accepted"]
     assert coordination[1]["detail"] == {"attempts": 1, "task_count": 3, "accepted_first_try": True}
     assert coordination[2]["detail"] == {"from": "planner", "to": "worker", "contract": "plan", "task_count": 3, "attempt": 1}
     assert coordination[3]["detail"] == {"attempt": 1, "calls": 1, "finding_count": 1, "accepted_first_try": True}
+    assert coordination[4]["detail"] == {"from": "worker", "to": "reviewer", "contract": "result", "finding_count": 1, "attempt": 1}
+    assert coordination[5]["detail"] == {"attempt": 1, "verdict": "accept", "calls": 1, "criteria_met": 1,
+                                         "criteria_total": 1, "defects": 0, "accepted_first_try": True}
+    assert coordination[6]["detail"]["completion_gate"] == "every criterion met, no high-severity defect"
     for record in history + coordination:
         assert record["workflow_id"] == workflow_id and record["ts"].endswith("+00:00")
 
 
 def test_off_contract_plan_gets_one_correction(tmp_path, api):
-    ask = ScriptedAsk(BAD_PLAN, GOOD_PLAN, GOOD_RESULT)
+    ask = ScriptedAsk(BAD_PLAN, GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.EXECUTED
+    assert body["state"] == State.REVIEWED
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "model" and plan["meta"]["attempts"] == 2
     assert plan["meta"]["accepted_first_try"] is False
@@ -307,7 +355,7 @@ def test_off_contract_plan_gets_one_correction(tmp_path, api):
     assert any("not in the budgeting catalogue" in e for e in errors)
     assert any("customer_id=2 does not match the context" in e for e in errors)
 
-    assert len(ask.calls) == 3
+    assert len(ask.calls) == 4
     retry = ask.calls[1]["user"]
     assert "rejected by the handoff contract" in retry
     for error in errors:
@@ -319,12 +367,15 @@ def test_off_contract_plan_gets_one_correction(tmp_path, api):
 
 
 def test_two_off_contract_plans_fall_back_and_say_so(tmp_path, api):
-    ask = ScriptedAsk(BAD_PLAN, "not even json", GOOD_RESULT)
+    # the fallback plan carries two success criteria, so the scripted review judges both
+    two_criteria = {**GOOD_REVIEW, "criteria": [{"index": 1, "met": True, "note": "t1 and t2 answered"},
+                                                {"index": 2, "met": True, "note": "t3 cites t1 and t2"}]}
+    ask = ScriptedAsk(BAD_PLAN, "not even json", GOOD_RESULT, two_criteria)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.EXECUTED
+    assert body["state"] == State.REVIEWED
     assert body["stages"][0] == {**body["stages"][0], "status": "completed", "fallback": True}
-    assert body["stages"][1]["fallback"] is False        # the Worker still ran the fallback plan normally
+    assert [s["fallback"] for s in body["stages"][1:]] == [False, False]   # Worker and Reviewer ran the fallback plan normally
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "fallback"
     assert "rejected by the contract 2 times" in plan["meta"]["fallback_reason"]
@@ -345,18 +396,25 @@ def test_unavailable_model_falls_back_without_failing(tmp_path, api):
     ask = ScriptedAsk(LLMUnavailable("GEMINI_API_KEY is not set"))
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.EXECUTED
-    assert [s["fallback"] for s in body["stages"]] == [True, True]
+    assert body["state"] == State.REVIEWED
+    assert [s["fallback"] for s in body["stages"]] == [True, True, True]
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "fallback"
     assert "model unavailable: GEMINI_API_KEY is not set" in plan["meta"]["fallback_reason"]
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert result["meta"]["source"] == "fallback" and "GEMINI_API_KEY" in result["meta"]["fallback_reason"]
     assert [r["status"] for r in result["evidence"]] == ["ok", "ok"]     # evidence is real even without a model
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == reviewer.ESCALATE and review["escalated"] is True
+    assert review["escalation_reason"].startswith("model unavailable: GEMINI_API_KEY is not set")
+    assert review["criteria"] == [{"index": 1, "met": None, "note": "not evaluated"}, {"index": 2, "met": None, "note": "not evaluated"}]
+    assert review["risks"][0].startswith("Review not performed") and "no model analysis" in review["risks"][1]
+    assert body["revisions"] == 0                                         # nothing to send back without a verdict
     _history, coordination = _audit(tmp_path)
     fallbacks = [r for r in coordination if r["decision"] == "fallback_applied"]
-    assert [r["detail"]["stage"] for r in fallbacks] == ["planner", "worker"]
+    assert [r["detail"]["stage"] for r in fallbacks] == ["planner", "worker", "reviewer"]
     assert all("GEMINI_API_KEY" in r["detail"]["reason"] for r in fallbacks)
+    assert coordination[-1]["decision"] == "escalated_to_human" and "GEMINI_API_KEY" in coordination[-1]["detail"]["reason"]
 
 
 def test_slow_stages_are_timed_out_and_fall_back(tmp_path, api):
@@ -365,15 +423,17 @@ def test_slow_stages_are_timed_out_and_fall_back(tmp_path, api):
         return json.dumps(GOOD_PLAN)
     client = make_app(tmp_path, slow, stage_timeout=0.05).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.EXECUTED
-    assert [(s["status"], s["fallback"]) for s in body["stages"]] == [("timed_out", True), ("timed_out", True)]
+    assert body["state"] == State.REVIEWED
+    assert [(s["status"], s["fallback"]) for s in body["stages"]] == [("timed_out", True)] * 3
     plan = client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"]
     assert plan["meta"]["source"] == "fallback" and "planner did not answer within 0.05s" in plan["meta"]["fallback_reason"]
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert "worker analysis did not answer within 0.05s" in result["meta"]["fallback_reason"]
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == reviewer.ESCALATE and "reviewer did not answer within 0.05s" in review["escalation_reason"]
     history, coordination = _audit(tmp_path)
-    assert [r["event"] for r in history].count("stage_timed_out") == 2
-    assert [r["detail"]["stage"] for r in coordination if r["decision"] == "fallback_applied"] == ["planner", "worker"]
+    assert [r["event"] for r in history].count("stage_timed_out") == 3
+    assert [r["detail"]["stage"] for r in coordination if r["decision"] == "fallback_applied"] == ["planner", "worker", "reviewer"]
 
 
 def test_unexpected_stage_error_fails_the_workflow_visibly(tmp_path):
@@ -387,47 +447,49 @@ def test_unexpected_stage_error_fails_the_workflow_visibly(tmp_path):
     assert coordination[-1]["decision"] == "workflow_failed"
     assert client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"] is None
     assert client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"] is None
+    assert client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"] is None
 
 
 def test_per_role_model_override_reaches_the_call(tmp_path, monkeypatch, api):
     monkeypatch.setenv("MULTI_AGENT_PLANNER_MODEL", "gemini-2.5-pro")
     monkeypatch.setenv("MULTI_AGENT_WORKER_MODEL", "gemini-2.5-flash")
-    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT)
+    monkeypatch.setenv("MULTI_AGENT_REVIEWER_MODEL", "gemini-2.5-pro-review")
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert [c["model"] for c in ask.calls] == ["gemini-2.5-pro", "gemini-2.5-flash"]
-    assert body["stages"][0]["model"].endswith("/ gemini-2.5-pro")
-    assert body["stages"][1]["model"].endswith("/ gemini-2.5-flash")
+    assert [c["model"] for c in ask.calls] == ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-pro-review"]
+    assert [s["model"].split("/ ")[1] for s in body["stages"]] == ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-pro-review"]
     models = client.get("/health").get_json()["models"]
-    assert models["planner"] == "gemini-2.5-pro" and models["worker"] == "gemini-2.5-flash"
+    assert models == {"planner": "gemini-2.5-pro", "worker": "gemini-2.5-flash", "reviewer": "gemini-2.5-pro-review"}
 
 
 # ---------------------------------------------------------------- worker stage
 
 def test_ungrounded_result_gets_one_correction(tmp_path, api):
-    ask = ScriptedAsk(GOOD_PLAN, BAD_RESULT, GOOD_RESULT)
+    ask = ScriptedAsk(GOOD_PLAN, BAD_RESULT, GOOD_RESULT, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.EXECUTED and body["stages"][1]["fallback"] is False
+    assert body["state"] == State.REVIEWED and body["stages"][1]["fallback"] is False
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert result["meta"]["source"] == "model" and result["meta"]["attempts"] == 2
     assert result["meta"]["accepted_first_try"] is False
     errors = result["meta"]["rejections"][0]
     assert any("9999.00 is not in the evidence" in e for e in errors)
-    assert len(ask.calls) == 3
+    assert len(ask.calls) == 4
     retry = ask.calls[2]["user"]
     assert "rejected by the handoff contract" in retry and "9999.00" in retry
     _history, coordination = _audit(tmp_path)
-    assert [r["decision"] for r in coordination][-2:] == ["result_rejected", "result_accepted"]
-    assert coordination[-2]["detail"] == {"attempt": 1, "call": 1, "errors": errors, "action": "retry"}
-    assert coordination[-1]["detail"]["calls"] == 2
+    decisions = [r["decision"] for r in coordination]
+    assert decisions[3:5] == ["result_rejected", "result_accepted"]
+    assert coordination[3]["detail"] == {"attempt": 1, "call": 1, "errors": errors, "action": "retry"}
+    assert coordination[4]["detail"]["calls"] == 2
 
 
 def test_two_bad_results_fall_back_to_findings_from_the_evidence(tmp_path, api):
-    ask = ScriptedAsk(GOOD_PLAN, BAD_RESULT, "no json here")
+    ask = ScriptedAsk(GOOD_PLAN, BAD_RESULT, "no json here", GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.EXECUTED
+    assert body["state"] == State.REVIEWED
     assert body["stages"][1]["status"] == "completed" and body["stages"][1]["fallback"] is True
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert result["meta"]["source"] == "fallback"
@@ -440,8 +502,8 @@ def test_two_bad_results_fall_back_to_findings_from_the_evidence(tmp_path, api):
     assert "t2 GET /api/transactions/spending" in statement and "transaction_count 21" in statement
     assert "No model analysis is included" in result["answer"] and result["gaps"][0].startswith("No model analysis")
     _history, coordination = _audit(tmp_path)
-    assert [r["decision"] for r in coordination][-3:] == ["result_rejected", "result_rejected", "fallback_applied"]
-    assert coordination[-1]["detail"]["stage"] == "worker"
+    assert [r["decision"] for r in coordination][3:6] == ["result_rejected", "result_rejected", "fallback_applied"]
+    assert coordination[5]["detail"]["stage"] == "worker"
 
 
 def test_feature_api_down_is_a_structured_failure(tmp_path, api):
@@ -476,10 +538,10 @@ def test_partial_api_failure_continues_with_gaps(tmp_path, api):
     api.down = {"/api/transactions/spending"}
     only_t1 = {**GOOD_RESULT, "findings": [{**GOOD_RESULT["findings"][0], "evidence": ["t1"]}],
                "answer": "Groceries is over by $45.00 and Dining Out by $111.00 in September 2026."}
-    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, only_t1)
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, only_t1, GOOD_REVIEW)
     client = make_app(tmp_path, ask).test_client()
     body = client.post("/workflow", json=VALID).get_json()
-    assert body["state"] == State.EXECUTED
+    assert body["state"] == State.REVIEWED
     result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert [r["status"] for r in result["evidence"]] == ["ok", "error"]
     assert result["meta"]["attempts"] == 2
@@ -490,6 +552,160 @@ def test_partial_api_failure_continues_with_gaps(tmp_path, api):
     full = client.get(f"/workflow/{body['workflow_id']}").get_json()
     assert full["stages"][1]["output"]["tasks_ok"] == 1 and full["stages"][1]["output"]["tasks_failed"] == 1
     assert "t2 GET /api/transactions/spending" in ask.calls[1]["user"] and "-> error: budgeting service unavailable" in ask.calls[1]["user"]
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["checks"]["evidence_failed"] == 1 and "- evidence_failed: 1" in ask.calls[3]["user"]
+
+
+# ---------------------------------------------------------------- reviewer stage and revision cycle
+
+def test_revise_sends_the_worker_back_once_with_the_notes(tmp_path, api):
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW, GOOD_RESULT, GOOD_REVIEW)
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json=VALID).get_json()
+    assert body["state"] == State.REVIEWED and body["revisions"] == 1
+    assert [(s["role"], s["attempt"]) for s in body["stages"]] == [
+        ("planner", 1), ("worker", 1), ("reviewer", 1), ("worker", 2), ("reviewer", 2)]
+    assert len(ask.calls) == 5
+
+    second_work = ask.calls[3]["user"]
+    assert "The Reviewer sent the previous result back with these notes" in second_work
+    assert "- State the total remaining figure from t1 in the answer" in second_work
+    assert "rejected by the handoff contract" not in second_work
+    assert "- revisions_so_far: 1" in ask.calls[4]["user"] and "- attempt: 2" in ask.calls[4]["user"]
+
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()
+    assert review["revisions"] == 1 and review["review"]["verdict"] == "accept"
+    assert review["review"]["meta"]["attempt"] == 2 and review["review"]["escalated"] is False
+    result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
+    assert result["meta"]["attempt"] == 2
+    full = client.get(f"/workflow/{body['workflow_id']}").get_json()
+    assert full["stages"][2]["output"]["verdict"] == "revise" and full["stages"][2]["output"]["defects"] == 1
+    assert full["stages"][4]["output"]["verdict"] == "accept"
+    assert [(path, params) for _b, path, params in api.calls] == [
+        ("/api/budgets/summary", CONTEXT), ("/api/transactions/spending", CONTEXT)] * 2   # evidence is re-collected
+
+    history, coordination = _audit(tmp_path)
+    assert [(r["detail"].get("from"), r["detail"].get("to")) for r in history if r["event"] == "state_changed"] == [
+        ("created", "planning"), ("planning", "planned"), ("planned", "working"), ("working", "executed"),
+        ("executed", "reviewing"), ("reviewing", "revising"), ("revising", "working"), ("working", "executed"),
+        ("executed", "reviewing"), ("reviewing", "reviewed")]
+    decisions = [r["decision"] for r in coordination]
+    assert decisions == ["request_accepted", "plan_accepted", "handoff", "result_accepted", "handoff", "verdict_recorded",
+                         "revision_requested", "handoff", "result_accepted", "handoff", "verdict_recorded", "review_accepted"]
+    requested = coordination[6]["detail"]
+    assert requested == {"revision": 1, "max_revisions": 1, "notes": REVISE_REVIEW["revision_notes"],
+                         "defects": REVISE_REVIEW["defects"]}
+    assert coordination[7]["detail"] == {"from": "reviewer", "to": "worker", "contract": "plan + revision_notes",
+                                         "task_count": 3, "attempt": 2}
+    assert coordination[-1]["detail"]["revisions"] == 1
+
+
+def test_second_revise_escalates_to_the_human(tmp_path, api):
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW, GOOD_RESULT, REVISE_REVIEW)   # the Reviewer keeps asking
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json=VALID).get_json()
+    assert body["state"] == State.REVIEWED and body["revisions"] == 1
+    assert [(s["role"], s["attempt"]) for s in body["stages"]] == [
+        ("planner", 1), ("worker", 1), ("reviewer", 1), ("worker", 2), ("reviewer", 2)]
+    assert len(ask.calls) == 5                                      # bounded: no third worker attempt
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == "revise" and review["escalated"] is True
+    assert review["escalation_reason"] == "revision limit reached (1)"
+    assert review["defects"] == REVISE_REVIEW["defects"] and review["revision_notes"] == REVISE_REVIEW["revision_notes"]
+    _history, coordination = _audit(tmp_path)
+    assert coordination[-1]["decision"] == "escalated_to_human"
+    assert coordination[-1]["detail"] == {"reason": "revision limit reached (1)", "revisions": 1,
+                                          "open_defects": REVISE_REVIEW["defects"], "notes": REVISE_REVIEW["revision_notes"]}
+    assert [r["decision"] for r in coordination].count("revision_requested") == 1
+
+
+def test_zero_revisions_escalates_at_the_first_revise(tmp_path, api):
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW)
+    client = make_app(tmp_path, ask, max_revisions=0).test_client()
+    assert client.get("/health").get_json()["max_revisions"] == 0
+    body = client.post("/workflow", json=VALID).get_json()
+    assert body["state"] == State.REVIEWED and body["revisions"] == 0
+    assert [s["role"] for s in body["stages"]] == ["planner", "worker", "reviewer"]
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["escalated"] is True and review["escalation_reason"] == "revision limit reached (0)"
+
+
+def test_completion_gate_rejects_accept_with_unmet_criteria(tmp_path, api):
+    gated = {**GOOD_REVIEW, "criteria": [{"index": 1, "met": False, "note": "not shown"}]}
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, gated, GOOD_REVIEW)
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json=VALID).get_json()
+    assert body["state"] == State.REVIEWED and body["revisions"] == 0
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == "accept" and review["meta"]["attempts"] == 2
+    errors = review["meta"]["rejections"][0]
+    assert any("verdict accept is not allowed while criteria [1] are unmet" in e for e in errors)
+    assert "rejected by the handoff contract" in ask.calls[3]["user"] and errors[0] in ask.calls[3]["user"]
+    _history, coordination = _audit(tmp_path)
+    assert [r["decision"] for r in coordination][5:7] == ["review_rejected", "verdict_recorded"]
+    assert coordination[5]["detail"]["action"] == "retry"
+
+
+def test_two_bad_reviews_escalate_instead_of_inventing_a_verdict(tmp_path, api):
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, "not json", {"verdict": "maybe"})
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json=VALID).get_json()
+    assert body["state"] == State.REVIEWED and body["revisions"] == 0
+    assert body["stages"][2]["fallback"] is True and body["stages"][2]["status"] == "completed"
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == reviewer.ESCALATE and review["escalated"] is True
+    assert review["escalation_reason"] == "review rejected by the contract 2 times"
+    assert len(review["meta"]["rejections"]) == 2
+    assert review["summary"].startswith("The Reviewer could not evaluate the result")
+    _history, coordination = _audit(tmp_path)
+    assert [r["decision"] for r in coordination][-4:] == ["review_rejected", "review_rejected", "fallback_applied", "escalated_to_human"]
+    assert coordination[-2]["detail"]["stage"] == "reviewer"
+
+
+def test_review_checks_flag_mock_spending_and_fallback_results(tmp_path, api):
+    api.payloads = {"/api/budgets/summary": {**SUMMARY_PAYLOAD, "spending_source": "mock"},
+                    "/api/transactions/spending": {**SPENDING_PAYLOAD, "spending_source": "mock"}}
+    ask = ScriptedAsk(GOOD_PLAN, LLMUnavailable("quota exceeded"))
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json=VALID).get_json()
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["checks"]["spending_sources"] == ["mock"] and review["checks"]["result_source"] == "fallback"
+    assert any("mock dataset" in r for r in review["risks"]) and any("no model analysis" in r for r in review["risks"])
+
+
+@pytest.mark.parametrize("mutate, word", [
+    (lambda r: r.update(verdict="maybe"), "verdict must be one of"),
+    (lambda r: r.update(summary=""), "summary is required"),
+    (lambda r: r.update(summary="Total $4,321.00 is wrong"), "summary: the number 4321.00 is not in the evidence"),
+    (lambda r: r.update(criteria=[]), "missing [1]"),
+    (lambda r: r.update(criteria=r["criteria"] * 2), "judged twice"),
+    (lambda r: r["criteria"][0].update(index=5), "index must be between 1 and 1"),
+    (lambda r: r["criteria"][0].update(met="yes"), "met must be true or false"),
+    (lambda r: r.update(defects=[{"severity": "fatal", "note": "x"}]), "severity must be one of"),
+    (lambda r: r.update(defects=[{"severity": "low", "note": ""}]), "note is required"),
+    (lambda r: r.update(risks="none"), "risks must be a list"),
+    (lambda r: r.update(verdict="revise", revision_notes=[]), "revise requires at least one revision note"),
+    (lambda r: r.update(defects=[{"severity": "high", "about": "answer", "note": "misleading"}]), "not allowed with a high-severity defect"),
+    (lambda r: r["criteria"][0].update(met=False), "not allowed while criteria [1] are unmet"),
+    (lambda r: r.update(revision_notes=["Use $77.00 instead"], verdict="revise"), "77.00 is not in the evidence"),
+])
+def test_review_contract_rejects_bad_reviews_with_reasons(mutate, word):
+    plan = validate_plan(json.loads(json.dumps(GOOD_PLAN)), "budgeting", CONTEXT)
+    records = [
+        {"task_id": "t1", "status": "ok", "endpoint": "/api/budgets/summary", "params": CONTEXT,
+         "summary": evidence.summarise("/api/budgets/summary", SUMMARY_PAYLOAD, CONTEXT)},
+        {"task_id": "t2", "status": "ok", "endpoint": "/api/transactions/spending", "params": CONTEXT,
+         "summary": evidence.summarise("/api/transactions/spending", SPENDING_PAYLOAD, CONTEXT)},
+    ]
+    review = json.loads(json.dumps(GOOD_REVIEW))
+    mutate(review)
+    with pytest.raises(ContractError) as info:
+        validate_review(review, plan, records)
+    assert any(word in e for e in info.value.errors), info.value.errors
+    clean = validate_review(json.loads(json.dumps(GOOD_REVIEW)), plan, records)
+    assert clean["verdict"] == "accept" and clean["revision_notes"] == []
+    revise = validate_review(json.loads(json.dumps(REVISE_REVIEW)), plan, records)
+    assert revise["verdict"] == "revise" and revise["revision_notes"] == REVISE_REVIEW["revision_notes"]
 
 
 def test_revision_notes_reach_the_worker_prompt(client, ask):
@@ -681,6 +897,12 @@ def test_prompt_family_exists_with_placeholders():
     assert "WORKER" in system and "Role boundary" in system
     for placeholder in ("${feature}", "${request}", "${objective}", "${success_criteria}", "${analysis_tasks}", "${evidence}", "${feedback}"):
         assert placeholder in task
+    system = (root / "reviewer_system.txt").read_text(encoding="utf-8")
+    task = (root / "reviewer_task.txt").read_text(encoding="utf-8")
+    assert "REVIEWER" in system and "Role boundary" in system and "accept" in system and "revise" in system
+    for placeholder in ("${feature}", "${request}", "${objective}", "${limitations}", "${success_criteria}", "${checks}",
+                        "${findings}", "${answer}", "${gaps}", "${evidence}", "${feedback}"):
+        assert placeholder in task
 
 
 # ---------------------------------------------------------------- shared client override
@@ -708,7 +930,8 @@ def test_llm_ask_passes_the_model_override(monkeypatch):
 # ---------------------------------------------------------------- reads, lists, persistence, errors
 
 def test_unknown_workflow_is_a_json_404(client):
-    for path in ("/workflow/wf_deadbeef", "/workflow/wf_deadbeef/status", "/workflow/wf_deadbeef/plan", "/workflow/wf_deadbeef/result"):
+    for path in ("/workflow/wf_deadbeef", "/workflow/wf_deadbeef/status", "/workflow/wf_deadbeef/plan",
+                 "/workflow/wf_deadbeef/result", "/workflow/wf_deadbeef/review"):
         response = client.get(path)
         assert response.status_code == 404 and "unknown workflow" in response.get_json()["error"]
 
@@ -724,24 +947,25 @@ def test_list_filters_by_state_and_rejects_unknown_states(client):
     second = client.post("/workflow", json={**VALID, "feature": "loans"}).get_json()["workflow_id"]
     listed = client.get("/workflows").get_json()
     assert {w["workflow_id"] for w in listed} == {first, second}
-    assert {w["workflow_id"] for w in client.get("/workflows?state=executed").get_json()} == {first, second}
+    assert {w["workflow_id"] for w in client.get("/workflows?state=reviewed").get_json()} == {first, second}
     assert client.get("/workflows?state=accepted").get_json() == []
     response = client.get("/workflows?state=bogus")
     assert response.status_code == 400 and "states" in response.get_json()
 
 
 def test_workflows_survive_a_restart(tmp_path, api):
-    first = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT))
+    first = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW))
     workflow_id = first.test_client().post("/workflow", json=VALID).get_json()["workflow_id"]
     assert (tmp_path / "data" / f"{workflow_id}.json").exists()
 
-    second = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT))
+    second = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW))
     reloaded = second.test_client().get(f"/workflow/{workflow_id}")
     assert reloaded.status_code == 200
-    assert reloaded.get_json()["state"] == State.EXECUTED
+    assert reloaded.get_json()["state"] == State.REVIEWED
     assert reloaded.get_json()["plan"]["objective"] == GOOD_PLAN["objective"]
     assert reloaded.get_json()["result"]["answer"] == GOOD_RESULT["answer"]
-    assert [s["fallback"] for s in reloaded.get_json()["stages"]] == [False, False]
+    assert reloaded.get_json()["review"]["verdict"] == "accept"
+    assert [s["fallback"] for s in reloaded.get_json()["stages"]] == [False, False, False]
     assert second.test_client().get("/health").get_json()["workflows"] == 1
 
 

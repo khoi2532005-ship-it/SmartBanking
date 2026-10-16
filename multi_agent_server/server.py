@@ -3,7 +3,7 @@
 Runs on the host, never as a Compose service; containers reach it at
 MULTI_AGENT_SERVER_URL. Starting a workflow answers at once; the orchestrator
 then runs the stages in the background and the caller polls the status. The
-Planner and Worker stages are in place; the Reviewer and the human gate follow.
+Planner, Worker and Reviewer stages are in place; the human gate follows.
 
     python -m multi_agent_server.server
 
@@ -14,6 +14,7 @@ Planner and Worker stages are in place; the Reviewer and the human gate follow.
     GET  /workflow/<id>/status         the compact view the UI polls
     GET  /workflow/<id>/plan           the Planner's plan (null until planned)
     GET  /workflow/<id>/result         the Worker's evidence and result (null until executed)
+    GET  /workflow/<id>/review         the Reviewer's verdict, defects and risks (null until reviewed)
 """
 
 from __future__ import annotations
@@ -33,14 +34,15 @@ from multi_agent_server.store import WorkflowStore, is_valid_state
 
 def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
                executor: Any | None = None, ask: Any | None = None,
-               stage_timeout: float | None = None) -> Flask:
+               stage_timeout: float | None = None, max_revisions: int | None = None) -> Flask:
     """`executor` and `ask` are injection points for tests and the validate
     script: an inline executor runs the stages before POST /workflow answers,
     and `ask` replaces the model call."""
     app = Flask(__name__)
     store = WorkflowStore(Path(data_dir or config.DATA_DIR))
     audit = AuditLog(Path(audit_dir or config.AUDIT_DIR))
-    orchestrator = Orchestrator(store, audit, executor=executor, ask=ask, stage_timeout=stage_timeout)
+    orchestrator = Orchestrator(store, audit, executor=executor, ask=ask, stage_timeout=stage_timeout,
+                                max_revisions=max_revisions)
     app.extensions["multi_agent"] = {"store": store, "audit": audit, "orchestrator": orchestrator}
 
     @app.errorhandler(Exception)
@@ -62,7 +64,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
             "models": {role: config.role_model(role) or "shared AI-Mode model" for role in config.ROLES},
             "features": list(config.FEATURES),
             "stage_timeout_seconds": config.STAGE_TIMEOUT,
-            "max_revisions": config.MAX_REVISIONS,
+            "max_revisions": orchestrator.max_revisions,
             "pipeline": orchestrator.stage_names,
             "workflows": store.count(),
             "audit": {
@@ -124,6 +126,14 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
             return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
         return jsonify({"workflow_id": workflow.workflow_id, "state": workflow.state, "result": workflow.result})
 
+    @app.get("/workflow/<workflow_id>/review")
+    def get_review(workflow_id: str):
+        workflow = store.get(workflow_id)
+        if workflow is None:
+            return jsonify({"error": f"unknown workflow {workflow_id!r}"}), 404
+        return jsonify({"workflow_id": workflow.workflow_id, "state": workflow.state,
+                        "revisions": workflow.revisions, "review": workflow.review})
+
     return app
 
 
@@ -162,7 +172,7 @@ def _banner(app: Flask) -> None:
     print(rule)
     print("  SmartBank Multi-Agent Server (Release 2) - host process, not a container")
     print(f"  listening:  {config.local_url()}")
-    print(f"  pipeline:   {' -> '.join(ext['orchestrator'].stage_names)} (reviewer, human review follow)")
+    print(f"  pipeline:   {' -> '.join(ext['orchestrator'].stage_names)} (human review follows)")
     print(f"  workflows:  {ext['store'].count()} loaded from {ext['store'].directory}")
     print(f"  audit:      {ext['audit'].history_path}")
     print(f"              {ext['audit'].coordination_path}")

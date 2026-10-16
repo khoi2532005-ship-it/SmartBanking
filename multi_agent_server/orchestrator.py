@@ -4,8 +4,8 @@ The orchestrator owns the state machine; the agents own their reasoning.
 Every transition and stage outcome goes to workflow_history.jsonl and every
 coordination decision (contract checks, retries, fallbacks, handoffs) to
 coordination_audit.jsonl, so a run can be reconstructed from the two files
-alone. Stages arrive one per commit: planner and worker now; reviewer and the
-human gate follow.
+alone. Stages arrive one per commit: planner, worker and reviewer now; the
+human gate follows.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from multi_agent_server import config, evidence
-from multi_agent_server.agents import base, planner, worker
+from multi_agent_server.agents import base, planner, reviewer, worker
 from multi_agent_server.audit import AuditLog
 from multi_agent_server.models import StageRecord, State, Workflow, now_iso
 from multi_agent_server.store import WorkflowStore
@@ -32,13 +32,16 @@ class InlineExecutor:
 
 class Orchestrator:
     def __init__(self, store: WorkflowStore, audit: AuditLog, *, executor: Any | None = None,
-                 ask: base.AskFn | None = None, stage_timeout: float | None = None) -> None:
+                 ask: base.AskFn | None = None, stage_timeout: float | None = None,
+                 max_revisions: int | None = None) -> None:
         self.store = store
         self.audit = audit
         self.executor = executor or ThreadPoolExecutor(max_workers=2, thread_name_prefix="workflow")
         self.ask = ask
         self.stage_timeout = config.STAGE_TIMEOUT if stage_timeout is None else stage_timeout
-        self.stages: list[tuple[str, Stage]] = [("planner", self.run_planner), ("worker", self.run_worker)]
+        self.max_revisions = config.MAX_REVISIONS if max_revisions is None else max_revisions
+        self.stages: list[tuple[str, Stage]] = [
+            ("planner", self.run_planner), ("worker", self.run_worker), ("reviewer", self.run_reviewer)]
 
     @property
     def stage_names(self) -> list[str]:
@@ -108,7 +111,8 @@ class Orchestrator:
         plan = workflow.plan or {}
         self.transition(workflow, State.WORKING)
         self.audit.coordination(workflow, "handoff", detail={
-            "from": planner.ROLE, "to": worker.ROLE, "contract": "plan",
+            "from": reviewer.ROLE if workflow.revisions else planner.ROLE, "to": worker.ROLE,
+            "contract": "plan" if not workflow.revisions else "plan + revision_notes",
             "task_count": len(plan.get("tasks", [])), "attempt": attempt,
         })
         record = self.begin_stage(workflow, worker.ROLE, model=base.model_for(worker.ROLE), attempt=attempt)
@@ -173,6 +177,92 @@ class Orchestrator:
                                "source": result.source, "calls": result.attempts},
                        fallback=result.source == "fallback", fallback_reason=result.fallback_reason)
         self.transition(workflow, State.EXECUTED)
+
+    # ---- stage: reviewer, with the bounded revision cycle -------------------
+
+    def run_reviewer(self, workflow: Workflow) -> None:
+        while True:
+            outcome = self._review_once(workflow)
+            if workflow.state == State.FAILED:
+                return
+            verdict = outcome.review["verdict"]
+            if verdict == "revise" and workflow.revisions < self.max_revisions:
+                workflow.revisions += 1
+                self.transition(workflow, State.REVISING)
+                self.audit.coordination(workflow, "revision_requested", detail={
+                    "revision": workflow.revisions, "max_revisions": self.max_revisions,
+                    "notes": outcome.review["revision_notes"],
+                    "defects": outcome.review["defects"],
+                })
+                self.run_worker(workflow)
+                if workflow.state == State.FAILED:
+                    return
+                continue
+            break
+
+        review = workflow.review or {}
+        if verdict == "revise":
+            review["escalated"] = True
+            review["escalation_reason"] = f"revision limit reached ({self.max_revisions})"
+            self.audit.coordination(workflow, "escalated_to_human", detail={
+                "reason": review["escalation_reason"], "revisions": workflow.revisions,
+                "open_defects": review["defects"], "notes": review["revision_notes"],
+            })
+        elif verdict == reviewer.ESCALATE:
+            self.audit.coordination(workflow, "escalated_to_human", detail={
+                "reason": review["escalation_reason"], "revisions": workflow.revisions,
+                "risks": review["risks"],
+            })
+        else:
+            self.audit.coordination(workflow, "review_accepted", detail={
+                "completion_gate": "every criterion met, no high-severity defect",
+                "revisions": workflow.revisions, "risks": review["risks"],
+            })
+        self.store.save(workflow)
+        self.transition(workflow, State.REVIEWED)
+
+    def _review_once(self, workflow: Workflow) -> reviewer.ReviewResult:
+        attempt = workflow.revisions + 1
+        self.transition(workflow, State.REVIEWING)
+        self.audit.coordination(workflow, "handoff", detail={
+            "from": worker.ROLE, "to": reviewer.ROLE, "contract": "result",
+            "finding_count": len((workflow.result or {}).get("findings", [])), "attempt": attempt,
+        })
+        record = self.begin_stage(workflow, reviewer.ROLE, model=base.model_for(reviewer.ROLE), attempt=attempt)
+        started = time.monotonic()
+        status = "completed"
+        try:
+            outcome = base.bounded(lambda: reviewer.review(workflow, attempt=attempt, ask=self.ask),
+                                   self.stage_timeout, label=reviewer.ROLE)
+        except base.StageTimeout as exc:
+            status = "timed_out"
+            outcome = reviewer.fallback_result(workflow, str(exc), model=record.model, attempt=attempt)
+
+        for call, errors in enumerate(outcome.rejections, start=1):
+            self.audit.coordination(workflow, "review_rejected", detail={
+                "attempt": attempt, "call": call, "errors": errors,
+                "action": "retry" if call < reviewer.MAX_ATTEMPTS else "fallback",
+            })
+        if outcome.source == "fallback":
+            self.audit.coordination(workflow, "fallback_applied", detail={
+                "stage": reviewer.ROLE, "reason": outcome.fallback_reason,
+                "fallback": "no verdict invented; the review escalates to the human with the checks",
+            })
+        else:
+            self.audit.coordination(workflow, "verdict_recorded", detail={
+                "attempt": attempt, "verdict": outcome.review["verdict"], "calls": outcome.attempts,
+                "criteria_met": sum(1 for c in outcome.review["criteria"] if c["met"]),
+                "criteria_total": len(outcome.review["criteria"]),
+                "defects": len(outcome.review["defects"]), "accepted_first_try": outcome.accepted_first_try,
+            })
+
+        workflow.review = outcome.review
+        self.end_stage(workflow, record, status=status, duration=time.monotonic() - started,
+                       output={"verdict": outcome.review["verdict"], "defects": len(outcome.review["defects"]),
+                               "risks": len(outcome.review["risks"]), "source": outcome.source,
+                               "calls": outcome.attempts},
+                       fallback=outcome.source == "fallback", fallback_reason=outcome.fallback_reason)
+        return outcome
 
     @staticmethod
     def _revision_feedback(workflow: Workflow) -> str:
