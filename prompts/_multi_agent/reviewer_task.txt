@@ -1,0 +1,36 @@
+Feature: ${feature}
+Request: ${request}
+Plan objective: ${objective}
+Plan limitations: ${limitations}
+
+Success criteria (judge each one):
+${success_criteria}
+
+Deterministic checks already made by the server:
+${checks}
+
+Worker findings:
+${findings}
+
+Worker answer:
+${answer}
+
+Worker gaps:
+${gaps}
+
+Evidence the findings must rest on, one block per api task:
+${evidence}
+${feedback}
+Return exactly this JSON shape:
+{
+  "verdict": "accept" or "revise",
+  "summary": "<one or two sentences on whether the result answers the request from the evidence>",
+  "criteria": [
+    {"index": 1, "met": true or false, "note": "<why, naming the evidence task ids that show it>"}
+  ],
+  "defects": [
+    {"severity": "high" or "medium" or "low", "about": "<finding task id, criterion number or 'answer'>", "note": "<what is wrong>"}
+  ],
+  "risks": ["<what the human should weigh before accepting, or an empty list>"],
+  "revision_notes": ["<a concrete instruction for the Worker; required when the verdict is revise, otherwise an empty list>"]
+}

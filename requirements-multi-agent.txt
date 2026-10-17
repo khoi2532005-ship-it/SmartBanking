@@ -1,0 +1,13 @@
+# Dependencies for the shared Multi-Agent Server (multi_agent_server/).
+# It runs on the host, not in a container:
+#
+#   pip install -r requirements-multi-agent.txt
+#   python -m multi_agent_server.server
+
+flask>=3.0
+requests>=2.32
+python-dotenv>=1.0
+openai>=1.40          # the agents reuse the shared client in agentic/llm.py
+
+# tests/test_multi_agent_server.py: stubbed, no server or API key needed
+pytest>=8.0

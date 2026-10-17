@@ -1,0 +1,17 @@
+Feature: ${feature}
+Request: ${request}
+Context: ${context}
+
+Endpoints the Worker may call for this feature, with the query parameters each one accepts:
+${catalogue}
+${feedback}
+Return exactly this JSON shape, with your own task list:
+{
+  "objective": "<one sentence stating what the plan achieves>",
+  "tasks": [
+    {"id": "t1", "kind": "api", "title": "<short title>", "endpoint": "<path copied from the catalogue>", "params": {"<parameter>": <value from the context>}, "evidence": "<what the Worker records from the response>"},
+    {"id": "t2", "kind": "analysis", "title": "<short title>", "depends_on": ["t1"], "instruction": "<what to conclude from the evidence of the tasks it depends on>", "evidence": "<what the Worker records>"}
+  ],
+  "success_criteria": ["<a check the Reviewer can make against the evidence>"],
+  "limitations": ["<anything the request asks that the catalogue cannot answer, or an empty list>"]
+}

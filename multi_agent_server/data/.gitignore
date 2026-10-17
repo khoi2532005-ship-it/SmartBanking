@@ -1,0 +1,4 @@
+# Per-workflow state written by the running server. The two audit files the
+# report quotes live under docs/evidence/multi_agent/ instead.
+*
+!.gitignore
