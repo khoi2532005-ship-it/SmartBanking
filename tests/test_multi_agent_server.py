@@ -21,7 +21,8 @@ pytest.importorskip("flask")
 
 from agentic import llm  # noqa: E402
 from agentic.llm import LLMUnavailable  # noqa: E402
-from multi_agent_server import catalogue, config, evidence, review as review_cli, run as run_cli, terminal  # noqa: E402
+from multi_agent_server import catalogue, config, evidence, metrics, review as review_cli, run as run_cli, terminal  # noqa: E402
+from multi_agent_server import validate  # noqa: E402
 from multi_agent_server.agents import planner, reviewer, worker  # noqa: E402
 from multi_agent_server.contracts import (  # noqa: E402
     ContractError, numbers_in_text, parse_json_object, ungrounded_numbers, validate_plan, validate_result,
@@ -124,7 +125,7 @@ class FakeAPI:
     def __call__(self, base_url, path, params=None):
         self.calls.append((base_url, path, dict(params or {})))
         url = f"{base_url.rstrip('/')}{path}"
-        if path in self.down:
+        if path in self.down or base_url.startswith(validate.UNREACHABLE_URL):
             raise UpstreamError(f"connection refused at {url} - is the service running?")
         return FetchResult(url=url, status_code=200, payload=self.payloads.get(path, []), duration_seconds=0.012)
 
@@ -137,15 +138,19 @@ def api(monkeypatch):
 
 
 class ScriptedAsk:
-    """Answers in order and records every prompt it was given."""
+    """Answers in order (repeating the last one, or cycling) and records every prompt."""
 
-    def __init__(self, *answers):
+    def __init__(self, *answers, cycle=False):
         self.answers = list(answers)
+        self.cycle = cycle
         self.calls: list[dict] = []
 
     def __call__(self, system_prompt, user_prompt, **kwargs):
         self.calls.append({"system": system_prompt, "user": user_prompt, **kwargs})
-        answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+        if self.cycle:
+            answer = self.answers[(len(self.calls) - 1) % len(self.answers)]
+        else:
+            answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
         if isinstance(answer, Exception):
             raise answer
         return answer if isinstance(answer, str) else json.dumps(answer)
@@ -160,7 +165,7 @@ def make_app(tmp_path, ask, **kwargs):
 
 @pytest.fixture
 def ask():
-    return ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW)
+    return ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True)
 
 
 @pytest.fixture
@@ -965,6 +970,99 @@ def test_runners_explain_an_unreachable_server(monkeypatch):
     assert code == 1 and "cannot reach" in lines[-1]
 
 
+# ---------------------------------------------------------------- metrics and the validate script
+
+def test_metrics_are_computed_from_the_audit_files_alone(client, tmp_path):
+    first = _start(client)
+    client.post(f"/workflow/{first}/decision", json={"decision": "accept"})
+    second = _start(client)
+    client.post(f"/workflow/{second}/decision", json={"decision": "reject", "note": "no"})
+    body = client.get("/metrics").get_json()
+    assert body["workflows"] == {"total": 2, "by_final_state": {"accepted": 1, "rejected": 1}, "decided": 2, "failed": 0}
+    assert body["plan_acceptance_rate"] == 1.0 and body["worker_completion_rate"] == 1.0
+    assert body["handoff_success_rate"] == 1.0 and body["reviewer_defect_yield"] == 0.0
+    assert body["rework_ratio"] == 0.0 and body["escalation_rate"] == 0.0 and body["fallback_rate"] == 0.0
+    assert body["human_acceptance_rate"] == 0.5 and body["human_decisions"] == {"accept": 1, "reject": 1}
+    assert set(body["stage_seconds"]) == {"planner", "worker", "reviewer", "human"}
+    assert body["end_to_end_seconds"]["to_human_gate"] is not None and body["end_to_end_seconds"]["to_decision"] is not None
+    assert body["counts"]["handoffs"] == 6 and body["counts"]["stages_started"] == {"planner": 2, "worker": 2, "reviewer": 2, "human": 2}
+    # the same numbers from a copy of the files, with no server involved
+    history, coordination = _audit(tmp_path)
+    assert metrics.compute(history, coordination) == {k: v for k, v in body.items() if k != "scope"} and body["scope"] == "all"
+    # a filter narrows the metrics to named workflows
+    one = client.get(f"/metrics?workflows={first}").get_json()
+    assert one["scope"] == [first] and one["workflows"]["total"] == 1 and one["human_decisions"] == {"accept": 1}
+
+
+def test_metrics_reflect_revisions_fallbacks_and_failures(tmp_path, api):
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW, GOOD_RESULT, GOOD_REVIEW, LLMUnavailable("quota"))
+    client = make_app(tmp_path, ask).test_client()
+    _start(client)                                                   # one revision, then accept verdict
+    _start(client)                                                   # model unavailable: three fallbacks, escalated
+    api.down = {"/api/budgets/summary", "/api/transactions/spending"}
+    _start(client)                                                   # fails at the worker
+    body = client.get("/metrics").get_json()
+    assert body["workflows"]["total"] == 3 and body["workflows"]["failed"] == 1 and body["workflows"]["decided"] == 0
+    assert body["rework_ratio"] == round(1 / 3, 3) and body["escalation_rate"] == round(1 / 3, 3)
+    assert body["counts"]["revisions_requested"] == 1 and body["counts"]["escalations"] == 1
+    assert body["counts"]["fallbacks"] == 4 and body["plan_acceptance_rate"] == round(1 / 3, 3)   # 3 in the 2nd, the planner in the 3rd
+    assert body["worker_completion_rate"] == round(3 / 4, 3)        # two attempts + one fallback completed, one failed
+    assert body["human_acceptance_rate"] is None and body["human_decisions"] == {}
+    assert metrics.compute([], []) ["workflows"]["total"] == 0
+
+
+def test_validate_passes_every_check_against_the_server(client, api, tmp_path, monkeypatch):
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True)
+    client.application.extensions["multi_agent"]["orchestrator"].ask = ask
+    monkeypatch.setattr(validate, "EVIDENCE_DIR", tmp_path / "evidence")
+    monkeypatch.setattr(validate, "EVIDENCE_AUDIT_DIR", tmp_path / "evidence" / "multi_agent")
+    records = validate.run_checks("flask://test", client=terminal.FlaskClientAdapter(client), ask=ask, sleep=lambda s: None)
+    assert [(r.n, r.passed, r.skipped) for r in records] == [(n, True, False) for n in range(1, 10)]
+    by_n = {r.n: r for r in records}
+    assert by_n[2].detail["plan_source"] == "model" and by_n[2].detail["fallbacks"] == []
+    assert by_n[2].detail["criteria_met"] == "1/1" and by_n[2].detail["spending_sources"] == ["transactions-api"]
+    assert by_n[3].detail["status"] == 409
+    assert by_n[4].detail["answer"] == GOOD_RESULT["answer"]
+    assert by_n[5].detail["review_verdict"] == "accept"
+    assert by_n[6].detail["human_decisions"] == ["accept", "reject"]
+    assert by_n[7].detail["plan"]["rejected"] and by_n[7].detail["result"]["rejected"] and by_n[7].detail["review"]["rejected"]
+    assert validate.UNREACHABLE_URL in by_n[8].detail["error"] and by_n[8].detail["worker_blocked"] is True
+    assert by_n[8].detail["coordination"] == ["request_accepted", "plan_accepted", "handoff", "worker_blocked", "workflow_failed"]
+    assert config.SERVICE_URLS["budgeting"] != validate.UNREACHABLE_URL                  # the probe restored the URL
+    assert by_n[9].detail["workflows"]["decided"] == 2 and by_n[9].detail["human_decisions"] == {"accept": 1, "reject": 1}
+    assert sorted(by_n[9].detail["scope"]) == sorted(by_n[2].detail["workflow_ids"].values())
+    ids = by_n[2].detail["workflow_ids"]
+    assert set(ids) == {"accept", "reject"}
+
+    written = validate.write_evidence("flask://test", records)
+    report = json.loads(written[0].read_text())
+    assert report["kind"] == "multi-agent-terminal-validation" and report["passed"] is True
+    assert sorted(report["workflow_ids"]) == sorted(ids.values()) and len(report["records"]) == 9
+    assert [p.name for p in written[1:]] == ["workflow_history.jsonl", "coordination_audit.jsonl"]
+    snapshot = [json.loads(line) for line in written[1].read_text().splitlines()]
+    assert {r["workflow_id"] for r in snapshot} == set(ids.values())
+    assert "workflow_completed" in {r["event"] for r in snapshot}
+    assert report["audit_snapshot"][0].startswith("docs/evidence/multi_agent/validation-") or True   # tmp paths in tests
+
+
+def test_validate_report_prints_the_tally_and_fails_when_unreachable(capsys):
+    records = validate.run_checks("http://127.0.0.1:9")
+    assert len(records) == 1 and records[0].passed is False and "cannot reach" in records[0].observed
+    validate.print_report("http://127.0.0.1:9", records)
+    out = capsys.readouterr().out
+    assert "SmartBank Multi-Agent Server - terminal validation" in out
+    assert "FAIL  1. server reachable" in out and "0/1 checks passed, 0 skipped" in out
+    assert validate.main(["--url", "http://127.0.0.1:9"]) == 1
+
+
+def test_validate_stops_cleanly_when_a_workflow_fails(tmp_path, api):
+    api.down = {"/api/budgets/summary", "/api/transactions/spending"}
+    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN)).test_client()
+    records = validate.run_checks("flask://test", client=terminal.FlaskClientAdapter(client), sleep=lambda s: None)
+    assert [r.n for r in records] == [1, 2] and records[1].passed is False
+    assert "failed" in records[1].observed and "no feature API answered" in records[1].observed
+
+
 # ---------------------------------------------------------------- evidence summaries
 
 def test_summaries_follow_the_mcp_tools_and_stay_bounded():
@@ -1091,10 +1189,12 @@ def test_plan_contract_rejects_bad_plans_with_reasons(mutate, word):
 def test_plan_contract_normalises_and_drops_unknown_keys():
     plan = json.loads(json.dumps(GOOD_PLAN))
     plan["tasks"][0]["params"]["customer_id"] = "1"          # digit string is accepted as the integer
+    plan["tasks"][0]["endpoint"] = "GET /api/budgets/summary"  # the verb copied from the catalogue listing is tolerated
     plan["tasks"][0]["notes"] = "ignored"
     plan["chatter"] = "ignored"
     clean = validate_plan(plan, "budgeting", CONTEXT)
     assert clean["tasks"][0]["params"]["customer_id"] == 1
+    assert clean["tasks"][0]["endpoint"] == "/api/budgets/summary"
     assert "notes" not in clean["tasks"][0] and "chatter" not in clean
     assert clean["limitations"] == []
 

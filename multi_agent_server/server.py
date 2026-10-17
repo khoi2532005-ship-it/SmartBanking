@@ -19,6 +19,7 @@ exists only once a person has decided.
     GET  /workflow/<id>/review         the Reviewer's verdict, defects and risks (null until reviewed)
     POST /workflow/<id>/decision       {"decision": accept | partially_accept | reject, "note"?: str}
     GET  /workflow/<id>/response       the final response; 409 until the decision is made
+    GET  /metrics[?workflows=id,id]    coordination metrics computed from the two audit files
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from typing import Any
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 
-from multi_agent_server import config
+from multi_agent_server import config, metrics
 from multi_agent_server.audit import AuditLog
 from multi_agent_server.models import DECISIONS, State
 from multi_agent_server.orchestrator import InvalidDecision, Orchestrator, WrongState
@@ -78,6 +79,18 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
                 "coordination_audit": str(audit.coordination_path),
             },
         })
+
+    @app.get("/metrics")
+    def get_metrics():
+        history, coordination = audit.read_history(), audit.read_coordination()
+        selected = request.args.get("workflows")
+        if selected:
+            ids = {w.strip() for w in selected.split(",") if w.strip()}
+            history = [r for r in history if r["workflow_id"] in ids]
+            coordination = [r for r in coordination if r["workflow_id"] in ids]
+        body = metrics.compute(history, coordination)
+        body["scope"] = sorted(ids) if selected else "all"
+        return jsonify(body)
 
     @app.post("/workflow")
     def start_workflow():

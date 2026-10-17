@@ -51,11 +51,13 @@ def role_model(role: str) -> str | None:
     return os.getenv(f"MULTI_AGENT_{role.upper()}_MODEL") or None
 
 
-# Where state lives. Per-workflow JSON is runtime data (gitignored, like
-# rag_server/data). The two audit files Lecture 10 names are evidence, so they
-# are written under docs/evidence where the report can quote them.
+# Where state lives. Per-workflow JSON and the two append-only audit files are
+# runtime output under multi_agent_server/data (gitignored, like rag_server/data),
+# so demo runs never dirty the tree. `python -m multi_agent_server.validate
+# --evidence` snapshots the audit records of its own workflows into
+# docs/evidence/multi_agent/, which is what the report quotes.
 DATA_DIR = Path(os.getenv("MULTI_AGENT_DATA_DIR", str(REPO_ROOT / "multi_agent_server" / "data")))
-AUDIT_DIR = Path(os.getenv("MULTI_AGENT_AUDIT_DIR", str(REPO_ROOT / "docs" / "evidence" / "multi_agent")))
+AUDIT_DIR = Path(os.getenv("MULTI_AGENT_AUDIT_DIR", str(DATA_DIR / "audit")))
 HISTORY_FILE = "workflow_history.jsonl"
 COORDINATION_FILE = "coordination_audit.jsonl"
 

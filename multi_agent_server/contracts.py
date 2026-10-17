@@ -148,6 +148,8 @@ def validate_plan(plan: dict[str, Any], feature: str, context: dict[str, Any]) -
 def _validate_api_task(raw: dict[str, Any], task: dict[str, Any], feature: str,
                        context: dict[str, Any], label: str, errors: list[str]) -> None:
     path = str(raw.get("endpoint") or "").strip()
+    if path.upper().startswith("GET "):
+        path = path[4:].strip()                 # models copy the verb from the catalogue listing; the intent is clear
     entry = catalogue.endpoint(feature, path)
     if entry is None:
         allowed = [e["path"] for e in catalogue.endpoints(feature)]
