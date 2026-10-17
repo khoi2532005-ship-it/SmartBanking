@@ -24,6 +24,7 @@ exists only once a person has decided.
 
 from __future__ import annotations
 
+import hmac
 import socket
 from pathlib import Path
 from typing import Any
@@ -33,7 +34,7 @@ from werkzeug.exceptions import HTTPException
 
 from multi_agent_server import config, metrics
 from multi_agent_server.audit import AuditLog
-from multi_agent_server.models import DECISIONS, State
+from multi_agent_server.models import CONTEXT_KEYS, DECISIONS, State
 from multi_agent_server.orchestrator import InvalidDecision, Orchestrator, WrongState
 from multi_agent_server.store import WorkflowStore, is_valid_state
 
@@ -46,6 +47,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
     script: an inline executor runs the stages before POST /workflow answers,
     and `ask` replaces the model call. `api_token` overrides MULTI_AGENT_API_TOKEN."""
     app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES     # a request is a sentence and three integers
     store = WorkflowStore(Path(data_dir or config.DATA_DIR))
     audit = AuditLog(Path(audit_dir or config.AUDIT_DIR))
     orchestrator = Orchestrator(store, audit, executor=executor, ask=ask, stage_timeout=stage_timeout,
@@ -60,7 +62,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
         # /health stays open so a probe can tell "down" from "not authorised".
         if not token or request.path == "/health":
             return None
-        if request.headers.get("Authorization", "") != f"Bearer {token}":
+        if not hmac.compare_digest(request.headers.get("Authorization", ""), f"Bearer {token}"):
             return jsonify({"error": "missing or invalid bearer token",
                             "hint": "set MULTI_AGENT_API_TOKEN to the server's value for every client"}), 401
         return None
@@ -223,6 +225,9 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
     return app
 
 
+MAX_BODY_BYTES = 64 * 1024
+
+
 def _validate_request(data: Any) -> tuple[dict[str, Any], dict[str, Any] | None]:
     """Shape and bounds of POST /workflow; the structured error names what to fix."""
     if not isinstance(data, dict):
@@ -238,8 +243,15 @@ def _validate_request(data: Any) -> tuple[dict[str, Any], dict[str, Any] | None]
     context = data.get("context") or {}
     if not isinstance(context, dict):
         return {}, {"error": "context must be a JSON object"}
+    unknown = sorted(str(k) for k in context if k not in CONTEXT_KEYS)
+    if unknown:
+        # Only these three reach the agents, the prompts and the audit; anything
+        # else would become "evidence" the grounding check could not question.
+        return {}, {"error": f"context accepts only {', '.join(CONTEXT_KEYS)}; unknown {unknown}"}
     for key, low, high in (("customer_id", 1, None), ("month", 1, 12), ("year", 2000, 2100)):
         if key in context:
+            if isinstance(context[key], bool):
+                return {}, {"error": f"context.{key} must be an integer"}
             try:
                 value = int(context[key])
             except (TypeError, ValueError):

@@ -205,13 +205,19 @@ MAX_ANSWER_CHARS = 2000
 # Small whole numbers (months, ranks, "2 of 7 budgets") are not checked; dollar
 # amounts, percentages and counts above this must come from the evidence.
 SMALL_NUMBER = 12
-_NUMBER = re.compile(r"(?<![A-Za-z\d.])-?\$?\d[\d,]*(?:\.\d+)?%?")
+_NUMBER = re.compile(r"(?<!\d)-?\$?\d[\d,]*(?:\.\d+)?%?")
+_TASK_ID = re.compile(r"\bt\d+\b")                  # t1, t2: plan task ids, not figures
+_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
 
 
 def numbers_in_text(text: str) -> list[tuple[float, int]]:
-    """Every number written in `text` as (value, decimals written)."""
+    """Every number written in `text` as (value, decimals written).
+
+    A figure glued to a currency code or a word ("AUD1,200", "approx.9999")
+    is still a figure; only plan task ids are left out.
+    """
     found = []
-    for match in _NUMBER.finditer(text or ""):
+    for match in _NUMBER.finditer(_TASK_ID.sub(" ", text or "")):
         raw = match.group(0).replace("$", "").replace(",", "").rstrip("%")
         if not raw or raw == "-":
             continue
@@ -236,7 +242,9 @@ def numbers_in_data(data: Any, into: set[float] | None = None) -> set[float]:
         try:
             into.add(float(stripped))
         except ValueError:
-            pass
+            date = _DATE.match(stripped)
+            if date:                          # "2026-09-30": the year, month and day are all quotable
+                into.update(float(part) for part in date.groups())
     elif isinstance(data, dict):
         for value in data.values():
             numbers_in_data(value, into)
@@ -271,7 +279,9 @@ def ungrounded_numbers(text: str, allowed: set[float]) -> list[str]:
         if decimals == 0 and abs(value) <= SMALL_NUMBER:
             continue
         tolerance = 0.5 * 10 ** (-decimals) + 1e-9       # "113%" and "112%" both stand for 112.5
-        if any(abs(candidate - value) <= tolerance for candidate in allowed):
+        # Sign is ignored: the API reports an overspend as total_remaining -124.0,
+        # which a person writes as "$124.00 over".
+        if any(abs(abs(candidate) - abs(value)) <= tolerance for candidate in allowed):
             continue
         written = f"{value:.{decimals}f}" if decimals else f"{int(value)}"
         if written not in missing:

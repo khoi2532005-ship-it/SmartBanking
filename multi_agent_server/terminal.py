@@ -173,11 +173,15 @@ def prompt_decision(input_fn: Callable[[str], str] = input, out: Callable[[str],
         out(f"  Please answer A, P, R or S (one of {list(DECISIONS)} or skip).")
     if decision is None:
         return None, ""
-    try:
-        note = input_fn(NOTE_PROMPT).strip()
-    except EOFError:
-        note = ""
-    return decision, note
+    prompt = NOTE_PROMPT if decision != "partially_accept" else "Correction note (required for partially accept): "
+    while True:
+        try:
+            note = input_fn(prompt).strip()
+        except EOFError:
+            return decision, ""                # stdin ran dry: let the server say no
+        if note or decision != "partially_accept":
+            return decision, note
+        out("  Partially accept needs a note saying what to correct.")
 
 
 def send_decision(client: Any, workflow_id: str, decision: str, note: str, by: str) -> tuple[int, Any]:

@@ -123,12 +123,14 @@ class FakeAPI:
     def __init__(self):
         self.payloads = {"/api/budgets/summary": SUMMARY_PAYLOAD, "/api/transactions/spending": SPENDING_PAYLOAD}
         self.down: set[str] = set()
+        self.fail_after: int | None = None          # calls answered before the service "dies"
         self.calls: list[tuple[str, str, dict]] = []
 
     def __call__(self, base_url, path, params=None):
         self.calls.append((base_url, path, dict(params or {})))
         url = f"{base_url.rstrip('/')}{path}"
-        if path in self.down or base_url.startswith(validate.UNREACHABLE_URL):
+        died = self.fail_after is not None and len(self.calls) > self.fail_after
+        if path in self.down or died or base_url.startswith(validate.UNREACHABLE_URL):
             raise UpstreamError(f"connection refused at {url} - is the service running?")
         return FetchResult(url=url, status_code=200, payload=self.payloads.get(path, []), duration_seconds=0.012)
 
@@ -219,6 +221,8 @@ def test_health_reports_roles_models_pipeline_and_audit_paths(client):
     ({"feature": "budgeting", "request": "x", "context": {"customer_id": 1, "month": 13}}, "context.month"),
     ({"feature": "budgeting", "request": "x", "context": {"customer_id": "abc"}}, "context.customer_id"),
     ({"feature": "budgeting", "request": "x", "context": {"month": 9}}, "customer_id is required"),
+    ({"feature": "budgeting", "request": "x", "context": {"customer_id": 1, "ref": 9999}}, "context accepts only customer_id, month, year"),
+    ({"feature": "budgeting", "request": "x", "context": {"customer_id": True}}, "context.customer_id must be an integer"),
 ])
 def test_bad_requests_are_400_with_a_reason(client, ask, body, word):
     if isinstance(body, str):
@@ -228,6 +232,13 @@ def test_bad_requests_are_400_with_a_reason(client, ask, body, word):
     assert response.status_code == 400, response.get_data(as_text=True)
     assert word in response.get_json()["error"], response.get_json()
     assert ask.calls == []                        # nothing reached the model
+
+
+def test_oversized_bodies_are_refused_as_json(client, ask):
+    huge = {"feature": "budgeting", "request": "x", "context": {"customer_id": 1, "month": 9, "year": 2026, "blob": "x" * 200_000}}
+    response = client.post("/workflow", json=huge)
+    assert response.status_code == 413 and response.is_json and response.get_json()["status"] == 413
+    assert ask.calls == [] and client.get("/health").get_json()["workflows"] == 0
 
 
 def test_unknown_feature_lists_the_allowed_ones(client):
@@ -658,6 +669,33 @@ def test_second_revise_escalates_to_the_human(tmp_path, api):
     assert client.get("/workflows/pending").get_json()["workflows"][0]["escalated"] is True
 
 
+def test_failed_revision_keeps_the_first_result_and_escalates(tmp_path, api):
+    api.fail_after = 2                                              # the API dies after the first attempt's two calls
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW)
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json=VALID).get_json()
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["revisions"] == 1
+    assert [(s["role"], s["attempt"], s["status"]) for s in body["stages"]] == [
+        ("planner", 1, "completed"), ("worker", 1, "completed"), ("reviewer", 1, "completed"),
+        ("worker", 2, "failed"), ("human", 1, "running")]
+    assert len(ask.calls) == 3                                      # no analysis call without evidence
+    result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
+    assert result["answer"] == GOOD_RESULT["answer"] and result["meta"]["attempt"] == 1   # the first result survives
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == "revise" and review["escalated"] is True
+    assert review["escalation_reason"].startswith("revision attempt failed (no feature API answered")
+    assert "the first result is kept for the human" in review["escalation_reason"]
+    assert review["defects"] == REVISE_REVIEW["defects"]            # the human sees what the Reviewer wanted changed
+    _history, coordination = _audit(tmp_path)
+    decisions = [r["decision"] for r in coordination]
+    assert "revision_failed" in decisions and "workflow_failed" not in decisions
+    escalated = next(r for r in coordination if r["decision"] == "escalated_to_human")
+    assert escalated["detail"]["reason"].startswith("revision attempt failed")
+    assert client.get("/workflows/pending").get_json()["count"] == 1
+    decided = client.post(f"/workflow/{body['workflow_id']}/decision", json={"decision": "accept"})
+    assert decided.status_code == 200 and decided.get_json()["final_response"]["answer"] == GOOD_RESULT["answer"]
+
+
 def test_zero_revisions_escalates_at_the_first_revise(tmp_path, api):
     ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, REVISE_REVIEW)
     client = make_app(tmp_path, ask, max_revisions=0).test_client()
@@ -846,6 +884,8 @@ def test_reject_withholds_the_answer_but_keeps_the_trail(client, tmp_path):
     ({"decision": "maybe"}, 400, "decision must be one of"),
     ({}, 400, "decision must be one of"),
     ({"decision": "accept", "note": "x" * 1001}, 400, "1000 characters"),
+    ({"decision": "accept", "by": "x" * 101}, 400, "by must be 100 characters"),
+    ({"decision": "partially_accept"}, 400, "needs a note saying what to correct"),
     ("[1]", 400, "JSON object"),
 ])
 def test_bad_decisions_are_400_and_change_nothing(client, body, status, word):
@@ -929,6 +969,15 @@ def test_second_server_start_leaves_a_running_servers_data_alone(tmp_path, monke
     finally:
         listener.close()
     assert server_module.port_in_use(port) is False
+
+
+def test_store_skips_files_that_are_not_workflows(tmp_path, api):
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "wf_list.json").write_text("[]", encoding="utf-8")
+    (tmp_path / "data" / "wf_broken.json").write_text('{"workflow_id": "wf_broken"}', encoding="utf-8")
+    (tmp_path / "data" / "wf_nojson.json").write_text("not json", encoding="utf-8")
+    app = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True))
+    assert app.test_client().get("/health").get_json()["workflows"] == 0
 
 
 def test_interrupted_workflows_are_closed_on_restart(tmp_path, api):
@@ -1062,6 +1111,15 @@ def test_review_runner_prompts_and_records_the_decision(client, tmp_path):
     status = client.get(f"/workflow/{workflow_id}/status").get_json()
     assert status["state"] == State.PARTIALLY_ACCEPTED and status["decision"]["by"] == "terminal"
     assert status["decision"]["note"] == "Mention the period"
+
+
+def test_prompt_insists_on_a_note_for_partially_accept():
+    lines = []
+    decision, note = terminal.prompt_decision(Inputs("p", "", "Fix the month"), lines.append)
+    assert (decision, note) == ("partially_accept", "Fix the month")
+    assert "needs a note" in "\n".join(lines)
+    assert terminal.prompt_decision(Inputs("a", ""), lines.append) == ("accept", "")
+    assert terminal.prompt_decision(Inputs("p"), lines.append) == ("partially_accept", "")   # stdin ran dry
 
 
 def test_review_runner_skip_and_flags(client):
@@ -1302,6 +1360,15 @@ def test_number_grounding_helpers():
     # a half is accepted whichever way it was rounded, and nothing further away
     assert ungrounded_numbers("113% or 112%", {112.5}) == [] and ungrounded_numbers("114%", {112.5}) == ["114"]
     assert ungrounded_numbers("$45.00 and $45.01", {45.0}) == ["45.01"]
+    # sign is ignored: the API's total_remaining -124.0 is "$124.00 over" to a person
+    assert ungrounded_numbers("You are $124.00 over your total budget", {-124.0}) == []
+    # figures glued to a currency code or a word are still figures; task ids are not
+    assert numbers_in_text("AUD1,200 and approx.9999 from t1 and t12") == [(1200.0, 0), (9999.0, 0)]
+    assert ungrounded_numbers("USD9999 was spent", {120.5}) == ["9999"]
+    # the day of a stored date string can be quoted
+    from multi_agent_server.contracts import numbers_in_data
+    assert {2026.0, 9.0, 30.0} <= numbers_in_data({"date_from": "2026-09-01", "date_to": "2026-09-30"})
+    assert ungrounded_numbers("between 1 and 30 September 2026", {2026.0, 9.0, 1.0, 30.0}) == []
 
 
 def test_allowed_numbers_include_context_plan_params_and_the_request():

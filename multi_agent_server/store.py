@@ -27,8 +27,11 @@ class WorkflowStore:
     def _load(self) -> None:
         for path in sorted(self.directory.glob("wf_*.json")):
             try:
-                workflow = Workflow.from_dict(json.loads(path.read_text(encoding="utf-8")))
-            except (ValueError, TypeError):
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    continue                  # valid JSON but not a workflow
+                workflow = Workflow.from_dict(data)
+            except (ValueError, TypeError, KeyError, AttributeError):
                 continue                      # a damaged file is skipped, not fatal
             self._items[workflow.workflow_id] = workflow
 

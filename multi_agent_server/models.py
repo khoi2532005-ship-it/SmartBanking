@@ -41,6 +41,8 @@ DECISIONS = {
     "reject": State.REJECTED,
 }
 MAX_NOTE_CHARS = 1000
+MAX_BY_CHARS = 100
+CONTEXT_KEYS = ("customer_id", "month", "year")      # the only context a workflow carries
 
 
 def now_iso() -> str:

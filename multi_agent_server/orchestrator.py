@@ -20,7 +20,7 @@ from multi_agent_server import config, evidence
 from multi_agent_server.agents import base, planner, reviewer, worker
 from multi_agent_server.audit import AuditLog
 from multi_agent_server.models import (
-    DECISIONS, MAX_NOTE_CHARS, StageRecord, State, Workflow, now_iso, seconds_between,
+    DECISIONS, MAX_BY_CHARS, MAX_NOTE_CHARS, StageRecord, State, Workflow, now_iso, seconds_between,
 )
 from multi_agent_server.store import WorkflowStore
 
@@ -124,9 +124,17 @@ class Orchestrator:
 
     # ---- stage: worker ------------------------------------------------------
 
-    def run_worker(self, workflow: Workflow) -> None:
+    def run_worker(self, workflow: Workflow, *, keep_previous_on_failure: bool = False) -> bool:
+        """Run the Worker. Returns True when a result was produced.
+
+        On a revision (`keep_previous_on_failure`), a Worker that cannot run,
+        because the feature API is down or evidence timed out, does not fail
+        the workflow: the first result and review are kept and escalated to
+        the human, who still sees everything that was produced.
+        """
         attempt = workflow.revisions + 1
         plan = workflow.plan or {}
+        previous_result = workflow.result
         self.transition(workflow, State.WORKING)
         self.audit.coordination(workflow, "handoff", detail={
             "from": reviewer.ROLE if workflow.revisions else planner.ROLE, "to": worker.ROLE,
@@ -144,12 +152,10 @@ class Orchestrator:
         except base.StageTimeout as exc:
             self.end_stage(workflow, record, status="timed_out", duration=time.monotonic() - started,
                            output={"step": "evidence"}, error=str(exc))
-            self.fail(workflow, f"worker: {exc}")
-            return
+            return self._worker_unavailable(workflow, str(exc), previous_result, keep_previous_on_failure)
         failed = [r for r in collected if r["status"] != "ok"]
         if collected and len(failed) == len(collected):
             reason = "no feature API answered"
-            workflow.result = worker.blocked_result(collected, reason, attempt)
             self.audit.coordination(workflow, "worker_blocked", detail={
                 "reason": reason, "errors": [r["error"] for r in failed],
                 "urls": [r["url"] for r in failed],
@@ -158,8 +164,10 @@ class Orchestrator:
                            output={"step": "evidence", "tasks_total": len(collected), "tasks_ok": 0,
                                    "tasks_failed": len(failed)},
                            error="; ".join(r["error"] for r in failed))
-            self.fail(workflow, f"worker: {reason}: {failed[0]['error']}")
-            return
+            if not keep_previous_on_failure:
+                workflow.result = worker.blocked_result(collected, reason, attempt)
+            return self._worker_unavailable(workflow, f"{reason}: {failed[0]['error']}", previous_result,
+                                            keep_previous_on_failure)
 
         # Step 2: the analysis tasks, one bounded model call with a correction.
         status = "completed"
@@ -195,6 +203,22 @@ class Orchestrator:
                                "source": result.source, "calls": result.attempts},
                        fallback=result.source == "fallback", fallback_reason=result.fallback_reason)
         self.transition(workflow, State.EXECUTED)
+        return True
+
+    def _worker_unavailable(self, workflow: Workflow, error: str, previous_result: Any, keep_previous: bool) -> bool:
+        if not keep_previous:
+            self.fail(workflow, f"worker: {error}")
+            return False
+        workflow.result = previous_result
+        review = dict(workflow.review or {})
+        review["escalated"] = True
+        review["escalation_reason"] = f"revision attempt failed ({error}); the first result is kept for the human"
+        workflow.review = review
+        self.audit.coordination(workflow, "revision_failed", detail={
+            "error": error, "kept": "the first result and its review", "revision": workflow.revisions,
+        })
+        self.store.save(workflow)
+        return False
 
     # ---- stage: reviewer, with the bounded revision cycle -------------------
 
@@ -212,16 +236,18 @@ class Orchestrator:
                     "notes": outcome.review["revision_notes"],
                     "defects": outcome.review["defects"],
                 })
-                self.run_worker(workflow)
-                if workflow.state == State.FAILED:
-                    return
+                if not self.run_worker(workflow, keep_previous_on_failure=True):
+                    if workflow.state == State.FAILED:
+                        return
+                    break                       # the first result and review go to the human
                 continue
             break
 
         review = workflow.review or {}
         if verdict == "revise":
-            review["escalated"] = True
-            review["escalation_reason"] = f"revision limit reached ({self.max_revisions})"
+            if not review.get("escalated"):
+                review["escalated"] = True
+                review["escalation_reason"] = f"revision limit reached ({self.max_revisions})"
             self.audit.coordination(workflow, "escalated_to_human", detail={
                 "reason": review["escalation_reason"], "revisions": workflow.revisions,
                 "open_defects": review["defects"], "notes": review["revision_notes"],
@@ -313,6 +339,11 @@ class Orchestrator:
         note = str(note or "").strip()
         if len(note) > MAX_NOTE_CHARS:
             raise InvalidDecision(f"note must be {MAX_NOTE_CHARS} characters or fewer")
+        by = str(by or "api").strip()
+        if len(by) > MAX_BY_CHARS:
+            raise InvalidDecision(f"by must be {MAX_BY_CHARS} characters or fewer")
+        if decision == "partially_accept" and not note:
+            raise InvalidDecision("partially_accept needs a note saying what to correct")
 
         with self._gate_lock:                      # check and change the state as one step
             if workflow.state != State.AWAITING_HUMAN_REVIEW:
