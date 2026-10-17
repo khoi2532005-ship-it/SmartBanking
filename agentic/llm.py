@@ -110,4 +110,9 @@ def ask(system_prompt: str, user_prompt: str, *, review: bool = False,
     except Exception as exc:  # provider SDK raises a wide range of errors
         raise LLMUnavailable(f"{describe(review=review, model=model)} call failed: {exc}") from exc
 
-    return (response.choices[0].message.content or "").strip()
+    choices = getattr(response, "choices", None) or []
+    if not choices or getattr(choices[0], "message", None) is None:
+        # A safety block or an empty completion: the provider answered, but with
+        # nothing usable. Callers treat it like any other unavailable provider.
+        raise LLMUnavailable(f"{describe(review=review, model=model)} returned no choices (the request may have been blocked)")
+    return (choices[0].message.content or "").strip()

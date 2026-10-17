@@ -40,7 +40,7 @@ class ReviewResult:
     duration_seconds: float = 0.0
 
 
-def checks(workflow: Workflow, attempt: int) -> dict[str, Any]:
+def checks(workflow: Workflow, attempt: int, max_revisions: int | None = None) -> dict[str, Any]:
     """Facts the server establishes before any model judges the result."""
     plan = workflow.plan or {}
     result = workflow.result or {}
@@ -49,7 +49,7 @@ def checks(workflow: Workflow, attempt: int) -> dict[str, Any]:
     return {
         "attempt": attempt,
         "revisions_so_far": workflow.revisions,
-        "max_revisions": config.MAX_REVISIONS,
+        "max_revisions": config.MAX_REVISIONS if max_revisions is None else max_revisions,
         "evidence_tasks": len(records),
         "evidence_ok": len(ok),
         "evidence_failed": len(records) - len(ok),
@@ -85,10 +85,11 @@ def build_prompts(workflow: Workflow, facts: dict[str, Any], feedback: str = "")
     return system, user
 
 
-def review(workflow: Workflow, *, attempt: int = 1, ask: base.AskFn | None = None) -> ReviewResult:
+def review(workflow: Workflow, *, attempt: int = 1, ask: base.AskFn | None = None,
+           max_revisions: int | None = None) -> ReviewResult:
     started = time.monotonic()
     model = base.model_for(ROLE)
-    facts = checks(workflow, attempt)
+    facts = checks(workflow, attempt, max_revisions)
     rejections: list[list[str]] = []
     correction = ""
     for call in range(1, MAX_ATTEMPTS + 1):
@@ -97,10 +98,12 @@ def review(workflow: Workflow, *, attempt: int = 1, ask: base.AskFn | None = Non
             text = base.call_model(ROLE, system, user, ask=ask, max_tokens=MAX_TOKENS)
         except LLMUnavailable as exc:
             return fallback_result(workflow, f"model unavailable: {exc}", model=model, attempts=call,
-                                   rejections=rejections, attempt=attempt, started=started)
+                                   rejections=rejections, attempt=attempt, started=started,
+                                   max_revisions=max_revisions)
         try:
             accepted = validate_review(parse_json_object(text), workflow.plan or {},
-                                       (workflow.result or {}).get("evidence", []))
+                                       (workflow.result or {}).get("evidence", []),
+                                       request=workflow.request, context=workflow.context)
         except ContractError as exc:
             rejections.append(exc.errors)
             correction = "\n".join(f"- {error}" for error in exc.errors)
@@ -111,15 +114,16 @@ def review(workflow: Workflow, *, attempt: int = 1, ask: base.AskFn | None = Non
         return ReviewResult(review=accepted, model=model, attempts=call, source="model",
                             accepted_first_try=call == 1, rejections=rejections, duration_seconds=duration)
     return fallback_result(workflow, f"review rejected by the contract {MAX_ATTEMPTS} times", model=model,
-                           attempts=MAX_ATTEMPTS, rejections=rejections, attempt=attempt, started=started)
+                           attempts=MAX_ATTEMPTS, rejections=rejections, attempt=attempt, started=started,
+                           max_revisions=max_revisions)
 
 
 def fallback_result(workflow: Workflow, reason: str, *, model: str = "", attempts: int = 0,
                     rejections: list[list[str]] | None = None, attempt: int = 1,
-                    started: float | None = None) -> ReviewResult:
+                    started: float | None = None, max_revisions: int | None = None) -> ReviewResult:
     """No verdict is invented: the review escalates to the human with the facts."""
     duration = round(time.monotonic() - started, 3) if started is not None else 0.0
-    facts = checks(workflow, attempt)
+    facts = checks(workflow, attempt, max_revisions)
     reason = reason.rstrip(".")
     risks = [f"Review not performed: {reason}"]
     if facts["result_source"] != "model":

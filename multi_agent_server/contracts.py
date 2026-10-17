@@ -54,8 +54,11 @@ def _as_int(value: Any) -> int | None:
         return None
     if isinstance(value, int):
         return value
-    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
-        return int(value.strip())
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:                      # "--9", "1e3", "" and friends
+            return None
     return None
 
 
@@ -125,6 +128,8 @@ def validate_plan(plan: dict[str, Any], feature: str, context: dict[str, Any]) -
 
     if tasks and not any(t["kind"] == "api" for t in tasks):
         errors.append("at least one task must call an endpoint")
+    if tasks and not any(t["kind"] == "analysis" for t in tasks):
+        errors.append("at least one analysis task is required, so the Worker has a conclusion to draw from the evidence")
 
     criteria = _string_list(plan.get("success_criteria"))
     if criteria is None:
@@ -241,14 +246,32 @@ def numbers_in_data(data: Any, into: set[float] | None = None) -> set[float]:
     return into
 
 
+def allowed_numbers(plan: dict[str, Any], evidence: list[dict[str, Any]], request: str = "",
+                    context: dict[str, Any] | None = None) -> set[float]:
+    """Figures a role may quote: the evidence, the plan's own parameters, the
+    request context (customer, month, year) and any number the person typed in
+    the request. Period values are included even where an endpoint turned them
+    into date strings before the call."""
+    allowed: set[float] = set()
+    for record in evidence:
+        if record["status"] == "ok":
+            numbers_in_data(record["summary"], allowed)
+            numbers_in_data(record["params"], allowed)
+    for task in plan.get("tasks", []):
+        numbers_in_data(task.get("params") or {}, allowed)
+    numbers_in_data(context or {}, allowed)
+    allowed.update(value for value, _decimals in numbers_in_text(request))
+    return allowed
+
+
 def ungrounded_numbers(text: str, allowed: set[float]) -> list[str]:
     """Numbers written in `text` that no evidence value equals or rounds to."""
     missing = []
     for value, decimals in numbers_in_text(text):
         if decimals == 0 and abs(value) <= SMALL_NUMBER:
             continue
-        if any(abs(candidate - value) < 1e-9 or abs(round(candidate, decimals) - value) < 1e-9
-               for candidate in allowed):
+        tolerance = 0.5 * 10 ** (-decimals) + 1e-9       # "113%" and "112%" both stand for 112.5
+        if any(abs(candidate - value) <= tolerance for candidate in allowed):
             continue
         written = f"{value:.{decimals}f}" if decimals else f"{int(value)}"
         if written not in missing:
@@ -256,17 +279,14 @@ def ungrounded_numbers(text: str, allowed: set[float]) -> list[str]:
     return missing
 
 
-def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
+def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list[dict[str, Any]], *,
+                    request: str = "", context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return the normalised Worker result, or raise ContractError listing every problem."""
     errors: list[str] = []
     analysis_ids = [t["id"] for t in plan.get("tasks", []) if t["kind"] == "analysis"]
     ok_ids = [r["task_id"] for r in evidence if r["status"] == "ok"]
     failed_ids = [r["task_id"] for r in evidence if r["status"] != "ok"]
-    allowed = set()
-    for record in evidence:
-        if record["status"] == "ok":
-            numbers_in_data(record["summary"], allowed)
-            numbers_in_data(record["params"], allowed)
+    allowed = allowed_numbers(plan, evidence, request, context)
 
     raw_findings = result.get("findings")
     if raw_findings is None:
@@ -331,7 +351,8 @@ SEVERITIES = ("high", "medium", "low")
 MAX_NOTE_CHARS = 600
 
 
-def validate_review(review: dict[str, Any], plan: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
+def validate_review(review: dict[str, Any], plan: dict[str, Any], evidence: list[dict[str, Any]], *,
+                    request: str = "", context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return the normalised review, or raise ContractError listing every problem.
 
     The completion gate lives here: a verdict of accept with an unmet criterion
@@ -339,11 +360,7 @@ def validate_review(review: dict[str, Any], plan: dict[str, Any], evidence: list
     """
     errors: list[str] = []
     criteria_count = len(plan.get("success_criteria", []))
-    allowed = set()
-    for record in evidence:
-        if record["status"] == "ok":
-            numbers_in_data(record["summary"], allowed)
-            numbers_in_data(record["params"], allowed)
+    allowed = allowed_numbers(plan, evidence, request, context)
 
     verdict = str(review.get("verdict") or "").strip().lower()
     if verdict not in VERDICTS:

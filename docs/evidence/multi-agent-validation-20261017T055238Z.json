@@ -1,15 +1,15 @@
 {
   "kind": "multi-agent-terminal-validation",
-  "timestamp": "20261017T030806Z",
+  "timestamp": "20261017T055238Z",
   "server_url": "http://localhost:8300",
-  "implementation_version": "3122636",
+  "implementation_version": "86850b1",
   "workflow_ids": [
-    "wf_9fabfb58",
-    "wf_e2855d38"
+    "wf_2edf6db0",
+    "wf_3f751423"
   ],
   "audit_snapshot": [
-    "docs/evidence/multi_agent/validation-20261017T030806Z/workflow_history.jsonl",
-    "docs/evidence/multi_agent/validation-20261017T030806Z/coordination_audit.jsonl"
+    "docs/evidence/multi_agent/validation-20261017T055238Z/workflow_history.jsonl",
+    "docs/evidence/multi_agent/validation-20261017T055238Z/coordination_audit.jsonl"
   ],
   "records": [
     {
@@ -40,6 +40,7 @@
         },
         "max_revisions": 1,
         "stage_timeout_seconds": 60.0,
+        "auth": "open",
         "audit": {
           "coordination_audit": "multi_agent_server/data/audit/coordination_audit.jsonl",
           "workflow_history": "multi_agent_server/data/audit/workflow_history.jsonl"
@@ -60,14 +61,17 @@
         }
       },
       "expected": "planner, worker and reviewer complete; state awaiting_human_review with plan, evidence and review",
-      "observed": "wf_e2855d38 -> awaiting_human_review; stages ['planner#1 completed 2.483s', 'worker#1 completed 1.601s', 'reviewer#1 completed 1.517s', 'human#1 running']; plan 2 tasks (model); evidence 1/1 ok; review accept (model)",
+      "observed": "wf_3f751423 -> awaiting_human_review; stages ['planner#1 completed 2.338s', 'worker#1 completed 2.158s', 'reviewer#1 completed 1.705s', 'human#1 running']; plan 2 tasks (model); evidence 1/1 ok; review accept (model)",
       "passed": true,
       "skipped": false,
       "detail": {
+        "workflow_ids": {
+          "accept": "wf_3f751423"
+        },
         "stages": [
-          "planner#1 completed 2.483s",
-          "worker#1 completed 1.601s",
-          "reviewer#1 completed 1.517s",
+          "planner#1 completed 2.338s",
+          "worker#1 completed 2.158s",
+          "reviewer#1 completed 1.705s",
           "human#1 running"
         ],
         "fallbacks": [],
@@ -90,11 +94,7 @@
         "criteria_met": "2/2",
         "defects": 0,
         "risks": [],
-        "escalated": false,
-        "workflow_ids": {
-          "accept": "wf_e2855d38",
-          "reject": "wf_9fabfb58"
-        }
+        "escalated": false
       }
     },
     {
@@ -102,7 +102,7 @@
       "check": "response withheld until a person decides",
       "call": "GET /workflow/<id>/response",
       "arguments": {
-        "workflow_id": "wf_e2855d38"
+        "workflow_id": "wf_3f751423"
       },
       "expected": "HTTP 409 with awaiting_decision true; the workflow is listed under /workflows/pending",
       "observed": "HTTP 409: no response yet: the workflow has not been decided by a human; pending 1 incl. this one: True",
@@ -128,11 +128,11 @@
         "by": "validate"
       },
       "expected": "state accepted; GET /response is 200 with released true and the Worker's answer",
-      "observed": "decision HTTP 200 -> accepted; response HTTP 200, released True, answer 230 chars, decided_by validate",
+      "observed": "decision HTTP 200 -> accepted; response HTTP 200, released True, answer 267 chars, decided_by validate",
       "passed": true,
       "skipped": false,
       "detail": {
-        "answer": "In September 2026, two budget categories went over their limits. Dining Out exceeded its 300.0 monthly limit by 25.2 with a total spend of 325.2, while Shopping exceeded its 400.0 monthly limit by 74.9 with a total spend of 474.9.",
+        "answer": "In September 2026, two budget categories went over their limits: Dining Out and Shopping. Dining Out had a monthly limit of 300.0, an actual spend of 325.2, and went over by 25.2. Shopping had a monthly limit of 400.0, an actual spend of 474.9, and went over by 74.9.",
         "risks": [],
         "evidence_sources": [
           {
@@ -160,23 +160,23 @@
         "note": "Validation run: rejected on purpose to record the withheld path."
       },
       "expected": "state rejected; GET /response is 200 with released false and the note kept",
-      "observed": "wf_9fabfb58 -> rejected; response HTTP 200, released False, answer None, note kept True",
+      "observed": "wf_2edf6db0 -> rejected; response HTTP 200, released False, answer None, note kept True",
       "passed": true,
       "skipped": false,
       "detail": {
+        "workflow_ids": {
+          "accept": "wf_3f751423",
+          "reject": "wf_2edf6db0"
+        },
         "stages": [
-          "planner#1 completed 1.775s",
-          "worker#1 completed 1.666s",
-          "reviewer#1 completed 1.689s",
+          "planner#1 completed 1.95s",
+          "worker#1 completed 1.772s",
+          "reviewer#1 completed 1.371s",
           "human#1 running"
         ],
         "fallbacks": [],
         "revisions": 0,
-        "review_verdict": "accept",
-        "workflow_ids": {
-          "accept": "wf_e2855d38",
-          "reject": "wf_9fabfb58"
-        }
+        "review_verdict": "accept"
       }
     },
     {
@@ -192,6 +192,10 @@
       "passed": true,
       "skipped": false,
       "detail": {
+        "workflow_ids": {
+          "accept": "wf_3f751423",
+          "reject": "wf_2edf6db0"
+        },
         "history_records": 36,
         "coordination_records": 22,
         "events": [
@@ -216,11 +220,7 @@
         "human_decisions": [
           "accept",
           "reject"
-        ],
-        "workflow_ids": {
-          "accept": "wf_e2855d38",
-          "reject": "wf_9fabfb58"
-        }
+        ]
       }
     },
     {
@@ -242,7 +242,8 @@
           "errors": [
             "task t1: endpoint '/api/customers' is not in the budgeting catalogue ['/api/budgets/summary', '/api/transactions/spending', '/api/budgets', '/api/budgets/insights', '/api/categories']",
             "task t2: customer_id=2 does not match the context (1)",
-            "task t2: /api/budgets/summary requires customer_id"
+            "task t2: /api/budgets/summary requires customer_id",
+            "at least one analysis task is required, so the Worker has a conclusion to draw from the evidence"
           ]
         },
         "result": {
@@ -274,7 +275,7 @@
         }
       },
       "expected": "state failed; error names the unreachable URL; evidence records carry the errors; worker_blocked audited",
-      "observed": "wf_f1bc3e4a -> failed; error: worker: no feature API answered: budgeting service unavailable: connection refused at http://127.0.0.1:9/api/budgets/summary - is the service running?",
+      "observed": "wf_ea3833be -> failed; error: worker: no feature API answered: budgeting service unavailable: connection refused at http://127.0.0.1:9/api/budgets/summary - is the service running?",
       "passed": true,
       "skipped": false,
       "detail": {
@@ -299,10 +300,10 @@
       "check": "coordination metrics computed from the audit files",
       "call": "GET /metrics",
       "arguments": {
-        "workflows": "wf_e2855d38,wf_9fabfb58"
+        "workflows": "wf_3f751423,wf_2edf6db0"
       },
       "expected": "rates and stage times derived from the two JSONL files, covering the workflows above",
-      "observed": "HTTP 200; workflows 2 (2 decided); plan acceptance 1.0, worker completion 1.0, handoff success 1.0, defect yield 0.0, rework 0.0, fallback 0.0, human acceptance 0.5; stage s {'human': 0.0, 'planner': 2.129, 'reviewer': 1.603, 'worker': 1.633}; end-to-end s {'to_decision': 6.0, 'to_human_gate': 6.0}",
+      "observed": "HTTP 200; workflows 2 (2 decided); plan acceptance 1.0, worker completion 1.0, handoff success 1.0, defect yield 0.0, rework 0.0, fallback 0.0, human acceptance 0.5; stage s {'human': 1.0, 'planner': 2.144, 'reviewer': 1.538, 'worker': 1.965}; end-to-end s {'to_decision': 7.0, 'to_human_gate': 6.0}",
       "passed": true,
       "skipped": false,
       "detail": {
@@ -329,7 +330,7 @@
           "timeouts": 0
         },
         "end_to_end_seconds": {
-          "to_decision": 6.0,
+          "to_decision": 7.0,
           "to_human_gate": 6.0
         },
         "escalation_rate": 0.0,
@@ -344,14 +345,14 @@
         "reviewer_defect_yield": 0.0,
         "rework_ratio": 0.0,
         "scope": [
-          "wf_9fabfb58",
-          "wf_e2855d38"
+          "wf_2edf6db0",
+          "wf_3f751423"
         ],
         "stage_seconds": {
-          "human": 0.0,
-          "planner": 2.129,
-          "reviewer": 1.603,
-          "worker": 1.633
+          "human": 1.0,
+          "planner": 2.144,
+          "reviewer": 1.538,
+          "worker": 1.965
         },
         "worker_completion_rate": 1.0,
         "workflows": {

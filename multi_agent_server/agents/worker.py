@@ -80,7 +80,8 @@ def analyse(workflow: Workflow, evidence: list[dict[str, Any]], *, feedback: str
             return fallback_result(workflow, evidence, f"model unavailable: {exc}", model=model,
                                    attempts=call, rejections=rejections, attempt=attempt, started=started)
         try:
-            accepted = validate_result(parse_json_object(text), workflow.plan or {}, evidence)
+            accepted = validate_result(parse_json_object(text), workflow.plan or {}, evidence,
+                                       request=workflow.request, context=workflow.context)
         except ContractError as exc:
             rejections.append(exc.errors)
             correction = "\n".join(f"- {error}" for error in exc.errors)

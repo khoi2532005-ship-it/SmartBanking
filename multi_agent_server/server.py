@@ -39,16 +39,30 @@ from multi_agent_server.store import WorkflowStore, is_valid_state
 
 def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
                executor: Any | None = None, ask: Any | None = None,
-               stage_timeout: float | None = None, max_revisions: int | None = None) -> Flask:
+               stage_timeout: float | None = None, max_revisions: int | None = None,
+               api_token: str | None = None) -> Flask:
     """`executor` and `ask` are injection points for tests and the validate
     script: an inline executor runs the stages before POST /workflow answers,
-    and `ask` replaces the model call."""
+    and `ask` replaces the model call. `api_token` overrides MULTI_AGENT_API_TOKEN."""
     app = Flask(__name__)
     store = WorkflowStore(Path(data_dir or config.DATA_DIR))
     audit = AuditLog(Path(audit_dir or config.AUDIT_DIR))
     orchestrator = Orchestrator(store, audit, executor=executor, ask=ask, stage_timeout=stage_timeout,
                                 max_revisions=max_revisions)
-    app.extensions["multi_agent"] = {"store": store, "audit": audit, "orchestrator": orchestrator}
+    token = config.API_TOKEN if api_token is None else api_token.strip()
+    interrupted = orchestrator.recover_interrupted()
+    app.extensions["multi_agent"] = {"store": store, "audit": audit, "orchestrator": orchestrator,
+                                     "token": token, "interrupted": interrupted}
+
+    @app.before_request
+    def require_token():
+        # /health stays open so a probe can tell "down" from "not authorised".
+        if not token or request.path == "/health":
+            return None
+        if request.headers.get("Authorization", "") != f"Bearer {token}":
+            return jsonify({"error": "missing or invalid bearer token",
+                            "hint": "set MULTI_AGENT_API_TOKEN to the server's value for every client"}), 401
+        return None
 
     @app.errorhandler(Exception)
     def handle_exception(exc):
@@ -68,8 +82,10 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
             "roles": list(config.ROLES),
             "models": {role: config.role_model(role) or "shared AI-Mode model" for role in config.ROLES},
             "features": list(config.FEATURES),
-            "stage_timeout_seconds": config.STAGE_TIMEOUT,
+            "stage_timeout_seconds": orchestrator.stage_timeout,
             "max_revisions": orchestrator.max_revisions,
+            "auth": "token" if token else "open",
+            "interrupted_on_start": interrupted,
             "pipeline": orchestrator.stage_names,
             "decisions": list(DECISIONS),
             "workflows": store.count(),
@@ -246,6 +262,12 @@ def _banner(app: Flask) -> None:
     print(f"  audit:      {ext['audit'].history_path}")
     print(f"              {ext['audit'].coordination_path}")
     print(f"  containers: http://host.docker.internal:{config.PORT}")
+    if ext["token"]:
+        print("  auth:       bearer token required on every /workflow route (MULTI_AGENT_API_TOKEN)")
+    else:
+        print("  auth:       open - set MULTI_AGENT_API_TOKEN in .env to require a bearer token")
+    if ext["interrupted"]:
+        print(f"  recovered:  {len(ext['interrupted'])} interrupted workflow(s) closed as failed")
     print(rule)
 
 

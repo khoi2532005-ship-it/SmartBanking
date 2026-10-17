@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -25,8 +26,8 @@ from multi_agent_server import catalogue, config, evidence, metrics, review as r
 from multi_agent_server import validate  # noqa: E402
 from multi_agent_server.agents import planner, reviewer, worker  # noqa: E402
 from multi_agent_server.contracts import (  # noqa: E402
-    ContractError, numbers_in_text, parse_json_object, ungrounded_numbers, validate_plan, validate_result,
-    validate_review,
+    ContractError, allowed_numbers, numbers_in_text, parse_json_object, ungrounded_numbers, validate_plan,
+    validate_result, validate_review,
 )
 from multi_agent_server.http import FetchResult, UpstreamError  # noqa: E402
 from multi_agent_server.models import State  # noqa: E402
@@ -198,6 +199,7 @@ def test_health_reports_roles_models_pipeline_and_audit_paths(client):
     assert body["pipeline"] == ["planner", "worker", "reviewer", "human"]
     assert body["max_revisions"] == 1 and body["pending"] == 0
     assert body["decisions"] == ["accept", "partially_accept", "reject"]
+    assert body["auth"] == "open" and body["interrupted_on_start"] == []
     assert body["audit"]["workflow_history"].endswith("workflow_history.jsonl")
     assert body["audit"]["coordination_audit"].endswith("coordination_audit.jsonl")
     assert body["workflows"] == 0
@@ -344,7 +346,7 @@ def test_valid_run_goes_plan_work_review_to_the_human_gate(client, ask, api, tmp
         "workflow_created", "state_changed", "stage_started", "stage_completed", "state_changed",
         "state_changed", "stage_started", "stage_completed", "state_changed",
         "state_changed", "stage_started", "stage_completed", "state_changed",
-        "state_changed", "stage_started"]
+        "stage_started", "state_changed"]                    # the human stage opens before the gate state
     assert [(r["detail"].get("from"), r["detail"].get("to")) for r in history if r["event"] == "state_changed"] == [
         ("created", "planning"), ("planning", "planned"), ("planned", "working"), ("working", "executed"),
         ("executed", "reviewing"), ("reviewing", "reviewed"), ("reviewed", "awaiting_human_review")]
@@ -448,6 +450,7 @@ def test_slow_stages_are_timed_out_and_fall_back(tmp_path, api):
         time.sleep(0.5)
         return json.dumps(GOOD_PLAN)
     client = make_app(tmp_path, slow, stage_timeout=0.05).test_client()
+    assert client.get("/health").get_json()["stage_timeout_seconds"] == 0.05
     body = client.post("/workflow", json=VALID).get_json()
     assert body["state"] == State.AWAITING_HUMAN_REVIEW
     assert [(s["status"], s["fallback"]) for s in body["stages"]] == [("timed_out", True)] * 3 + [("running", False)]
@@ -468,7 +471,10 @@ def test_unexpected_stage_error_fails_the_workflow_visibly(tmp_path):
     body = client.post("/workflow", json=VALID).get_json()
     assert body["state"] == State.FAILED
     assert body["error"] == "RuntimeError: prompt family missing"
+    assert body["stages"] == [{**body["stages"][0], "role": "planner", "status": "failed"}]   # no record left running
     history, coordination = _audit(tmp_path)
+    assert [r["event"] for r in history][-3:] == ["stage_failed", "state_changed", "workflow_failed"]
+    assert history[-3]["role"] == "planner" and history[-3]["detail"]["error"] == "RuntimeError: prompt family missing"
     assert history[-1]["event"] == "workflow_failed" and history[-1]["state"] == State.FAILED
     assert coordination[-1]["decision"] == "workflow_failed"
     assert client.get(f"/workflow/{body['workflow_id']}/plan").get_json()["plan"] is None
@@ -655,6 +661,7 @@ def test_zero_revisions_escalates_at_the_first_revise(tmp_path, api):
     client = make_app(tmp_path, ask, max_revisions=0).test_client()
     assert client.get("/health").get_json()["max_revisions"] == 0
     body = client.post("/workflow", json=VALID).get_json()
+    assert "- max_revisions: 0" in ask.calls[2]["user"]            # the Reviewer is told the limit in use
     assert body["state"] == State.AWAITING_HUMAN_REVIEW and body["revisions"] == 0
     assert [s["role"] for s in body["stages"]] == ["planner", "worker", "reviewer", "human"]
     review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
@@ -869,6 +876,130 @@ def test_escalated_workflow_still_waits_for_the_human(tmp_path, api):
     assert body["state"] == State.REJECTED and body["final_response"]["review_verdict"] == "revise"
 
 
+def test_concurrent_decisions_cannot_both_succeed(client, tmp_path):
+    workflow_id = _start(client)
+    results = []
+    barrier = threading.Barrier(2)
+
+    def decide(choice):
+        barrier.wait()
+        response = client.post(f"/workflow/{workflow_id}/decision", json={"decision": choice, "by": choice})
+        results.append((choice, response.status_code))
+
+    threads = [threading.Thread(target=decide, args=(c,)) for c in ("accept", "reject")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(code for _c, code in results) == [200, 409]
+    full = client.get(f"/workflow/{workflow_id}").get_json()
+    winner = next(c for c, code in results if code == 200)
+    assert full["decision"]["decision"] == winner and full["final_response"]["decision"] == winner
+    _history, coordination = _audit(tmp_path)
+    assert [r["decision"] for r in coordination].count("human_decision") == 1
+
+
+def test_interrupted_workflows_are_closed_on_restart(tmp_path, api):
+    first = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True))
+    waiting = first.test_client().post("/workflow", json=VALID).get_json()["workflow_id"]
+    # forge a workflow that was mid-run when the process died: state working, worker stage still running
+    store = first.extensions["multi_agent"]["store"]
+    stuck = store.create("budgeting", "cut off", dict(CONTEXT))
+    stuck.state = State.WORKING
+    from multi_agent_server.models import StageRecord, now_iso
+    stuck.stages.append(StageRecord(role="planner", attempt=1, started_at=now_iso(), finished_at=now_iso(), status="completed"))
+    stuck.stages.append(StageRecord(role="worker", attempt=1, started_at=now_iso(), status="running"))
+    store.save(stuck)
+
+    second = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True))
+    health = second.test_client().get("/health").get_json()
+    assert health["interrupted_on_start"] == [stuck.workflow_id]
+    reloaded = second.test_client().get(f"/workflow/{stuck.workflow_id}").get_json()
+    assert reloaded["state"] == State.FAILED
+    assert reloaded["error"] == "interrupted by a server restart while working"
+    assert [s["status"] for s in reloaded["stages"]] == ["completed", "failed"]
+    assert reloaded["stages"][1]["error"].startswith("interrupted by a server restart")
+    # the workflow waiting for a human is untouched and can still be decided
+    assert second.test_client().get(f"/workflow/{waiting}/status").get_json()["state"] == State.AWAITING_HUMAN_REVIEW
+    assert second.test_client().post(f"/workflow/{waiting}/decision", json={"decision": "accept"}).status_code == 200
+    _history, coordination = _audit(tmp_path)
+    interrupted = [r for r in coordination if r["decision"] == "interrupted"]
+    assert len(interrupted) == 1 and interrupted[0]["workflow_id"] == stuck.workflow_id
+    assert any(r["decision"] == "workflow_failed" and r["workflow_id"] == stuck.workflow_id for r in coordination)
+
+
+def test_bearer_token_guards_every_workflow_route_but_not_health(tmp_path, api):
+    app = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True), api_token="s3cret")
+    client = app.test_client()
+    assert client.get("/health").get_json()["auth"] == "token"
+    refused = client.post("/workflow", json=VALID)
+    assert refused.status_code == 401 and "bearer token" in refused.get_json()["error"]
+    assert client.get("/workflows/pending").status_code == 401
+    assert client.get("/metrics", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    ok = client.post("/workflow", json=VALID, headers={"Authorization": "Bearer s3cret"})
+    assert ok.status_code == 202
+    adapter = terminal.FlaskClientAdapter(client, token="s3cret")
+    status, pending = adapter.get("/workflows/pending")
+    assert status == 200 and pending["count"] == 1
+    lines = []
+    assert review_cli.main(["--decision", "accept"], client=adapter, input_fn=Inputs(), out=lines.append) == 0
+    assert "response released" in "\n".join(lines)
+
+
+def test_http_client_sends_the_token_and_explains_a_401(monkeypatch):
+    seen = {}
+
+    class Response:
+        status_code = 401
+        def json(self):
+            return {"error": "missing or invalid bearer token"}
+
+    def fake_request(method, url, json=None, headers=None, timeout=None):
+        seen.update(method=method, url=url, headers=headers)
+        return Response()
+
+    monkeypatch.setattr(terminal.requests, "request", fake_request)
+    client = terminal.HttpClient("http://localhost:8300", token="abc")
+    with pytest.raises(terminal.ServerUnavailable) as info:
+        client.get("/workflows/pending")
+    assert seen["headers"] == {"Authorization": "Bearer abc"} and "MULTI_AGENT_API_TOKEN" in str(info.value)
+    assert terminal.HttpClient("http://localhost:8300", token="").token == ""
+
+
+def test_watch_one_waits_for_the_gate_then_stops(client):
+    workflow_id = _start(client)
+
+    class SlowGate:
+        """Reports the workflow as still working the first two times it is asked."""
+        def __init__(self, inner):
+            self.inner, self.polls = inner, 0
+            self.base_url = inner.base_url
+        def get(self, path):
+            if path.endswith("/status") and self.polls < 2:
+                self.polls += 1
+                status, body = self.inner.get(path)
+                return status, {**body, "state": "working"}
+            return self.inner.get(path)
+        def post(self, path, body):
+            return self.inner.post(path, body)
+
+    slept = []
+    lines = []
+    code = review_cli.main(["--watch", "0.01", "--id", workflow_id, "--decision", "accept"],
+                           client=SlowGate(terminal.FlaskClientAdapter(client)), input_fn=Inputs(),
+                           out=lines.append, sleep=slept.append)
+    text = "\n".join(lines)
+    assert code == 0 and slept == [0.01, 0.01]
+    assert "waiting for the human gate" in text and "-> accepted; response released" in text
+    lines = []
+    assert review_cli.main(["--watch", "0.01", "--id", workflow_id], client=terminal.FlaskClientAdapter(client),
+                           input_fn=Inputs(), out=lines.append, sleep=lambda s: None) == 0
+    assert "is accepted; nothing to decide" in "\n".join(lines)
+    lines = []
+    assert review_cli.main(["--watch", "0.01", "--id", "wf_deadbeef"], client=terminal.FlaskClientAdapter(client),
+                           input_fn=Inputs(), out=lines.append, sleep=lambda s: None) == 1
+
+
 # ---------------------------------------------------------------- terminal runners
 
 class Inputs:
@@ -1030,9 +1161,9 @@ def test_validate_passes_every_check_against_the_server(client, api, tmp_path, m
     assert by_n[8].detail["coordination"] == ["request_accepted", "plan_accepted", "handoff", "worker_blocked", "workflow_failed"]
     assert config.SERVICE_URLS["budgeting"] != validate.UNREACHABLE_URL                  # the probe restored the URL
     assert by_n[9].detail["workflows"]["decided"] == 2 and by_n[9].detail["human_decisions"] == {"accept": 1, "reject": 1}
-    assert sorted(by_n[9].detail["scope"]) == sorted(by_n[2].detail["workflow_ids"].values())
-    ids = by_n[2].detail["workflow_ids"]
-    assert set(ids) == {"accept", "reject"}
+    assert sorted(by_n[9].detail["scope"]) == sorted(by_n[6].detail["workflow_ids"].values())
+    ids = by_n[6].detail["workflow_ids"]
+    assert set(ids) == {"accept", "reject"} and by_n[2].detail["workflow_ids"] == {"accept": ids["accept"]}
 
     written = validate.write_evidence("flask://test", records)
     report = json.loads(written[0].read_text())
@@ -1055,12 +1186,20 @@ def test_validate_report_prints_the_tally_and_fails_when_unreachable(capsys):
     assert validate.main(["--url", "http://127.0.0.1:9"]) == 1
 
 
-def test_validate_stops_cleanly_when_a_workflow_fails(tmp_path, api):
+def test_validate_stops_cleanly_when_a_workflow_fails(tmp_path, api, monkeypatch):
     api.down = {"/api/budgets/summary", "/api/transactions/spending"}
     client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN)).test_client()
     records = validate.run_checks("flask://test", client=terminal.FlaskClientAdapter(client), sleep=lambda s: None)
     assert [r.n for r in records] == [1, 2] and records[1].passed is False
     assert "failed" in records[1].observed and "no feature API answered" in records[1].observed
+    failed_id = records[1].detail["workflow_ids"]["accept"]
+    monkeypatch.setattr(validate, "EVIDENCE_DIR", tmp_path / "evidence")
+    monkeypatch.setattr(validate, "EVIDENCE_AUDIT_DIR", tmp_path / "evidence" / "multi_agent")
+    written = validate.write_evidence("flask://test", records)
+    report = json.loads(written[0].read_text())
+    assert report["passed"] is False and report["workflow_ids"] == [failed_id]
+    snapshot = [json.loads(line) for line in written[1].read_text().splitlines()]
+    assert {r["workflow_id"] for r in snapshot} == {failed_id} and "workflow_failed" in {r["event"] for r in snapshot}
 
 
 # ---------------------------------------------------------------- evidence summaries
@@ -1128,6 +1267,41 @@ def test_number_grounding_helpers():
     assert ungrounded_numbers("$2,169.97 at 108% on t1 in 2026, 9 of 12", allowed) == []     # 108 rounds from 108.2
     assert ungrounded_numbers("about $2,170 and 1.2k and 99%", allowed) == ["1.2", "99"]    # 2170 rounds from 2169.97
     assert ungrounded_numbers("no numbers here", set()) == []
+    # a half is accepted whichever way it was rounded, and nothing further away
+    assert ungrounded_numbers("113% or 112%", {112.5}) == [] and ungrounded_numbers("114%", {112.5}) == ["114"]
+    assert ungrounded_numbers("$45.00 and $45.01", {45.0}) == ["45.01"]
+
+
+def test_allowed_numbers_include_context_plan_params_and_the_request():
+    plan = {"tasks": [{"id": "t1", "kind": "api", "endpoint": "/api/transactions",
+                       "params": {"customer_id": 1, "month": 9, "year": 2026}}]}
+    # the transactions call turned the period into date strings, so the evidence itself carries no 2026
+    evidence = [{"task_id": "t1", "status": "ok", "endpoint": "/api/transactions",
+                 "params": {"customer_id": 1, "date_from": "2026-09-01", "date_to": "2026-09-30"},
+                 "summary": {"transaction_count": 21, "total_spent": 120.5}}]
+    allowed = allowed_numbers(plan, evidence, "Did I spend more than $500 in total?", {"customer_id": 1, "month": 9, "year": 2026})
+    assert {2026.0, 9.0, 1.0, 500.0, 120.5, 21.0} <= allowed
+    assert ungrounded_numbers("In September 2026 you spent $120.50, which is not more than $500.", allowed) == []
+    assert ungrounded_numbers("In September 2026 you spent $999.00.", allowed) == ["999.00"]
+
+
+def test_worker_may_quote_the_period_and_the_figure_the_person_typed(tmp_path, api):
+    api.payloads["/api/transactions"] = [{"amount": -120.5, "category": "Groceries", "type": "Withdrawal", "date": "2026-09-03"}]
+    plan = {**GOOD_PLAN, "tasks": [
+        {"id": "t1", "kind": "api", "title": "Transactions", "endpoint": "/api/transactions",
+         "params": {"customer_id": 1, "month": 9, "year": 2026}, "evidence": "totals"},
+        {"id": "t2", "kind": "analysis", "title": "Judge", "depends_on": ["t1"], "instruction": "compare with $500", "evidence": "x"}]}
+    result = {"findings": [{"task_id": "t2", "statement": "In September 2026 you spent $120.50 on Groceries, under the $500 you asked about.", "evidence": ["t1"]}],
+              "answer": "No. In September 2026 your spending was $120.50, below $500.", "gaps": []}
+    review = {**GOOD_REVIEW, "summary": "The September 2026 figure of $120.50 is in the evidence and the $500 comes from the request."}
+    ask = ScriptedAsk(plan, result, review)
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json={"feature": "transactions", "request": "Did I spend more than $500 in September 2026?",
+                                          "context": CONTEXT}).get_json()
+    assert body["state"] == State.AWAITING_HUMAN_REVIEW
+    assert [s["fallback"] for s in body["stages"][:3]] == [False, False, False]          # no contract rejection anywhere
+    stored = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
+    assert stored["meta"]["attempts"] == 1 and stored["answer"].startswith("No. In September 2026")
 
 
 @pytest.mark.parametrize("mutate, word", [
@@ -1174,6 +1348,9 @@ def test_result_contract_rejects_bad_results_with_reasons(mutate, word):
     (lambda p: p["tasks"][2].pop("instruction"), "need an instruction"),
     (lambda p: p.update(tasks=[p["tasks"][2] | {"depends_on": []}]), "must list depends_on"),
     (lambda p: p.update(tasks=[{"id": "t1", "kind": "analysis", "depends_on": ["t1"], "instruction": "x"}]), "at least one task must call an endpoint"),
+    (lambda p: p.update(tasks=p["tasks"][:2]), "at least one analysis task is required"),
+    (lambda p: p["tasks"][0]["params"].update(customer_id="--9"), "customer_id must be an integer"),
+    (lambda p: p["tasks"][0]["params"].update(month="1e3"), "month must be an integer"),
     (lambda p: p.update(success_criteria=[]), "success_criteria needs"),
     (lambda p: p["tasks"].append(dict(p["tasks"][0])), "duplicate id"),
     (lambda p: p["tasks"][0].update(kind="shell"), "kind must be one of"),
@@ -1271,6 +1448,15 @@ def test_llm_ask_passes_the_model_override(monkeypatch):
     assert llm.ask("s", "u", model="other-model") == "ok" and seen["model"] == "other-model"
     assert llm.describe(model="other-model") == "gemini / other-model"
     assert llm.describe() == "gemini / default-model"
+
+    class EmptyCompletions:
+        def create(self, **kwargs):
+            return type("R", (), {"choices": []})()
+
+    monkeypatch.setattr(llm, "_get_client", lambda: type("C", (), {"chat": type("Chat", (), {"completions": EmptyCompletions()})()})())
+    with pytest.raises(LLMUnavailable) as info:
+        llm.ask("s", "u")
+    assert "returned no choices" in str(info.value)
 
 
 # ---------------------------------------------------------------- reads, lists, persistence, errors

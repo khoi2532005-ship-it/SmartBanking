@@ -28,8 +28,9 @@ class ServerUnavailable(RuntimeError):
 class HttpClient:
     """The few calls the runners need, with the project's fail-fast timeouts."""
 
-    def __init__(self, base_url: str | None = None) -> None:
+    def __init__(self, base_url: str | None = None, token: str | None = None) -> None:
         self.base_url = (base_url or config.local_url()).rstrip("/")
+        self.token = config.API_TOKEN if token is None else token
 
     def get(self, path: str) -> tuple[int, Any]:
         return self._call("GET", path)
@@ -39,8 +40,10 @@ class HttpClient:
 
     def _call(self, method: str, path: str, body: dict[str, Any] | None = None) -> tuple[int, Any]:
         url = f"{self.base_url}{path}"
+        headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
         try:
-            response = requests.request(method, url, json=body, timeout=(config.CONNECT_TIMEOUT, config.READ_TIMEOUT))
+            response = requests.request(method, url, json=body, headers=headers,
+                                        timeout=(config.CONNECT_TIMEOUT, config.READ_TIMEOUT))
         except requests.ConnectionError:
             raise ServerUnavailable(f"cannot reach the Multi-Agent Server at {self.base_url} "
                                     "- start it with: python -m multi_agent_server.server") from None
@@ -50,22 +53,26 @@ class HttpClient:
             payload = response.json()
         except ValueError:
             payload = {"error": f"non-JSON response from {url}"}
+        if response.status_code == 401:
+            raise ServerUnavailable("the server requires a bearer token: set MULTI_AGENT_API_TOKEN in .env "
+                                    "to the same value the server uses")
         return response.status_code, payload
 
 
 class FlaskClientAdapter:
     """Same interface over a Flask test client (tests and the validate script)."""
 
-    def __init__(self, test_client: Any) -> None:
+    def __init__(self, test_client: Any, token: str = "") -> None:
         self.client = test_client
         self.base_url = "flask://test"
+        self.headers = {"Authorization": f"Bearer {token}"} if token else {}
 
     def get(self, path: str) -> tuple[int, Any]:
-        response = self.client.get(path)
+        response = self.client.get(path, headers=self.headers)
         return response.status_code, response.get_json()
 
     def post(self, path: str, body: dict[str, Any]) -> tuple[int, Any]:
-        response = self.client.post(path, json=body)
+        response = self.client.post(path, json=body, headers=self.headers)
         return response.status_code, response.get_json()
 
 

@@ -124,7 +124,7 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
     rec.passed = (status == 200 and health.get("service") == "multi-agent-server"
                   and pipeline == ["planner", "worker", "reviewer", "human"]
                   and health.get("decisions") == ["accept", "partially_accept", "reject"])
-    rec.detail = {k: health.get(k) for k in ("pipeline", "roles", "models", "max_revisions", "stage_timeout_seconds", "audit")}
+    rec.detail = {k: health.get(k) for k in ("pipeline", "roles", "models", "max_revisions", "stage_timeout_seconds", "auth", "audit")}
     rec.detail["audit"] = {k: _rel(Path(v)) for k, v in (health.get("audit") or {}).items()}
     records.append(rec)
     if not rec.passed:
@@ -140,6 +140,7 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
         records.append(rec)
         return records
     ids["accept"] = started["workflow_id"]
+    rec.detail["workflow_ids"] = dict(ids)              # recorded now, so a failed run still snapshots its audit
     final = _wait_for_gate(client, ids["accept"], timeout, poll, sleep)
     _s, full = client.get(f"/workflow/{ids['accept']}")
     plan, result, review = full.get("plan") or {}, full.get("result") or {}, full.get("review") or {}
@@ -156,7 +157,7 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
                     + (f"; error {final.get('error')}" if final.get("error") else ""))
     if summary["fallbacks"]:
         rec.observed += f"  (degraded: fallback in {summary['fallbacks']})"
-    rec.detail = {
+    rec.detail.update({
         **summary,
         "plan_source": (plan.get("meta") or {}).get("source"),
         "plan_tasks": [f"{t['id']} {t['kind']} {t.get('endpoint', '')}".strip() for t in plan.get("tasks", [])],
@@ -171,7 +172,7 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
         "defects": len(review.get("defects", [])),
         "risks": review.get("risks", []),
         "escalated": review.get("escalated"),
-    }
+    })
     records.append(rec)
     if final.get("state") != State.AWAITING_HUMAN_REVIEW:
         return records
@@ -209,6 +210,7 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
     status, started = client.post("/workflow", body)
     if status == 202:
         ids["reject"] = started["workflow_id"]
+        rec.detail["workflow_ids"] = dict(ids)
         final = _wait_for_gate(client, ids["reject"], timeout, poll, sleep)
         if final.get("state") == State.AWAITING_HUMAN_REVIEW:
             status, decided = client.post(f"/workflow/{ids['reject']}/decision",
@@ -220,7 +222,7 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
             rec.passed = (status == 200 and decided.get("state") == State.REJECTED and status2 == 200
                           and response.get("released") is False and response.get("answer") is None
                           and response.get("correction_note") == REJECT_NOTE)
-            rec.detail = {**_stage_summary(final), "review_verdict": response.get("review_verdict")}
+            rec.detail.update({**_stage_summary(final), "review_verdict": response.get("review_verdict")})
         else:
             rec.observed = f"{ids['reject']} -> {final.get('state')}: {final.get('error')}"
     else:
@@ -232,6 +234,7 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
     rec = Record(6, "audit files written", "read workflow_history.jsonl and coordination_audit.jsonl",
                  {k: _rel(Path(v)) for k, v in audit.items()},
                  "both files exist and hold every stage, handoff and the human decisions of the workflows above")
+    rec.detail["workflow_ids"] = dict(ids)
     history_path, coord_path = Path(audit.get("workflow_history", "")), Path(audit.get("coordination_audit", ""))
     if history_path.is_file() and coord_path.is_file():
         history = _read_jsonl(history_path, set(ids.values()))
@@ -247,9 +250,9 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
                       and all(r["ts"].endswith("+00:00") for r in history + coordination))
         rec.observed = (f"{len(history)} history records, {len(coordination)} coordination records for "
                         f"{len(ids)} workflows; events {sorted(events)}; decisions {sorted(decisions_seen)}")
-        rec.detail = {"history_records": len(history), "coordination_records": len(coordination),
-                      "events": sorted(events), "decisions": sorted(decisions_seen),
-                      "human_decisions": [r["detail"].get("decision") for r in human]}
+        rec.detail.update({"history_records": len(history), "coordination_records": len(coordination),
+                           "events": sorted(events), "decisions": sorted(decisions_seen),
+                           "human_decisions": [r["detail"].get("decision") for r in human]})
     else:
         rec.observed = f"missing: {[str(p) for p in (history_path, coord_path) if not p.is_file()]}"
     records.append(rec)
@@ -291,8 +294,6 @@ def run_checks(url: str, *, client: Any | None = None, timeout: float = 240, pol
     rec.detail = metrics if isinstance(metrics, dict) else {"body": metrics}
     records.append(rec)
 
-    for r in records:
-        r.detail.setdefault("workflow_ids", dict(ids)) if r.n in (2, 5, 6) else None
     return records
 
 
@@ -348,7 +349,7 @@ def _down_probe(ask: Any | None) -> tuple[str, bool, dict[str, Any]]:
     try:
         with tempfile.TemporaryDirectory() as tmp:
             app = create_app(data_dir=Path(tmp) / "data", audit_dir=Path(tmp) / "audit",
-                             executor=InlineExecutor(), ask=ask)
+                             executor=InlineExecutor(), ask=ask, api_token="")
             test_client = app.test_client()
             body = test_client.post("/workflow", json={"feature": "budgeting", "request": REQUEST_ACCEPT, "context": CONTEXT}).get_json()
             result = test_client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"] or {}

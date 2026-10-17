@@ -11,6 +11,7 @@ accepts, partially accepts or rejects it.
 
 from __future__ import annotations
 
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
@@ -52,6 +53,10 @@ class Orchestrator:
         self.ask = ask
         self.stage_timeout = config.STAGE_TIMEOUT if stage_timeout is None else stage_timeout
         self.max_revisions = config.MAX_REVISIONS if max_revisions is None else max_revisions
+        # One lock for the human gate: opening it and deciding are each atomic,
+        # so two decisions cannot both succeed and a decision cannot slip in
+        # before the human stage record exists.
+        self._gate_lock = threading.Lock()
         self.stages: list[tuple[str, Stage]] = [
             ("planner", self.run_planner), ("worker", self.run_worker), ("reviewer", self.run_reviewer),
             (HUMAN, self.run_human_gate)]
@@ -245,11 +250,13 @@ class Orchestrator:
         started = time.monotonic()
         status = "completed"
         try:
-            outcome = base.bounded(lambda: reviewer.review(workflow, attempt=attempt, ask=self.ask),
+            outcome = base.bounded(lambda: reviewer.review(workflow, attempt=attempt, ask=self.ask,
+                                                           max_revisions=self.max_revisions),
                                    self.stage_timeout, label=reviewer.ROLE)
         except base.StageTimeout as exc:
             status = "timed_out"
-            outcome = reviewer.fallback_result(workflow, str(exc), model=record.model, attempt=attempt)
+            outcome = reviewer.fallback_result(workflow, str(exc), model=record.model, attempt=attempt,
+                                               max_revisions=self.max_revisions)
 
         for call, errors in enumerate(outcome.rejections, start=1):
             self.audit.coordination(workflow, "review_rejected", detail={
@@ -280,9 +287,15 @@ class Orchestrator:
     # ---- stage: human gate --------------------------------------------------
 
     def run_human_gate(self, workflow: Workflow) -> None:
-        """Park the workflow for the person. Nothing is released until they decide."""
+        """Park the workflow for the person. Nothing is released until they decide.
+
+        The human stage record is opened before the state becomes decidable,
+        under the gate lock, so a decision can never arrive between the two.
+        """
         review = workflow.review or {}
-        self.transition(workflow, State.AWAITING_HUMAN_REVIEW)
+        with self._gate_lock:
+            self.begin_stage(workflow, HUMAN, model=HUMAN)
+            self.transition(workflow, State.AWAITING_HUMAN_REVIEW)
         self.audit.coordination(workflow, "handoff", detail={
             "from": reviewer.ROLE, "to": HUMAN, "contract": "review",
             "verdict": review.get("verdict"), "escalated": bool(review.get("escalated")),
@@ -291,7 +304,6 @@ class Orchestrator:
         self.audit.coordination(workflow, "awaiting_decision", detail={
             "options": list(DECISIONS), "released": False,
         })
-        self.begin_stage(workflow, HUMAN, model=HUMAN)
 
     def decide(self, workflow: Workflow, decision: str, note: str = "", by: str = "api") -> Workflow:
         """Apply the person's decision and build the final response."""
@@ -301,27 +313,28 @@ class Orchestrator:
         note = str(note or "").strip()
         if len(note) > MAX_NOTE_CHARS:
             raise InvalidDecision(f"note must be {MAX_NOTE_CHARS} characters or fewer")
-        if workflow.state != State.AWAITING_HUMAN_REVIEW:
-            raise WrongState(f"workflow {workflow.workflow_id} is {workflow.state}, not awaiting_human_review")
 
-        decided_at = now_iso()
-        workflow.decision = {"decision": decision, "note": note, "by": by or "api", "decided_at": decided_at}
-        workflow.final_response = self.build_final_response(workflow)
-        record = next((s for s in reversed(workflow.stages) if s.role == HUMAN and s.status == "running"), None)
-        if record is not None:
-            record.finished_at = decided_at
-            record.status = "completed"
-            record.output = {"decision": decision, "note": note, "by": workflow.decision["by"],
-                             "released": workflow.final_response["released"]}
-            record.duration_seconds = seconds_between(record.started_at, decided_at)
-            self.audit.history(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
-                **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
-                "fallback": False, "fallback_reason": "", "error": ""})
-        self.audit.coordination(workflow, "human_decision", actor=HUMAN, detail={
-            "decision": decision, "note": note, "by": workflow.decision["by"],
-            "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions,
-        })
-        self.transition(workflow, DECISIONS[decision])
+        with self._gate_lock:                      # check and change the state as one step
+            if workflow.state != State.AWAITING_HUMAN_REVIEW:
+                raise WrongState(f"workflow {workflow.workflow_id} is {workflow.state}, not awaiting_human_review")
+            decided_at = now_iso()
+            workflow.decision = {"decision": decision, "note": note, "by": by or "api", "decided_at": decided_at}
+            workflow.final_response = self.build_final_response(workflow)
+            record = next((s for s in reversed(workflow.stages) if s.role == HUMAN and s.status == "running"), None)
+            if record is not None:
+                record.finished_at = decided_at
+                record.status = "completed"
+                record.output = {"decision": decision, "note": note, "by": workflow.decision["by"],
+                                 "released": workflow.final_response["released"]}
+                record.duration_seconds = seconds_between(record.started_at, decided_at)
+                self.audit.history(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
+                    **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
+                    "fallback": False, "fallback_reason": "", "error": ""})
+            self.audit.coordination(workflow, "human_decision", actor=HUMAN, detail={
+                "decision": decision, "note": note, "by": workflow.decision["by"],
+                "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions,
+            })
+            self.transition(workflow, DECISIONS[decision])
         released = workflow.final_response["released"]
         self.audit.coordination(workflow, "response_released" if released else "response_withheld", detail={
             "decision": decision, "with_correction": bool(note) and decision == "partially_accept",
@@ -412,6 +425,39 @@ class Orchestrator:
 
     def fail(self, workflow: Workflow, error: str) -> None:
         workflow.error = error
+        self.close_running_stages(workflow, error)
         self.transition(workflow, State.FAILED)
         self.audit.history(workflow, "workflow_failed", detail={"error": error})
         self.audit.coordination(workflow, "workflow_failed", detail={"error": error})
+
+    def close_running_stages(self, workflow: Workflow, error: str) -> int:
+        """A crashed or interrupted stage is closed as failed, so no record stays 'running'."""
+        closed = 0
+        for record in workflow.stages:
+            if record.status != "running":
+                continue
+            record.finished_at = now_iso()
+            record.status = "failed"
+            record.error = error
+            record.duration_seconds = seconds_between(record.started_at, record.finished_at)
+            self.audit.history(workflow, "stage_failed", role=record.role, model=record.model, detail={
+                "attempt": record.attempt, "duration_seconds": record.duration_seconds,
+                "fallback": False, "fallback_reason": "", "error": error})
+            closed += 1
+        if closed:
+            self.store.save(workflow)
+        return closed
+
+    def recover_interrupted(self) -> list[str]:
+        """At startup: a workflow that was mid-run when the server stopped cannot
+        resume (its stage thread is gone), so it is closed as failed with the
+        reason, instead of staying 'working' forever. Workflows waiting for a
+        human decision are untouched: that gate survives a restart."""
+        interrupted = []
+        for workflow in self.store.list():
+            if workflow.state in (State.CREATED, *State.RUNNING):
+                reason = f"interrupted by a server restart while {workflow.state}"
+                self.audit.coordination(workflow, "interrupted", detail={"state": workflow.state, "reason": reason})
+                self.fail(workflow, reason)
+                interrupted.append(workflow.workflow_id)
+        return interrupted

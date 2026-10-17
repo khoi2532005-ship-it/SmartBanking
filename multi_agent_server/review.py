@@ -74,19 +74,39 @@ def pass_once(client: Any, args: argparse.Namespace, input_fn: Callable[[str], s
     return 0
 
 
+def watch_one(client: Any, args: argparse.Namespace, input_fn: Callable[[str], str],
+              out: Callable[[str], None], sleep: Callable[[float], None] = time.sleep) -> int:
+    """Wait for one workflow to reach the gate, decide, then stop. Unknown id or server error: 1."""
+    announced = False
+    while True:
+        status, body = client.get(f"/workflow/{args.workflow_id}/status")
+        if status != 200:
+            return terminal.fail(f"{args.workflow_id}: {body.get('error', status)}", out)
+        if body["state"] == "awaiting_human_review":
+            return 0 if review_one(client, args.workflow_id, args, input_fn, out) else 1
+        if body["state"] in ("accepted", "partially_accepted", "rejected", "failed"):
+            out(f"  {args.workflow_id} is {body['state']}; nothing to decide.")
+            return 0
+        if not announced:
+            out(f"  {args.workflow_id} is {body['state']}; waiting for the human gate...")
+            announced = True
+        sleep(args.watch)
+
+
 def main(argv: list[str] | None = None, *, client: Any | None = None,
-         input_fn: Callable[[str], str] = input, out: Callable[[str], None] = terminal.stdout) -> int:
+         input_fn: Callable[[str], str] = input, out: Callable[[str], None] = terminal.stdout,
+         sleep: Callable[[float], None] = time.sleep) -> int:
     args = build_parser().parse_args(argv)
     client = client or terminal.HttpClient(args.url)
     try:
         if args.watch is None:
             return pass_once(client, args, input_fn, out)
+        if args.workflow_id:
+            return watch_one(client, args, input_fn, out, sleep)
         out(f"Watching for pending workflows every {args.watch:g}s (Ctrl+C to stop)")
         while True:
-            code = pass_once(client, args, input_fn, out)
-            if code and args.workflow_id:
-                return code
-            time.sleep(args.watch)
+            pass_once(client, args, input_fn, out)
+            sleep(args.watch)
     except terminal.ServerUnavailable as exc:
         return terminal.fail(str(exc), out)
     except KeyboardInterrupt:

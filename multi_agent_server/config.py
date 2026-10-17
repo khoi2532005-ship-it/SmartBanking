@@ -63,6 +63,12 @@ COORDINATION_FILE = "coordination_audit.jsonl"
 
 MAX_REQUEST_CHARS = 1000
 
+# Optional shared secret. When set, every /workflow* route requires
+# "Authorization: Bearer <token>"; the feature backends, the terminal runners
+# and the validate script read the same variable. Unset means open, which is
+# fine for a local demo and is announced in the server banner.
+API_TOKEN = os.getenv("MULTI_AGENT_API_TOKEN", "").strip()
+
 
 def local_url() -> str:
     host = "localhost" if HOST in ("0.0.0.0", "") else HOST
