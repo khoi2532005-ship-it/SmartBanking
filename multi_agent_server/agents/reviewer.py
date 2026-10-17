@@ -110,6 +110,10 @@ def review(workflow: Workflow, *, attempt: int = 1, ask: base.AskFn | None = Non
             correction = "\n".join(f"- {error}" for error in exc.errors)
             continue
         duration = round(time.monotonic() - started, 3)
+        if facts["request_only_numbers"]:
+            risk = request_only_risk(facts["request_only_numbers"])
+            if risk not in accepted["risks"]:
+                accepted["risks"].append(risk)       # code-generated: the person always sees it
         accepted.update({"checks": facts, "escalated": False, "escalation_reason": "",
                          "meta": _meta("model", model, call, rejections, "", duration, attempt)})
         return ReviewResult(review=accepted, model=model, attempts=call, source="model",
@@ -132,8 +136,7 @@ def fallback_result(workflow: Workflow, reason: str, *, model: str = "", attempt
     if facts["evidence_failed"]:
         risks.append(f"{facts['evidence_failed']} of {facts['evidence_tasks']} evidence calls failed")
     if facts["request_only_numbers"]:
-        risks.append("Figures " + ", ".join(facts["request_only_numbers"])
-                     + " come from the request, not from the evidence; check how the answer uses them")
+        risks.append(request_only_risk(facts["request_only_numbers"]))
     if "mock" in facts["spending_sources"]:
         risks.append("Spending figures come from the budgeting service's mock dataset, not the Transactions API")
     plan = workflow.plan or {}
@@ -153,6 +156,11 @@ def fallback_result(workflow: Workflow, reason: str, *, model: str = "", attempt
     return ReviewResult(review=fallback, model=model, attempts=attempts, source="fallback",
                         accepted_first_try=False, rejections=rejections or [], fallback_reason=reason,
                         duration_seconds=duration)
+
+
+def request_only_risk(numbers: list[str]) -> str:
+    return ("Figures " + ", ".join(numbers)
+            + " come from the request, not from the evidence; check how the answer uses them")
 
 
 def _feedback_block(correction: str) -> str:

@@ -19,6 +19,7 @@ from typing import Any
 
 from multi_agent_server import catalogue
 from multi_agent_server.catalogue import CONTEXT_PARAMS
+from multi_agent_server.models import CONTEXT_BOUNDS
 
 MIN_TASKS = 1
 MAX_TASKS = 6
@@ -180,6 +181,10 @@ def _validate_api_task(raw: dict[str, Any], task: dict[str, Any], feature: str,
             if name in context and int(context[name]) != number:
                 errors.append(f"{label}: {name}={number} does not match the context ({context[name]})")
                 continue
+            low, high = CONTEXT_BOUNDS[name]
+            if number < low or (high is not None and number > high):
+                errors.append(f"{label}: {name}={number} is out of range ({low} to {high if high is not None else 'any'})")
+                continue
             clean[name] = number
         elif name == "limit":
             number = _as_int(value)
@@ -202,9 +207,10 @@ def _validate_api_task(raw: dict[str, Any], task: dict[str, Any], feature: str,
 
 MAX_STATEMENT_CHARS = 600
 MAX_ANSWER_CHARS = 2000
-# Small whole numbers (months, ranks, "2 of 7 budgets") are not checked; dollar
-# amounts, percentages and counts above this must come from the evidence.
-SMALL_NUMBER = 12
+# Only 0 and 1 are exempt from the grounding check. Counts are the whole of the
+# accounts, loans and fraud evidence, so "7 alerts" must be in the evidence
+# like any dollar amount; months, years and the customer come from the context.
+SMALL_NUMBER = 1
 _NUMBER = re.compile(r"(?<!\d)-?\$?\d[\d,]*(?:\.\d+)?%?")
 _TASK_ID = re.compile(r"\bt\d+\b")                  # t1, t2: plan task ids, not figures
 _DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
@@ -360,10 +366,17 @@ def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list
     gaps = _string_list(result.get("gaps"))
     if gaps is None:
         errors.append("gaps must be a list of strings")
+        gaps = []
+    for position, gap in enumerate(gaps, start=1):
+        if len(gap) > MAX_STATEMENT_CHARS:
+            errors.append(f"gap {position}: must be {MAX_STATEMENT_CHARS} characters or fewer")
+        for number in ungrounded_numbers(gap, allowed):
+            errors.append(f"gap {position}: the number {number} is not in the evidence; a gap names what is missing, not figures")
+        note_request_only(gap)
 
     if errors:
         raise ContractError(errors)
-    return {"findings": findings, "answer": answer, "gaps": gaps or [], "request_only_numbers": request_only}
+    return {"findings": findings, "answer": answer, "gaps": gaps, "request_only_numbers": request_only}
 
 
 # ---------------------------------------------------------------- Reviewer verdict
@@ -449,9 +462,10 @@ def validate_review(review: dict[str, Any], plan: dict[str, Any], evidence: list
         note = str(raw.get("note") or "").strip()
         if not note:
             errors.append(f"{label}: note is required")
-        for number in ungrounded_numbers(note, allowed):
+        about = str(raw.get("about") or "").strip()[:MAX_NOTE_CHARS]
+        for number in ungrounded_numbers(note + " " + about, allowed):
             errors.append(f"{label}: the number {number} is not in the evidence")
-        defects.append({"severity": severity, "about": str(raw.get("about") or "").strip(), "note": note[:MAX_NOTE_CHARS]})
+        defects.append({"severity": severity, "about": about, "note": note[:MAX_NOTE_CHARS]})
 
     risks = _string_list(review.get("risks"))
     if risks is None:

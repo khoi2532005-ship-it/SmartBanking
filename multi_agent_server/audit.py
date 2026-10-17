@@ -71,7 +71,7 @@ class AuditLog:
     # ---- internals ---------------------------------------------------------
 
     def _append(self, path: Path, record: dict[str, Any]) -> None:
-        line = json.dumps(record, ensure_ascii=False)
+        line = json.dumps(record)                 # ASCII-safe: a line can always be written and read back
         with self._lock, path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
 
@@ -88,6 +88,8 @@ class AuditLog:
                 record = json.loads(line)
             except ValueError:
                 continue
+            if not isinstance(record, dict):
+                continue                          # a stray line never breaks the metrics
             if workflow_id is None or record.get("workflow_id") == workflow_id:
                 records.append(record)
         return records

@@ -30,8 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--decision", choices=list(DECISIONS), default=None, help="decide without prompting")
     parser.add_argument("--note", default="", help="correction note to record with --decision")
     parser.add_argument("--by", default="terminal")
-    parser.add_argument("--timeout", type=float, default=300, help="seconds to wait for the human-review stage")
-    parser.add_argument("--poll", type=float, default=1.0, help="seconds between status polls")
+    parser.add_argument("--timeout", type=terminal.positive_float, default=300,
+                        help="seconds to wait for the human-review stage")
+    parser.add_argument("--poll", type=terminal.positive_float, default=1.0, help="seconds between status polls")
     return parser
 
 
@@ -61,7 +62,10 @@ def follow(client: Any, workflow_id: str, timeout: float, poll: float, out: Call
 def main(argv: list[str] | None = None, *, client: Any | None = None,
          input_fn: Callable[[str], str] = input, out: Callable[[str], None] = terminal.stdout,
          sleep: Callable[[float], None] = time.sleep) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    terminal.require_note_for_partial(parser, args)
+    terminal.configure_console()
     client = client or terminal.HttpClient(args.url)
     try:
         status, body = client.post("/workflow", {
@@ -73,7 +77,9 @@ def main(argv: list[str] | None = None, *, client: Any | None = None,
         workflow_id = body["workflow_id"]
         out(f"Started {workflow_id} ({args.feature}) at {client.base_url}; following the stages:")
         final = follow(client, workflow_id, args.timeout, args.poll, out, sleep)
-        _status, full = client.get(f"/workflow/{workflow_id}")
+        status, full = client.get(f"/workflow/{workflow_id}")
+        if status != 200:
+            return terminal.fail(f"could not read {workflow_id} ({status}): {full.get('error')}", out)
         out("")
         out(terminal.render_workflow(full))
         if final["state"] == State.FAILED:
@@ -95,8 +101,13 @@ def main(argv: list[str] | None = None, *, client: Any | None = None,
         if status != 200:
             return terminal.fail(f"decision rejected ({status}): {decided.get('error')}", out)
         status, response = client.get(f"/workflow/{workflow_id}/response")
+        if status != 200:
+            return terminal.fail(f"could not read the response ({status}): {response.get('error')}", out)
         out("")
         out(terminal.render_response(response))
+        return 0
+    except terminal.InputClosed as exc:
+        out(f"  stopped: {exc}; decide later with: python -m multi_agent_server.review --id {workflow_id}")
         return 0
     except terminal.ServerUnavailable as exc:
         return terminal.fail(str(exc), out)

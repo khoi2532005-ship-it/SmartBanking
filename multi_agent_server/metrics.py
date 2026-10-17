@@ -55,7 +55,9 @@ def compute(history: list[dict[str, Any]], coordination: list[dict[str, Any]]) -
             final_state[r["workflow_id"]] = r["detail"].get("to")
 
     stage_started = Counter(r["role"] for r in history if r["event"] == "stage_started")
-    stage_done = Counter(r["role"] for r in history if r["event"] in ("stage_completed", "stage_timed_out"))
+    stage_done = Counter(r["role"] for r in history
+                         if r["event"] == "stage_completed"
+                         or (r["event"] == "stage_timed_out" and r["detail"].get("fallback")))
     durations: dict[str, list[float]] = defaultdict(list)
     for r in history:
         if r["event"] in ("stage_completed", "stage_timed_out") and r["detail"].get("duration_seconds") is not None:
@@ -100,6 +102,7 @@ def compute(history: list[dict[str, Any]], coordination: list[dict[str, Any]]) -
             "stages_started": dict(stage_started),
             "stages_finished": dict(stage_done),
             "handoffs": decisions["handoff"],
+            "handoff_anomalies": max(0, decisions["handoff"] - stages_after_planner),
             "contract_rejections": decisions["plan_rejected"] + decisions["result_rejected"] + decisions["review_rejected"],
             "revisions_requested": decisions["revision_requested"],
             "fallbacks": fallbacks,

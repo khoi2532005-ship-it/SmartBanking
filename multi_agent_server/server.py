@@ -34,7 +34,7 @@ from werkzeug.exceptions import HTTPException
 
 from multi_agent_server import config, metrics
 from multi_agent_server.audit import AuditLog
-from multi_agent_server.models import CONTEXT_KEYS, DECISIONS, State
+from multi_agent_server.models import CONTEXT_BOUNDS, CONTEXT_KEYS, DECISIONS, MAX_BY_CHARS, MAX_NOTE_CHARS, State, clean_text
 from multi_agent_server.orchestrator import InvalidDecision, Orchestrator, WrongState
 from multi_agent_server.store import WorkflowStore, is_valid_state
 
@@ -42,7 +42,7 @@ from multi_agent_server.store import WorkflowStore, is_valid_state
 def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
                executor: Any | None = None, ask: Any | None = None,
                stage_timeout: float | None = None, max_revisions: int | None = None,
-               api_token: str | None = None) -> Flask:
+               api_token: str | None = None, service_urls: dict[str, str] | None = None) -> Flask:
     """`executor` and `ask` are injection points for tests and the validate
     script: an inline executor runs the stages before POST /workflow answers,
     and `ask` replaces the model call. `api_token` overrides MULTI_AGENT_API_TOKEN."""
@@ -51,7 +51,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
     store = WorkflowStore(Path(data_dir or config.DATA_DIR))
     audit = AuditLog(Path(audit_dir or config.AUDIT_DIR))
     orchestrator = Orchestrator(store, audit, executor=executor, ask=ask, stage_timeout=stage_timeout,
-                                max_revisions=max_revisions)
+                                max_revisions=max_revisions, service_urls=service_urls)
     token = config.API_TOKEN if api_token is None else api_token.strip()
     interrupted = orchestrator.recover_interrupted()
     app.extensions["multi_agent"] = {"store": store, "audit": audit, "orchestrator": orchestrator,
@@ -103,12 +103,12 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
     def get_metrics():
         history, coordination = audit.read_history(), audit.read_coordination()
         selected = request.args.get("workflows")
-        if selected:
+        if selected is not None:                  # "?workflows=" means none, never all
             ids = {w.strip() for w in selected.split(",") if w.strip()}
             history = [r for r in history if r["workflow_id"] in ids]
             coordination = [r for r in coordination if r["workflow_id"] in ids]
         body = metrics.compute(history, coordination)
-        body["scope"] = sorted(ids) if selected else "all"
+        body["scope"] = sorted(ids) if selected is not None else "all"
         return jsonify(body)
 
     @app.post("/workflow")
@@ -196,8 +196,14 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             return jsonify({"error": "JSON object body required", "options": list(DECISIONS)}), 400
+        note, error = clean_text(data.get("note"), "note", MAX_NOTE_CHARS)
+        if error:
+            return jsonify({"error": error, "options": list(DECISIONS)}), 400
+        by, error = clean_text(data.get("by"), "by", MAX_BY_CHARS)
+        if error:
+            return jsonify({"error": error, "options": list(DECISIONS)}), 400
         try:
-            orchestrator.decide(workflow, data.get("decision"), data.get("note") or "", str(data.get("by") or "api"))
+            orchestrator.decide(workflow, data.get("decision"), note, by or "api")
         except InvalidDecision as exc:
             return jsonify({"error": str(exc), "options": list(DECISIONS)}), 400
         except WrongState as exc:
@@ -235,11 +241,11 @@ def _validate_request(data: Any) -> tuple[dict[str, Any], dict[str, Any] | None]
     feature = str(data.get("feature") or "").strip().lower()
     if feature not in config.FEATURES:
         return {}, {"error": f"feature must be one of {list(config.FEATURES)}", "allowed_features": list(config.FEATURES)}
-    text = str(data.get("request") or "").strip()
+    text, error = clean_text(data.get("request"), "request", config.MAX_REQUEST_CHARS)
+    if error:
+        return {}, {"error": error}
     if not text:
         return {}, {"error": "request is required"}
-    if len(text) > config.MAX_REQUEST_CHARS:
-        return {}, {"error": f"request must be {config.MAX_REQUEST_CHARS} characters or fewer"}
     context = data.get("context") or {}
     if not isinstance(context, dict):
         return {}, {"error": "context must be a JSON object"}
@@ -248,13 +254,14 @@ def _validate_request(data: Any) -> tuple[dict[str, Any], dict[str, Any] | None]
         # Only these three reach the agents, the prompts and the audit; anything
         # else would become "evidence" the grounding check could not question.
         return {}, {"error": f"context accepts only {', '.join(CONTEXT_KEYS)}; unknown {unknown}"}
-    for key, low, high in (("customer_id", 1, None), ("month", 1, 12), ("year", 2000, 2100)):
+    for key, (low, high) in CONTEXT_BOUNDS.items():
         if key in context:
-            if isinstance(context[key], bool):
+            raw = context[key]
+            if isinstance(raw, bool) or (isinstance(raw, float) and not raw.is_integer()):
                 return {}, {"error": f"context.{key} must be an integer"}
             try:
-                value = int(context[key])
-            except (TypeError, ValueError):
+                value = int(raw)
+            except (TypeError, ValueError, OverflowError):
                 return {}, {"error": f"context.{key} must be an integer"}
             if value < low or (high is not None and value > high):
                 return {}, {"error": f"context.{key} must be between {low} and {high or 'any'}"}

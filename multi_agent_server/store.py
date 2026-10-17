@@ -41,8 +41,8 @@ class WorkflowStore:
             while workflow_id in self._items:
                 workflow_id = new_workflow_id()
             workflow = Workflow(workflow_id=workflow_id, feature=feature, request=request, context=context)
+            self._write(workflow)                 # on disk first: a failed write leaves no zombie in memory
             self._items[workflow_id] = workflow
-            self._write(workflow)
             return workflow
 
     def get(self, workflow_id: str) -> Workflow | None:
@@ -68,8 +68,12 @@ class WorkflowStore:
         """Write to a temp file then replace, so a crash never leaves half a record."""
         path = self.directory / f"{workflow.workflow_id}.json"
         tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(workflow.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
-        os.replace(tmp, path)
+        try:
+            tmp.write_text(json.dumps(workflow.to_dict(), indent=2), encoding="utf-8")
+            os.replace(tmp, path)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
 
 
 def is_valid_state(state: str) -> bool:

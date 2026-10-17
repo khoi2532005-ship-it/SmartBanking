@@ -119,14 +119,21 @@ def fallback_findings(plan: dict[str, Any], evidence: list[dict[str, Any]], reas
         parts = []
         for ref in refs:
             record = by_id[ref]
-            scalars = ", ".join(f"{k} {v}" for k, v in record["summary"].items()
-                                if isinstance(v, (int, float, str)) and not isinstance(v, bool))
-            parts.append(f"{ref} GET {record['endpoint']}: {scalars}"[:400])
+            pieces = []
+            for key, value in record["summary"].items():
+                if isinstance(value, (int, float, str)) and not isinstance(value, bool):
+                    pieces.append(f"{key} {value}")
+                elif isinstance(value, dict):             # one level down: totals, top categories
+                    pieces.extend(f"{key}.{k} {v}" for k, v in value.items()
+                                  if isinstance(v, (int, float, str)) and not isinstance(v, bool))
+                elif isinstance(value, list) and value and all(isinstance(v, str) for v in value):
+                    pieces.append(f"{key} {', '.join(value)}")
+            parts.append(f"{ref} GET {record['endpoint']}: {', '.join(pieces)}"[:600])
         findings.append({"task_id": task["id"], "statement": "; ".join(parts) or "No evidence available",
                          "evidence": refs})
     reason = reason.rstrip(".")
     answer = (f"Evidence was collected from {len(ok_ids)} of {len(evidence)} planned endpoints; the findings "
-              f"list what each one returned. No model analysis is included: {reason}.")
+              f"list the figures of each response. No model analysis is included: {reason}.")
     gaps = [f"No model analysis: {reason}"]
     return findings, answer, gaps
 

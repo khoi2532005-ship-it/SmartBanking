@@ -43,6 +43,27 @@ DECISIONS = {
 MAX_NOTE_CHARS = 1000
 MAX_BY_CHARS = 100
 CONTEXT_KEYS = ("customer_id", "month", "year")      # the only context a workflow carries
+CONTEXT_BOUNDS = {"customer_id": (1, None), "month": (1, 12), "year": (2000, 2100)}
+
+
+def clean_text(value: Any, name: str, max_chars: int) -> tuple[str, str | None]:
+    """A text field a person typed: a real string, UTF-8 encodable, within bounds.
+
+    JSON accepts unpaired surrogates ("\\ud83d"), which no UTF-8 writer can store;
+    they are refused here so a request or decision can never half-apply.
+    """
+    if value is None:
+        return "", None
+    if not isinstance(value, str):
+        return "", f"{name} must be a string"
+    text = value.strip()
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return "", f"{name} is not valid text (unpaired surrogate)"
+    if len(text) > max_chars:
+        return "", f"{name} must be {max_chars} characters or fewer"
+    return text, None
 
 
 def now_iso() -> str:

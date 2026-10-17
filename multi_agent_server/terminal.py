@@ -7,6 +7,7 @@ endpoint and leave the same audit records.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from typing import Any, Callable
@@ -23,6 +24,34 @@ NOTE_PROMPT = "Correction note (optional, Enter to skip): "
 
 class ServerUnavailable(RuntimeError):
     pass
+
+
+class InputClosed(EOFError):
+    """stdin is closed: no interactive decision can be made (use --decision)."""
+
+
+def positive_float(text: str) -> float:
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number") from None
+    if value <= 0:
+        raise argparse.ArgumentTypeError("must be a positive number of seconds")
+    return value
+
+
+def configure_console() -> None:
+    """UTF-8 output even when redirected on Windows (cp1252 would crash on an arrow or emoji)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
+def require_note_for_partial(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if args.decision == "partially_accept" and not args.note:
+        parser.error("--decision partially_accept needs --note saying what to correct")
 
 
 class HttpClient:
@@ -123,6 +152,9 @@ def render_workflow(full: dict[str, Any]) -> str:
                                     f"attempt {meta.get('attempt', '?')}]"))
         for gap in result.get("gaps", []):
             out.append(_wrap("Gap:", gap))
+        if result.get("request_only_numbers"):
+            out.append(_wrap("Unproven:", "figures " + ", ".join(result["request_only_numbers"])
+                             + " come from the request, not from the evidence"))
     if review:
         meta = review.get("meta") or {}
         criteria = review.get("criteria", [])
@@ -151,6 +183,9 @@ def render_response(response: dict[str, Any]) -> str:
     out.append(_wrap("Answer:", response.get("answer") or "(none)"))
     if response.get("correction_note"):
         out.append(_wrap("Correction:", response["correction_note"]))
+    if response.get("request_only_numbers"):
+        out.append(_wrap("Unproven:", "figures " + ", ".join(response["request_only_numbers"])
+                         + " come from the request, not from the evidence"))
     for risk in response.get("risks", []):
         out.append(_wrap("Risk:", risk))
     return "\n".join(out)
@@ -165,7 +200,7 @@ def prompt_decision(input_fn: Callable[[str], str] = input, out: Callable[[str],
         try:
             raw = input_fn(PROMPT)
         except EOFError:
-            return None, ""
+            raise InputClosed("stdin is closed; use --decision, or run from an interactive terminal") from None
         key = (raw or "").strip().lower()[:1]
         if key in DECISION_KEYS:
             decision = DECISION_KEYS[key]
@@ -178,7 +213,7 @@ def prompt_decision(input_fn: Callable[[str], str] = input, out: Callable[[str],
         try:
             note = input_fn(prompt).strip()
         except EOFError:
-            return decision, ""                # stdin ran dry: let the server say no
+            raise InputClosed("stdin is closed before the note; use --decision and --note") from None
         if note or decision != "partially_accept":
             return decision, note
         out("  Partially accept needs a note saying what to correct.")

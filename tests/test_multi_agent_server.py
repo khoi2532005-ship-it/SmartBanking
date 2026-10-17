@@ -223,6 +223,8 @@ def test_health_reports_roles_models_pipeline_and_audit_paths(client):
     ({"feature": "budgeting", "request": "x", "context": {"month": 9}}, "customer_id is required"),
     ({"feature": "budgeting", "request": "x", "context": {"customer_id": 1, "ref": 9999}}, "context accepts only customer_id, month, year"),
     ({"feature": "budgeting", "request": "x", "context": {"customer_id": True}}, "context.customer_id must be an integer"),
+    ({"feature": "budgeting", "request": "x", "context": {"customer_id": 2.9}}, "context.customer_id must be an integer"),
+    ({"feature": "budgeting", "request": ["not", "a", "string"], "context": {"customer_id": 1}}, "request must be a string"),
 ])
 def test_bad_requests_are_400_with_a_reason(client, ask, body, word):
     if isinstance(body, str):
@@ -232,6 +234,20 @@ def test_bad_requests_are_400_with_a_reason(client, ask, body, word):
     assert response.status_code == 400, response.get_data(as_text=True)
     assert word in response.get_json()["error"], response.get_json()
     assert ask.calls == []                        # nothing reached the model
+
+
+def test_raw_json_edge_cases_are_400_not_500(client, ask):
+    base = '"feature":"budgeting","context":{"customer_id":1,"month":9,"year":2026}'
+    for body, word in (
+        ('{' + base + ',"request":"budget \\udc00 check"}', "not valid text"),
+        ('{"feature":"budgeting","request":"x","context":{"customer_id":Infinity}}', "must be an integer"),
+        ('{"feature":"budgeting","request":"x","context":{"customer_id":1e999}}', "must be an integer"),
+    ):
+        response = client.post("/workflow", data=body, content_type="application/json")
+        assert response.status_code == 400, (body, response.get_json())
+        assert word in response.get_json()["error"], response.get_json()
+    assert ask.calls == [] and client.get("/health").get_json()["workflows"] == 0
+    assert client.get("/workflows").get_json() == []                        # no zombie workflow was registered
 
 
 def test_oversized_bodies_are_refused_as_json(client, ask):
@@ -300,7 +316,12 @@ def test_valid_run_goes_plan_work_review_to_the_human_gate(client, ask, api, tmp
     assert records[0]["summary"]["budget_count"] == 3
     assert records[0]["summary"]["over_budget_categories"] == ["Groceries", "Dining Out"]
     assert records[0]["summary"]["totals"]["total_spent"] == 1274.0
+    # derived figures a person asks for are computed by the server, so the Worker can quote them
+    assert records[0]["summary"]["total_over_by"] == 156.0
+    assert records[0]["summary"]["most_over_budget"] == {"category": "Dining Out", "over_by": 111.0}
+    assert records[0]["summary"]["most_spent"] == {"category": "Groceries", "spent": 645.0}
     assert records[1]["summary"]["total_spent"] == 1363.0 and records[1]["summary"]["transaction_count"] == 21
+    assert records[1]["summary"]["top_category"] == {"category": "Groceries", "amount": 645.0}
     assert result["findings"] == GOOD_RESULT["findings"]
     assert result["answer"] == GOOD_RESULT["answer"] and result["gaps"] == []
     assert result["meta"]["source"] == "model" and result["meta"]["attempts"] == 1 and result["meta"]["attempt"] == 1
@@ -316,7 +337,7 @@ def test_valid_run_goes_plan_work_review_to_the_human_gate(client, ask, api, tmp
 
     # the Reviewer saw the plan's criteria, the findings, the answer, the evidence and the server's checks
     judge = ask.calls[2]
-    assert "REVIEWER" in judge["system"] and "completion" not in judge["system"].lower() or True
+    assert "REVIEWER" in judge["system"] and "Role boundary" in judge["system"]
     assert "1. " + GOOD_PLAN["success_criteria"][0] in judge["user"]
     assert "- t3 (evidence t1, t2): " + GOOD_RESULT["findings"][0]["statement"] in judge["user"]
     assert GOOD_RESULT["answer"] in judge["user"]
@@ -832,11 +853,10 @@ def test_accept_releases_the_response_and_closes_the_audit(client, tmp_path):
     assert human["output"] == {"decision": "accept", "note": "", "by": "Bao", "released": True}
 
     history, coordination = _audit(tmp_path)
-    assert [r["event"] for r in history][-4:] == ["stage_completed", "state_changed", "workflow_completed", ][-3:] or True
     tail = [r["event"] for r in history][-3:]
-    assert tail == ["stage_completed", "state_changed", "workflow_completed"]
-    assert history[-3]["role"] == "human" and history[-3]["detail"]["decision"] == "accept"
-    assert history[-2]["detail"] == {"from": "awaiting_human_review", "to": "accepted"}
+    assert tail == ["state_changed", "stage_completed", "workflow_completed"]       # persisted first, then audited
+    assert history[-3]["detail"] == {"from": "awaiting_human_review", "to": "accepted"}
+    assert history[-2]["role"] == "human" and history[-2]["detail"]["decision"] == "accept"
     assert history[-1]["detail"] == {"decision": "accept", "released": True, "revisions": 0, "stages": 4}
     assert [r["decision"] for r in coordination][-2:] == ["human_decision", "response_released"]
     assert coordination[-2]["actor"] == "human"
@@ -885,6 +905,8 @@ def test_reject_withholds_the_answer_but_keeps_the_trail(client, tmp_path):
     ({}, 400, "decision must be one of"),
     ({"decision": "accept", "note": "x" * 1001}, 400, "1000 characters"),
     ({"decision": "accept", "by": "x" * 101}, 400, "by must be 100 characters"),
+    ({"decision": "accept", "note": {"a": [1, 2]}}, 400, "note must be a string"),
+    ({"decision": "accept", "by": ["x"]}, 400, "by must be a string"),
     ({"decision": "partially_accept"}, 400, "needs a note saying what to correct"),
     ("[1]", 400, "JSON object"),
 ])
@@ -897,6 +919,42 @@ def test_bad_decisions_are_400_and_change_nothing(client, body, status, word):
     assert response.status_code == status and word in response.get_json()["error"]
     assert response.get_json()["options"] == ["accept", "partially_accept", "reject"]
     assert client.get(f"/workflow/{workflow_id}/status").get_json()["state"] == State.AWAITING_HUMAN_REVIEW
+
+
+def test_surrogate_note_cannot_half_apply_a_decision(client, tmp_path):
+    workflow_id = _start(client)
+    body = '{"decision":"accept","note":"looks fine \\ud83d","by":"Bao"}'
+    response = client.post(f"/workflow/{workflow_id}/decision", data=body, content_type="application/json")
+    assert response.status_code == 400 and "not valid text" in response.get_json()["error"]
+    status = client.get(f"/workflow/{workflow_id}/status").get_json()
+    assert status["state"] == State.AWAITING_HUMAN_REVIEW and status["decision"] is None
+    assert client.get(f"/workflow/{workflow_id}/response").status_code == 409          # the gate still holds
+    assert client.get("/workflows/pending").get_json()["count"] == 1
+    _history, coordination = _audit(tmp_path)
+    assert "human_decision" not in [r["decision"] for r in coordination]
+
+
+def test_decision_is_restored_when_the_save_fails(client, tmp_path, monkeypatch):
+    workflow_id = _start(client)
+    store = client.application.extensions["multi_agent"]["store"]
+    original = store.save
+
+    def failing_save(workflow):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(store, "save", failing_save)
+    response = client.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"})
+    assert response.status_code == 500
+    monkeypatch.setattr(store, "save", original)
+    full = client.get(f"/workflow/{workflow_id}").get_json()
+    assert full["state"] == State.AWAITING_HUMAN_REVIEW and full["decision"] is None and full["final_response"] is None
+    assert full["stages"][-1]["role"] == "human" and full["stages"][-1]["status"] == "running"
+    assert client.get(f"/workflow/{workflow_id}/response").status_code == 409
+    _history, coordination = _audit(tmp_path)
+    assert "human_decision" not in [r["decision"] for r in coordination]
+    retry = client.post(f"/workflow/{workflow_id}/decision", json={"decision": "reject", "note": "no"})
+    assert retry.status_code == 200 and retry.get_json()["state"] == State.REJECTED
+    assert [r["decision"] for r in _audit(tmp_path)[1]].count("human_decision") == 1
 
 
 def test_decision_on_a_failed_workflow_is_409(tmp_path, api):
@@ -924,7 +982,8 @@ def test_gate_records_are_written_before_a_decision_can_be(client, tmp_path):
     _history, coordination = _audit(tmp_path)
     gate = [r for r in coordination if r["decision"] in ("handoff", "awaiting_decision", "human_decision")][-3:]
     assert [r["decision"] for r in gate] == ["handoff", "awaiting_decision", "human_decision"]
-    assert [r["state"] for r in gate] == [State.AWAITING_HUMAN_REVIEW] * 3
+    # the gate records carry the waiting state; the decision record is written once the new state is on disk
+    assert [r["state"] for r in gate] == [State.AWAITING_HUMAN_REVIEW, State.AWAITING_HUMAN_REVIEW, State.ACCEPTED]
 
 
 def test_concurrent_decisions_cannot_both_succeed(client, tmp_path):
@@ -1119,7 +1178,10 @@ def test_prompt_insists_on_a_note_for_partially_accept():
     assert (decision, note) == ("partially_accept", "Fix the month")
     assert "needs a note" in "\n".join(lines)
     assert terminal.prompt_decision(Inputs("a", ""), lines.append) == ("accept", "")
-    assert terminal.prompt_decision(Inputs("p"), lines.append) == ("partially_accept", "")   # stdin ran dry
+    with pytest.raises(terminal.InputClosed):                                   # stdin ran dry before the note
+        terminal.prompt_decision(Inputs("p"), lines.append)
+    with pytest.raises(terminal.InputClosed):
+        terminal.prompt_decision(Inputs(), lines.append)
 
 
 def test_review_runner_skip_and_flags(client):
@@ -1138,10 +1200,62 @@ def test_review_runner_skip_and_flags(client):
 
     lines = []
     code = review_cli.main(["--id", first], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
-    assert code == 1 and "nothing to decide" in "\n".join(lines)
+    assert code == 0 and "nothing to decide" in "\n".join(lines)                # nothing wrong happened
     lines = []
     assert review_cli.main([], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append) == 0
     assert "0 workflow(s) awaiting human review" in "\n".join(lines)
+    # a refused decision is an error exit; bad arguments are refused before any HTTP call
+    second = _start(client)
+    lines = []
+    code = review_cli.main(["--id", second, "--decision", "accept", "--by", "x" * 101],
+                           client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+    assert code == 1 and "decision refused (400)" in "\n".join(lines)
+    with pytest.raises(SystemExit) as info:
+        review_cli.main(["--decision", "partially_accept"], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+    assert info.value.code == 2
+    with pytest.raises(SystemExit):
+        review_cli.main(["--watch", "0"], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+    with pytest.raises(SystemExit):
+        run_cli.main(["--request", "x", "--poll", "-1"], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+    with pytest.raises(SystemExit):
+        run_cli.main(["--request", "x", "--decision", "partially_accept"], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+
+
+def test_watch_mode_stops_when_stdin_is_closed_and_does_not_rerender_skips(client):
+    first = _start(client)
+    lines = []
+    code = review_cli.main(["--watch", "0.01"], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(),
+                           out=lines.append, sleep=lambda s: None)
+    text = "\n".join(lines)
+    assert code == 0 and "stopped: stdin is closed" in text
+    assert text.count(first) == 1                                             # rendered once, not every pass
+    # a skipped workflow is not shown again while unchanged; the pass ends when input runs out
+    slept = []
+    lines = []
+    def stop_after(seconds):
+        slept.append(seconds)
+        if len(slept) == 3:
+            raise KeyboardInterrupt
+    code = review_cli.main(["--watch", "0.01"], client=terminal.FlaskClientAdapter(client), input_fn=Inputs("s", "s", "s", "s"),
+                           out=lines.append, sleep=stop_after)
+    text = "\n".join(lines)
+    assert code == 130 and text.count("skipped") == 1 and text.count("awaiting human review") == 1
+
+
+def test_run_runner_reports_an_unreadable_workflow(client):
+    class Missing:
+        def __init__(self, inner):
+            self.inner, self.base_url = inner, inner.base_url
+        def get(self, path):
+            if path.startswith("/workflow/wf_") and path.count("/") == 2:
+                return 404, {"error": "gone"}
+            return self.inner.get(path)
+        def post(self, path, body):
+            return self.inner.post(path, body)
+    lines = []
+    code = run_cli.main(["--request", "x", "--month", "9", "--year", "2026"], client=Missing(terminal.FlaskClientAdapter(client)),
+                        input_fn=Inputs(), out=lines.append, sleep=lambda s: None)
+    assert code == 1 and "could not read wf_" in lines[-1] and "gone" in lines[-1]
 
 
 def test_run_runner_starts_follows_and_decides(client):
@@ -1213,6 +1327,12 @@ def test_metrics_are_computed_from_the_audit_files_alone(client, tmp_path):
     # a filter narrows the metrics to named workflows
     one = client.get(f"/metrics?workflows={first}").get_json()
     assert one["scope"] == [first] and one["workflows"]["total"] == 1 and one["human_decisions"] == {"accept": 1}
+    none = client.get("/metrics?workflows=").get_json()
+    assert none["scope"] == [] and none["workflows"]["total"] == 0                # an empty filter is not "all"
+    assert body["counts"]["handoff_anomalies"] == 0
+    extra = metrics.compute(history, coordination + [{"ts": "2026-10-17T00:00:00+00:00", "workflow_id": first,
+                                                      "state": "working", "decision": "handoff", "actor": "orchestrator", "detail": {}}])
+    assert extra["counts"]["handoff_anomalies"] == 1 and extra["handoff_success_rate"] == 1.0
 
 
 def test_metrics_reflect_revisions_fallbacks_and_failures(tmp_path, api):
@@ -1232,6 +1352,21 @@ def test_metrics_reflect_revisions_fallbacks_and_failures(tmp_path, api):
     assert metrics.compute([], []) ["workflows"]["total"] == 0
 
 
+def test_metrics_ignore_stray_lines_and_do_not_count_a_dead_worker_as_done(tmp_path, api, monkeypatch):
+    def slow_fetch(base_url, path, params=None):
+        time.sleep(0.3)
+        return api(base_url, path, params)
+    monkeypatch.setattr(evidence, "fetch", slow_fetch)
+    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True), stage_timeout=0.05).test_client()
+    body = client.post("/workflow", json=VALID).get_json()
+    assert body["state"] == State.FAILED and "worker evidence did not answer" in body["error"]
+    metrics_body = client.get("/metrics").get_json()
+    assert metrics_body["workflows"]["failed"] == 1 and metrics_body["worker_completion_rate"] == 0.0
+    with (tmp_path / "audit" / "workflow_history.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write('"stray string line"\n[1, 2]\n')
+    assert client.get("/metrics").status_code == 200
+
+
 def test_validate_passes_every_check_against_the_server(client, api, tmp_path, monkeypatch):
     ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True)
     client.application.extensions["multi_agent"]["orchestrator"].ask = ask
@@ -1249,7 +1384,8 @@ def test_validate_passes_every_check_against_the_server(client, api, tmp_path, m
     assert by_n[7].detail["plan"]["rejected"] and by_n[7].detail["result"]["rejected"] and by_n[7].detail["review"]["rejected"]
     assert validate.UNREACHABLE_URL in by_n[8].detail["error"] and by_n[8].detail["worker_blocked"] is True
     assert by_n[8].detail["coordination"] == ["request_accepted", "plan_accepted", "handoff", "worker_blocked", "workflow_failed"]
-    assert config.SERVICE_URLS["budgeting"] != validate.UNREACHABLE_URL                  # the probe restored the URL
+    assert config.SERVICE_URLS["budgeting"] != validate.UNREACHABLE_URL                  # nothing global was touched
+    assert by_n[8].detail["coordination"][1] == "plan_accepted"                             # the scripted plan was used
     assert by_n[9].detail["workflows"]["decided"] == 2 and by_n[9].detail["human_decisions"] == {"accept": 1, "reject": 1}
     assert sorted(by_n[9].detail["scope"]) == sorted(by_n[6].detail["workflow_ids"].values())
     ids = by_n[6].detail["workflow_ids"]
@@ -1258,29 +1394,80 @@ def test_validate_passes_every_check_against_the_server(client, api, tmp_path, m
     written = validate.write_evidence("flask://test", records)
     report = json.loads(written[0].read_text())
     assert report["kind"] == "multi-agent-terminal-validation" and report["passed"] is True
+    assert report["degraded_stages"] == [] and report["model_participation"] is True
     assert sorted(report["workflow_ids"]) == sorted(ids.values()) and len(report["records"]) == 9
     assert [p.name for p in written[1:]] == ["workflow_history.jsonl", "coordination_audit.jsonl"]
     snapshot = [json.loads(line) for line in written[1].read_text().splitlines()]
     assert {r["workflow_id"] for r in snapshot} == set(ids.values())
     assert "workflow_completed" in {r["event"] for r in snapshot}
-    assert report["audit_snapshot"][0].startswith("docs/evidence/multi_agent/validation-") or True   # tmp paths in tests
+    assert all(name in report["audit_snapshot"][i] for i, name in enumerate(("workflow_history.jsonl", "coordination_audit.jsonl")))
 
 
 def test_validate_report_prints_the_tally_and_fails_when_unreachable(capsys):
     records = validate.run_checks("http://127.0.0.1:9")
-    assert len(records) == 1 and records[0].passed is False and "cannot reach" in records[0].observed
+    assert len(records) == 9 and records[0].passed is False and "cannot reach" in records[0].observed
+    assert all(r.skipped and not r.passed and r.observed == "not run: check 1 failed" for r in records[1:])
     validate.print_report("http://127.0.0.1:9", records)
     out = capsys.readouterr().out
     assert "SmartBank Multi-Agent Server - terminal validation" in out
-    assert "FAIL  1. server reachable" in out and "0/1 checks passed, 0 skipped" in out
+    assert "FAIL  1. server reachable" in out and "SKIP  9. coordination metrics" in out
+    assert "0/1 checks passed, 8 skipped" in out
     assert validate.main(["--url", "http://127.0.0.1:9"]) == 1
+
+
+def test_validate_refuses_evidence_from_a_dirty_tree(monkeypatch, capsys):
+    monkeypatch.setattr(validate, "_tree_is_dirty", lambda: True)
+    assert validate.main(["--url", "http://127.0.0.1:9", "--evidence"]) == 2
+    assert "refused: the working tree has uncommitted changes" in capsys.readouterr().out
+    assert validate.main(["--url", "http://127.0.0.1:9", "--evidence", "--allow-dirty"]) == 1   # runs, server unreachable
+
+
+def test_validate_fails_a_degraded_run_unless_allowed(client, api, tmp_path):
+    client.application.extensions["multi_agent"]["orchestrator"].ask = ScriptedAsk(LLMUnavailable("no key"))
+    records = validate.run_checks("flask://test", client=terminal.FlaskClientAdapter(client), sleep=lambda s: None)
+    by_n = {r.n: r for r in records}
+    assert by_n[2].passed is False and "DEGRADED: fallback in ['planner', 'worker', 'reviewer']" in by_n[2].observed
+    assert "set GEMINI_API_KEY or pass --allow-fallback" in by_n[2].observed
+    assert not any(r.skipped for r in records) and not all(r.passed for r in records)   # the gate checks still run; the record fails
+    records = validate.run_checks("flask://test", client=terminal.FlaskClientAdapter(client), sleep=lambda s: None, allow_fallback=True)
+    by_n = {r.n: r for r in records}
+    assert by_n[2].passed is True and "allowed by --allow-fallback" in by_n[2].observed
+    assert all(r.passed for r in records)
+
+
+def test_validate_check_6_notices_a_missing_history(client, api, tmp_path):
+    ask = ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True)
+    client.application.extensions["multi_agent"]["orchestrator"].ask = ask
+    history_path = tmp_path / "audit" / "workflow_history.jsonl"
+
+    class DropsHistory:
+        """After the second decision, deletes that workflow's history lines before check 6 reads them."""
+        def __init__(self, inner):
+            self.inner, self.base_url, self.decisions = inner, inner.base_url, 0
+        def get(self, path):
+            return self.inner.get(path)
+        def post(self, path, body):
+            status, payload = self.inner.post(path, body)
+            if path.endswith("/decision"):
+                self.decisions += 1
+                if self.decisions == 2:
+                    wid = path.split("/")[2]
+                    kept = [l for l in history_path.read_text().splitlines() if f'"{wid}"' not in l]
+                    history_path.write_text("\n".join(kept) + "\n")
+            return status, payload
+    records = validate.run_checks("flask://test", client=DropsHistory(terminal.FlaskClientAdapter(client)), ask=ask, sleep=lambda s: None)
+    by_n = {r.n: r for r in records}
+    assert by_n[6].passed is False and "MISSING" in by_n[6].observed
+    assert any(gap.endswith(": workflow_created") for gap in by_n[6].detail["missing"])
+    assert by_n[6].detail["workflow_ids"]["reject"] in by_n[6].observed
 
 
 def test_validate_stops_cleanly_when_a_workflow_fails(tmp_path, api, monkeypatch):
     api.down = {"/api/budgets/summary", "/api/transactions/spending"}
     client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN)).test_client()
     records = validate.run_checks("flask://test", client=terminal.FlaskClientAdapter(client), sleep=lambda s: None)
-    assert [r.n for r in records] == [1, 2] and records[1].passed is False
+    assert [r.n for r in records] == list(range(1, 10)) and records[1].passed is False
+    assert [r.skipped for r in records] == [False, False] + [True] * 7
     assert "failed" in records[1].observed and "no feature API answered" in records[1].observed
     failed_id = records[1].detail["workflow_ids"]["accept"]
     monkeypatch.setattr(validate, "EVIDENCE_DIR", tmp_path / "evidence")
@@ -1339,6 +1526,13 @@ def test_summaries_follow_the_mcp_tools_and_stay_bounded():
     assert evidence.summarise("/api/unknown", [{"a": 1, "b": 2}, {"a": 3}], {}) == {"count": 2, "fields": ["a", "b"]}
 
 
+def test_impossible_period_is_an_evidence_error_not_a_crash(api):
+    record = evidence.collect_task({"id": "t1", "kind": "api", "endpoint": "/api/transactions",
+                                    "params": {"customer_id": 1, "month": 13, "year": 2026}}, "transactions")
+    assert record["status"] == "error" and record["error"].startswith("invalid period in the plan")
+    assert api.calls == []
+
+
 def test_period_params_become_a_date_range_for_the_transactions_api(api):
     record = evidence.collect_task({"id": "t1", "kind": "api", "endpoint": "/api/transactions",
                                     "params": {"customer_id": 1, "month": 9, "year": 2026, "category": "Transport"}}, "transactions")
@@ -1354,7 +1548,7 @@ def test_number_grounding_helpers():
     assert numbers_in_text("$2,169.97 at 108% on t1 in 2026, -5 and 1.2k") == [
         (2169.97, 2), (108.0, 0), (2026.0, 0), (-5.0, 0), (1.2, 1)]
     allowed = {2169.97, 108.2, 2026.0, 9.0, 1.0}
-    assert ungrounded_numbers("$2,169.97 at 108% on t1 in 2026, 9 of 12", allowed) == []     # 108 rounds from 108.2
+    assert ungrounded_numbers("$2,169.97 at 108% on t1 in 2026, 9 of 12", allowed) == ["12"]   # 108 rounds from 108.2; 12 is unproven
     assert ungrounded_numbers("about $2,170 and 1.2k and 99%", allowed) == ["1.2", "99"]    # 2170 rounds from 2169.97
     assert ungrounded_numbers("no numbers here", set()) == []
     # a half is accepted whichever way it was rounded, and nothing further away
@@ -1405,6 +1599,77 @@ def test_worker_may_quote_the_period_and_the_figure_the_person_typed(tmp_path, a
     assert '- request_only_numbers: ["500"]' in ask.calls[2]["user"]                   # the Reviewer is told
     review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
     assert review["checks"]["request_only_numbers"] == ["500"]
+
+
+def test_fabricated_small_counts_are_rejected_for_count_only_features(tmp_path, api):
+    api.payloads["/api/alerts"] = [{"severity": "low", "status": "dismissed"}]
+    plan = {**GOOD_PLAN, "tasks": [
+        {"id": "t1", "kind": "api", "title": "Alerts", "endpoint": "/api/alerts", "params": {"customer_id": 1}, "evidence": "counts"},
+        {"id": "t2", "kind": "analysis", "title": "Judge", "depends_on": ["t1"], "instruction": "count", "evidence": "x"}]}
+    invented = {"findings": [{"task_id": "t2", "statement": "There are 7 alerts on your account, 5 high severity; 3 are confirmed.",
+                              "evidence": ["t1"]}], "answer": "You have 7 alerts.", "gaps": []}
+    honest = {"findings": [{"task_id": "t2", "statement": "There is 1 alert, severity low, status dismissed.", "evidence": ["t1"]}],
+              "answer": "You have 1 alert, low severity, already dismissed.", "gaps": []}
+    ask = ScriptedAsk(plan, invented, honest, GOOD_REVIEW)
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json={"feature": "fraud", "request": "How many fraud alerts do I have?", "context": {"customer_id": 1}}).get_json()
+    result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
+    assert result["meta"]["attempts"] == 2 and result["answer"].startswith("You have 1 alert")
+    errors = result["meta"]["rejections"][0]
+    assert any("the number 7 is not in the evidence" in e for e in errors)
+    assert any("the number 5 is not in the evidence" in e for e in errors) and any("the number 3 is not" in e for e in errors)
+
+
+def test_gaps_and_defect_labels_are_grounded_too():
+    plan = validate_plan(json.loads(json.dumps(GOOD_PLAN)), "budgeting", CONTEXT)
+    records = [{"task_id": "t1", "status": "ok", "endpoint": "/api/budgets/summary", "params": CONTEXT,
+                "summary": evidence.summarise("/api/budgets/summary", SUMMARY_PAYLOAD, CONTEXT)},
+               {"task_id": "t2", "status": "ok", "endpoint": "/api/transactions/spending", "params": CONTEXT,
+                "summary": evidence.summarise("/api/transactions/spending", SPENDING_PAYLOAD, CONTEXT)}]
+    result = {**json.loads(json.dumps(GOOD_RESULT)), "gaps": ["Could not confirm the $9,999.00 transfer or the 3,500 missing rows"]}
+    with pytest.raises(ContractError) as info:
+        validate_result(result, plan, records)
+    assert any("gap 1: the number 9999.00" in e for e in info.value.errors) and any("3500" in e for e in info.value.errors)
+    review = {**json.loads(json.dumps(GOOD_REVIEW)), "defects": [{"severity": "low", "about": "the $8,888.00 overspend", "note": "wording"}]}
+    with pytest.raises(ContractError) as info:
+        validate_review(review, plan, records)
+    assert any("8888.00" in e for e in info.value.errors)
+
+
+def test_request_only_figures_reach_the_review_the_response_and_the_terminal(tmp_path, api):
+    api.payloads["/api/transactions"] = [{"amount": -120.5, "category": "Groceries", "type": "Withdrawal", "date": "2026-09-03"}]
+    plan = {**GOOD_PLAN, "tasks": [
+        {"id": "t1", "kind": "api", "title": "Transactions", "endpoint": "/api/transactions",
+         "params": {"customer_id": 1, "month": 9, "year": 2026}, "evidence": "totals"},
+        {"id": "t2", "kind": "analysis", "title": "Judge", "depends_on": ["t1"], "instruction": "compare", "evidence": "x"}]}
+    lax = {"findings": [{"task_id": "t2", "statement": "You spent $500 in September 2026.", "evidence": ["t1"]}],
+           "answer": "You spent $500 and transferred $2,000 to account 4455.", "gaps": []}
+    ask = ScriptedAsk(plan, lax, GOOD_REVIEW)
+    client = make_app(tmp_path, ask).test_client()
+    request = "Did I spend more than $500 in September 2026? Also confirm the $2,000 transfer to account 4455."
+    body = client.post("/workflow", json={"feature": "transactions", "request": request, "context": CONTEXT}).get_json()
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == "accept"                                            # the lax model review stands
+    assert any(r.startswith("Figures 500, 2000, 4455 come from the request") for r in review["risks"])   # but code adds the risk
+    lines = []
+    review_cli.main(["--decision", "accept"], client=terminal.FlaskClientAdapter(client), input_fn=Inputs(), out=lines.append)
+    flat = " ".join("\n".join(lines).split())
+    assert "Unproven: figures 500, 2000, 4455 come from the request, not from the evidence" in flat
+    final = client.get(f"/workflow/{body['workflow_id']}/response").get_json()
+    assert final["request_only_numbers"] == ["500", "2000", "4455"]
+    assert any("come from the request" in r for r in final["risks"])
+
+
+def test_plan_periods_are_bounded_even_without_a_context_period():
+    plan = json.loads(json.dumps(GOOD_PLAN))
+    plan["tasks"][0]["params"] = {"customer_id": 1, "month": 13, "year": 2026}
+    with pytest.raises(ContractError) as info:
+        validate_plan(plan, "budgeting", {"customer_id": 1})
+    assert any("month=13 is out of range (1 to 12)" in e for e in info.value.errors)
+    plan["tasks"][0]["params"] = {"customer_id": 0, "month": 9, "year": 99999}
+    with pytest.raises(ContractError) as info:
+        validate_plan(plan, "budgeting", {"customer_id": 1})
+    assert any("customer_id=0" in e for e in info.value.errors) and any("year=99999" in e for e in info.value.errors)
 
 
 def test_request_figure_stated_as_fact_is_flagged_for_the_reviewer(tmp_path, api):

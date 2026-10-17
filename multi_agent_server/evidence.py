@@ -21,15 +21,24 @@ MAX_LIST_ITEMS = 25
 MAX_TEXT_CHARS = 200
 
 
-def collect(plan: dict[str, Any], feature: str, context: dict[str, Any]) -> list[dict[str, Any]]:
+def collect(plan: dict[str, Any], feature: str, context: dict[str, Any],
+            service_urls: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """One evidence record per api task, in plan order."""
-    return [collect_task(task, feature) for task in plan["tasks"] if task["kind"] == "api"]
+    return [collect_task(task, feature, service_urls) for task in plan["tasks"] if task["kind"] == "api"]
 
 
-def collect_task(task: dict[str, Any], feature: str) -> dict[str, Any]:
+def collect_task(task: dict[str, Any], feature: str, service_urls: dict[str, str] | None = None) -> dict[str, Any]:
     entry = catalogue.endpoint(feature, task["endpoint"]) or {}
-    params = request_params(task["params"], entry)
-    base_url = config.SERVICE_URLS[feature]
+    base_url = (service_urls or config.SERVICE_URLS)[feature]
+    try:
+        params = request_params(task["params"], entry)
+    except (ValueError, TypeError) as exc:       # an impossible period that slipped through
+        return {
+            "task_id": task["id"], "kind": "api", "feature": feature, "endpoint": task["endpoint"],
+            "url": build_url(base_url, task["endpoint"]), "params": dict(task["params"]), "status": "error",
+            "http_status": None, "duration_seconds": None, "summary": {},
+            "error": f"invalid period in the plan: {exc}", "collected_at": now_iso(),
+        }
     record: dict[str, Any] = {
         "task_id": task["id"],
         "kind": "api",
@@ -98,8 +107,22 @@ def _number(value: Any) -> float:
         return 0.0
 
 
+def _largest(rows: list[dict[str, Any]], key: str, name: str = "category") -> dict[str, Any] | None:
+    """The row with the largest `key`, as {category, key}: a figure people ask for."""
+    best = None
+    for row in rows:
+        value = _number(row.get(key))
+        if best is None or value > best[1]:
+            best = (row.get(name), value)
+    return {name: best[0], key: best[1]} if best else None
+
+
 def _budget_summary(payload: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
     lines = payload.get("budgets") or []
+    # Totals a person naturally asks for are computed here, deterministically,
+    # so the Worker can quote them instead of adding figures up itself (which
+    # the grounding contract would reject).
+    over = [line for line in lines if _number(line.get("over_by"))]
     return {
         "customer_id": payload.get("customer_id", params.get("customer_id")),
         "month": payload.get("month", params.get("month")),
@@ -113,6 +136,9 @@ def _budget_summary(payload: dict[str, Any], params: dict[str, Any]) -> dict[str
         ],
         "over_budget_count": len(payload.get("over_budget_categories") or []),
         "over_budget_categories": payload.get("over_budget_categories") or [],
+        "total_over_by": round(sum(_number(line.get("over_by")) for line in over), 2),
+        "most_over_budget": _largest(over, "over_by"),
+        "most_spent": _largest(lines, "spent"),
         "unbudgeted_spending": (payload.get("unbudgeted_spending") or [])[:MAX_LIST_ITEMS],
         "spending_source": payload.get("spending_source", "unknown"),
     }
@@ -128,6 +154,7 @@ def _spending(payload: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]
         "totals_by_category": dict(sorted(totals.items())),
         "category_count": len(totals),
         "total_spent": round(sum(_number(v) for v in totals.values()), 2),
+        "top_category": _largest([{"category": k, "amount": _number(v)} for k, v in totals.items()], "amount"),
         "transaction_count": payload.get("transaction_count"),
     }
 

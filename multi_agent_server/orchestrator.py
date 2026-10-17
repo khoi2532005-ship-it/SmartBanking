@@ -46,13 +46,14 @@ class InlineExecutor:
 class Orchestrator:
     def __init__(self, store: WorkflowStore, audit: AuditLog, *, executor: Any | None = None,
                  ask: base.AskFn | None = None, stage_timeout: float | None = None,
-                 max_revisions: int | None = None) -> None:
+                 max_revisions: int | None = None, service_urls: dict[str, str] | None = None) -> None:
         self.store = store
         self.audit = audit
         self.executor = executor or ThreadPoolExecutor(max_workers=2, thread_name_prefix="workflow")
         self.ask = ask
         self.stage_timeout = config.STAGE_TIMEOUT if stage_timeout is None else stage_timeout
         self.max_revisions = config.MAX_REVISIONS if max_revisions is None else max_revisions
+        self.service_urls = service_urls          # None: the configured feature URLs
         # One lock for the human gate: opening it and deciding are each atomic,
         # so two decisions cannot both succeed and a decision cannot slip in
         # before the human stage record exists.
@@ -147,7 +148,8 @@ class Orchestrator:
         # Step 1: evidence over the feature APIs. No evidence at all is a
         # structured failure, not something to reason about.
         try:
-            collected = base.bounded(lambda: evidence.collect(plan, workflow.feature, workflow.context),
+            collected = base.bounded(lambda: evidence.collect(plan, workflow.feature, workflow.context,
+                                                              self.service_urls),
                                      self.stage_timeout, label="worker evidence")
         except base.StageTimeout as exc:
             self.end_stage(workflow, record, status="timed_out", duration=time.monotonic() - started,
@@ -349,15 +351,28 @@ class Orchestrator:
             if workflow.state != State.AWAITING_HUMAN_REVIEW:
                 raise WrongState(f"workflow {workflow.workflow_id} is {workflow.state}, not awaiting_human_review")
             decided_at = now_iso()
-            workflow.decision = {"decision": decision, "note": note, "by": by or "api", "decided_at": decided_at}
-            workflow.final_response = self.build_final_response(workflow)
             record = next((s for s in reversed(workflow.stages) if s.role == HUMAN and s.status == "running"), None)
+            snapshot = (workflow.decision, workflow.final_response, workflow.state,
+                        None if record is None else (record.finished_at, record.status, dict(record.output),
+                                                     record.duration_seconds))
+            try:
+                workflow.decision = {"decision": decision, "note": note, "by": by or "api", "decided_at": decided_at}
+                workflow.final_response = self.build_final_response(workflow)
+                if record is not None:
+                    record.finished_at = decided_at
+                    record.status = "completed"
+                    record.output = {"decision": decision, "note": note, "by": workflow.decision["by"],
+                                     "released": workflow.final_response["released"]}
+                    record.duration_seconds = seconds_between(record.started_at, decided_at)
+                # Persist first; the audit lines follow once the state is safely on disk.
+                self.transition(workflow, DECISIONS[decision])
+            except Exception:
+                # Nothing half-applied: the workflow is exactly as it was, still awaiting.
+                workflow.decision, workflow.final_response, workflow.state = snapshot[:3]
+                if record is not None and snapshot[3] is not None:
+                    record.finished_at, record.status, record.output, record.duration_seconds = snapshot[3]
+                raise
             if record is not None:
-                record.finished_at = decided_at
-                record.status = "completed"
-                record.output = {"decision": decision, "note": note, "by": workflow.decision["by"],
-                                 "released": workflow.final_response["released"]}
-                record.duration_seconds = seconds_between(record.started_at, decided_at)
                 self.audit.history(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
                     **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
                     "fallback": False, "fallback_reason": "", "error": ""})
@@ -365,7 +380,6 @@ class Orchestrator:
                 "decision": decision, "note": note, "by": workflow.decision["by"],
                 "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions,
             })
-            self.transition(workflow, DECISIONS[decision])
         released = workflow.final_response["released"]
         self.audit.coordination(workflow, "response_released" if released else "response_withheld", detail={
             "decision": decision, "with_correction": bool(note) and decision == "partially_accept",
@@ -404,6 +418,7 @@ class Orchestrator:
             "review_summary": review.get("summary"),
             "risks": review.get("risks", []),
             "gaps": result.get("gaps", []) if released else [],
+            "request_only_numbers": result.get("request_only_numbers", []) if released else [],
             "evidence_sources": [
                 {"task_id": r["task_id"], "endpoint": r["endpoint"], "url": r["url"], "status": r["status"]}
                 for r in result.get("evidence", [])
