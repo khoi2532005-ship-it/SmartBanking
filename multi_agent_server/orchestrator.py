@@ -376,33 +376,43 @@ class Orchestrator:
             except Exception:
                 restore()
                 raise
-            # Phase 2: the audit lines. If one cannot be written, the decision is taken back on
-            # disk as well, so a restart never serves a released response that no record explains.
+            # Phase 2: the audit trail, built first and written as one append per file. If
+            # it cannot be written, the decision is taken back on disk as well and a
+            # decision_rolled_back marker is left where possible, so a reader never
+            # mistakes the partial lines of a failed decision for a real one.
             released = workflow.final_response["released"]
-            try:
-                self.audit.history(workflow, "state_changed", detail={"from": State.AWAITING_HUMAN_REVIEW,
-                                                                      "to": workflow.state})
-                if record is not None:
-                    self.audit.history(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
-                        **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
-                        "fallback": False, "fallback_reason": "", "error": ""})
-                self.audit.coordination(workflow, "human_decision", actor=HUMAN, detail={
+            history_batch = [self.audit.history_record(workflow, "state_changed", detail={
+                "from": State.AWAITING_HUMAN_REVIEW, "to": workflow.state})]
+            if record is not None:
+                history_batch.append(self.audit.history_record(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
+                    **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
+                    "fallback": False, "fallback_reason": "", "error": ""}))
+            history_batch.append(self.audit.history_record(workflow, "workflow_completed", detail={
+                "decision": decision, "released": released, "revisions": workflow.revisions,
+                "stages": len(workflow.stages)}))
+            coordination_batch = [
+                self.audit.coordination_record(workflow, "human_decision", actor=HUMAN, detail={
                     "decision": decision, "note": note, "by": workflow.decision["by"],
-                    "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions,
-                })
-                self.audit.coordination(workflow, "response_released" if released else "response_withheld", detail={
-                    "decision": decision, "with_correction": bool(note) and decision == "partially_accept",
-                })
-                self.audit.history(workflow, "workflow_completed", detail={
-                    "decision": decision, "released": released, "revisions": workflow.revisions,
-                    "stages": len(workflow.stages),
-                })
-            except Exception:
+                    "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions}),
+                self.audit.coordination_record(workflow, "response_released" if released else "response_withheld", detail={
+                    "decision": decision, "with_correction": bool(note) and decision == "partially_accept"}),
+            ]
+            try:
+                self.audit.append_batch(history_batch, coordination_batch)
+            except Exception as exc:
                 restore()
                 try:
                     self.store.save(workflow)
                 except Exception:
                     pass                           # the disk is failing; memory is at least consistent
+                marker = {"decision": decision, "reason": f"audit write failed: {type(exc).__name__}: {exc}",
+                          "effect": "the decision was not applied; lines above for it are void"}
+                try:
+                    self.audit.append_batch(
+                        [self.audit.history_record(workflow, "decision_rolled_back", role=HUMAN, detail=marker)],
+                        [self.audit.coordination_record(workflow, "decision_rolled_back", actor=HUMAN, detail=marker)])
+                except Exception:
+                    pass
                 raise
         return workflow
 

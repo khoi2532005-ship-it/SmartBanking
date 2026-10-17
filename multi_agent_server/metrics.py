@@ -54,14 +54,20 @@ def compute(history: list[dict[str, Any]], coordination: list[dict[str, Any]]) -
         if r["event"] == "state_changed":
             final_state[r["workflow_id"]] = r["detail"].get("to")
 
-    stage_started = Counter(r["role"] for r in history if r["event"] == "stage_started")
-    stage_done = Counter(r["role"] for r in history
-                         if r["event"] == "stage_completed"
-                         or (r["event"] == "stage_timed_out" and r["detail"].get("fallback")))
-    durations: dict[str, list[float]] = defaultdict(list)
+    # A stage is identified by (workflow, role, attempt), so a duplicated line, for
+    # example from a decision whose audit write failed and was retried, counts once.
+    started_keys = {(r["workflow_id"], r["role"], r["detail"].get("attempt")) for r in history
+                    if r["event"] == "stage_started"}
+    finished: dict[tuple[Any, ...], float | None] = {}
     for r in history:
-        if r["event"] in ("stage_completed", "stage_timed_out") and r["detail"].get("duration_seconds") is not None:
-            durations[r["role"]].append(float(r["detail"]["duration_seconds"]))
+        if r["event"] == "stage_completed" or (r["event"] == "stage_timed_out" and r["detail"].get("fallback")):
+            finished[(r["workflow_id"], r["role"], r["detail"].get("attempt"))] = r["detail"].get("duration_seconds")
+    stage_started = Counter(key[1] for key in started_keys)
+    stage_done = Counter(key[1] for key in finished)
+    durations: dict[str, list[float]] = defaultdict(list)
+    for key, seconds in finished.items():
+        if seconds is not None:
+            durations[key[1]].append(float(seconds))
 
     plans_first_try = sum(1 for r in coordination if r["decision"] == "plan_accepted"
                           and r["detail"].get("accepted_first_try"))
@@ -108,5 +114,6 @@ def compute(history: list[dict[str, Any]], coordination: list[dict[str, Any]]) -
             "fallbacks": fallbacks,
             "escalations": decisions["escalated_to_human"],
             "timeouts": events["stage_timed_out"],
+            "rolled_back_decisions": events["decision_rolled_back"],
         },
     }

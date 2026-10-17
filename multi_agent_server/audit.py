@@ -32,9 +32,9 @@ class AuditLog:
 
     # ---- writers ----------------------------------------------------------
 
-    def history(self, workflow: Workflow, event: str, *, role: str = "", model: str = "",
-                detail: dict[str, Any] | None = None) -> dict[str, Any]:
-        record = {
+    def history_record(self, workflow: Workflow, event: str, *, role: str = "", model: str = "",
+                       detail: dict[str, Any] | None = None) -> dict[str, Any]:
+        return {
             "ts": now_iso(),
             "workflow_id": workflow.workflow_id,
             "feature": workflow.feature,
@@ -44,12 +44,10 @@ class AuditLog:
             "model": model,
             "detail": detail or {},
         }
-        self._append(self.history_path, record)
-        return record
 
-    def coordination(self, workflow: Workflow, decision: str, *, actor: str = "orchestrator",
-                     detail: dict[str, Any] | None = None) -> dict[str, Any]:
-        record = {
+    def coordination_record(self, workflow: Workflow, decision: str, *, actor: str = "orchestrator",
+                            detail: dict[str, Any] | None = None) -> dict[str, Any]:
+        return {
             "ts": now_iso(),
             "workflow_id": workflow.workflow_id,
             "state": workflow.state,
@@ -57,8 +55,32 @@ class AuditLog:
             "actor": actor,
             "detail": detail or {},
         }
+
+    def history(self, workflow: Workflow, event: str, *, role: str = "", model: str = "",
+                detail: dict[str, Any] | None = None) -> dict[str, Any]:
+        record = self.history_record(workflow, event, role=role, model=model, detail=detail)
+        self._append(self.history_path, record)
+        return record
+
+    def coordination(self, workflow: Workflow, decision: str, *, actor: str = "orchestrator",
+                     detail: dict[str, Any] | None = None) -> dict[str, Any]:
+        record = self.coordination_record(workflow, decision, actor=actor, detail=detail)
         self._append(self.coordination_path, record)
         return record
+
+    def append_batch(self, history: list[dict[str, Any]], coordination: list[dict[str, Any]]) -> None:
+        """Several records as one step: everything is serialised before anything is
+        written, then each file gets a single append, so a failure can never leave
+        half of a decision's trail behind."""
+        history_lines = "".join(json.dumps(r) + "\n" for r in history)
+        coordination_lines = "".join(json.dumps(r) + "\n" for r in coordination)
+        with self._lock:
+            if history_lines:
+                with self.history_path.open("a", encoding="utf-8") as handle:
+                    handle.write(history_lines)
+            if coordination_lines:
+                with self.coordination_path.open("a", encoding="utf-8") as handle:
+                    handle.write(coordination_lines)
 
     # ---- readers (used by the review mode and the validation script) ------
 

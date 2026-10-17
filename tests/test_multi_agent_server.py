@@ -960,18 +960,14 @@ def test_decision_is_restored_when_the_save_fails(client, tmp_path, monkeypatch)
 def test_decision_is_taken_back_on_disk_when_the_audit_cannot_be_written(client, tmp_path, monkeypatch):
     workflow_id = _start(client)
     ext = client.application.extensions["multi_agent"]
-    original = ext["audit"].history
-    calls = {"n": 0}
+    original = ext["audit"].append_batch
 
-    def failing_history(workflow, event, **kwargs):
-        calls["n"] += 1
-        if event == "stage_completed":
-            raise OSError(28, "No space left on device")
-        return original(workflow, event, **kwargs)
+    def failing_batch(history, coordination):
+        raise OSError(28, "No space left on device")          # the disk is full for the whole attempt
 
-    monkeypatch.setattr(ext["audit"], "history", failing_history)
+    monkeypatch.setattr(ext["audit"], "append_batch", failing_batch)
     assert client.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"}).status_code == 500
-    monkeypatch.setattr(ext["audit"], "history", original)
+    monkeypatch.setattr(ext["audit"], "append_batch", original)
     on_disk = json.loads((tmp_path / "data" / f"{workflow_id}.json").read_text())
     assert on_disk["state"] == State.AWAITING_HUMAN_REVIEW and on_disk["final_response"] is None    # disk rolled back too
     assert client.get(f"/workflow/{workflow_id}/response").status_code == 409
@@ -981,6 +977,39 @@ def test_decision_is_taken_back_on_disk_when_the_audit_cannot_be_written(client,
     second = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True)).test_client()
     assert second.get(f"/workflow/{workflow_id}/status").get_json()["state"] == State.AWAITING_HUMAN_REVIEW
     assert second.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"}).status_code == 200
+
+
+def test_partial_audit_failure_leaves_a_marker_and_metrics_stay_sane(client, tmp_path, monkeypatch):
+    workflow_id = _start(client)
+    audit = client.application.extensions["multi_agent"]["audit"]
+    original = audit.append_batch
+    state = {"failed": False}
+
+    def history_then_fail(history, coordination):
+        """The history file takes the lines, then the coordination write fails, once."""
+        if not state["failed"]:
+            state["failed"] = True
+            original(history, [])
+            raise OSError(5, "Input/output error")
+        return original(history, coordination)
+
+    monkeypatch.setattr(audit, "append_batch", history_then_fail)
+    assert client.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"}).status_code == 500
+    assert client.get(f"/workflow/{workflow_id}/status").get_json()["state"] == State.AWAITING_HUMAN_REVIEW
+    retry = client.post(f"/workflow/{workflow_id}/decision", json={"decision": "reject", "note": "changed my mind"})
+    assert retry.status_code == 200 and retry.get_json()["state"] == State.REJECTED
+
+    history, coordination = _audit(tmp_path)
+    events = [(r["event"], r["detail"].get("to") or r["detail"].get("decision")) for r in history if r["workflow_id"] == workflow_id]
+    assert ("decision_rolled_back", "accept") in events                      # the stray accept lines are explained
+    assert events.index(("decision_rolled_back", "accept")) < events.index(("state_changed", "rejected"))
+    assert [r["detail"]["decision"] for r in coordination if r["decision"] == "human_decision"] == ["reject"]
+    assert any(r["decision"] == "decision_rolled_back" for r in coordination)
+
+    body = client.get("/metrics").get_json()
+    assert body["workflows"]["by_final_state"] == {"rejected": 1} and body["workflows"]["decided"] == 1
+    assert body["counts"]["stages_finished"]["human"] == 1 and body["counts"]["stages_started"]["human"] == 1
+    assert body["counts"]["rolled_back_decisions"] == 1 and body["human_decisions"] == {"reject": 1}
 
 
 def test_non_ascii_token_or_header_is_401_not_500(tmp_path, api):
