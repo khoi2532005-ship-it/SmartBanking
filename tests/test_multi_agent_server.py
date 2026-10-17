@@ -957,6 +957,39 @@ def test_decision_is_restored_when_the_save_fails(client, tmp_path, monkeypatch)
     assert [r["decision"] for r in _audit(tmp_path)[1]].count("human_decision") == 1
 
 
+def test_decision_is_taken_back_on_disk_when_the_audit_cannot_be_written(client, tmp_path, monkeypatch):
+    workflow_id = _start(client)
+    ext = client.application.extensions["multi_agent"]
+    original = ext["audit"].history
+    calls = {"n": 0}
+
+    def failing_history(workflow, event, **kwargs):
+        calls["n"] += 1
+        if event == "stage_completed":
+            raise OSError(28, "No space left on device")
+        return original(workflow, event, **kwargs)
+
+    monkeypatch.setattr(ext["audit"], "history", failing_history)
+    assert client.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"}).status_code == 500
+    monkeypatch.setattr(ext["audit"], "history", original)
+    on_disk = json.loads((tmp_path / "data" / f"{workflow_id}.json").read_text())
+    assert on_disk["state"] == State.AWAITING_HUMAN_REVIEW and on_disk["final_response"] is None    # disk rolled back too
+    assert client.get(f"/workflow/{workflow_id}/response").status_code == 409
+    _history, coordination = _audit(tmp_path)
+    assert "human_decision" not in [r["decision"] for r in coordination]
+    # a restart sees the same thing and the decision can be made again
+    second = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True)).test_client()
+    assert second.get(f"/workflow/{workflow_id}/status").get_json()["state"] == State.AWAITING_HUMAN_REVIEW
+    assert second.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"}).status_code == 200
+
+
+def test_non_ascii_token_or_header_is_401_not_500(tmp_path, api):
+    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True), api_token="s3crét").test_client()
+    assert client.post("/workflow", json=VALID, headers={"Authorization": "Bearer s3cret"}).status_code == 401
+    assert client.post("/workflow", json=VALID, headers={"Authorization": "Bearer s3crét"}).status_code == 202
+    assert client.get("/workflows/pending", headers={"Authorization": "Bearer ✗"}).status_code == 401
+
+
 def test_decision_on_a_failed_workflow_is_409(tmp_path, api):
     api.down = {"/api/budgets/summary", "/api/transactions/spending"}
     client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN)).test_client()
@@ -1415,11 +1448,15 @@ def test_validate_report_prints_the_tally_and_fails_when_unreachable(capsys):
     assert validate.main(["--url", "http://127.0.0.1:9"]) == 1
 
 
-def test_validate_refuses_evidence_from_a_dirty_tree(monkeypatch, capsys):
+def test_validate_refuses_evidence_from_a_dirty_tree(monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(validate, "EVIDENCE_DIR", tmp_path / "evidence")            # never the repo's docs/evidence
+    monkeypatch.setattr(validate, "EVIDENCE_AUDIT_DIR", tmp_path / "evidence" / "multi_agent")
     monkeypatch.setattr(validate, "_tree_is_dirty", lambda: True)
     assert validate.main(["--url", "http://127.0.0.1:9", "--evidence"]) == 2
     assert "refused: the working tree has uncommitted changes" in capsys.readouterr().out
+    assert not (tmp_path / "evidence").exists()
     assert validate.main(["--url", "http://127.0.0.1:9", "--evidence", "--allow-dirty"]) == 1   # runs, server unreachable
+    assert len(list((tmp_path / "evidence").glob("multi-agent-validation-*.json"))) == 1
 
 
 def test_validate_fails_a_degraded_run_unless_allowed(client, api, tmp_path):

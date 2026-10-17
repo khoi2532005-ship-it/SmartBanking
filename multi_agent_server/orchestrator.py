@@ -355,6 +355,13 @@ class Orchestrator:
             snapshot = (workflow.decision, workflow.final_response, workflow.state,
                         None if record is None else (record.finished_at, record.status, dict(record.output),
                                                      record.duration_seconds))
+
+            def restore() -> None:
+                workflow.decision, workflow.final_response, workflow.state = snapshot[:3]
+                if record is not None and snapshot[3] is not None:
+                    record.finished_at, record.status, record.output, record.duration_seconds = snapshot[3]
+
+            # Phase 1: memory and disk change together, or not at all (the store write is atomic).
             try:
                 workflow.decision = {"decision": decision, "note": note, "by": by or "api", "decided_at": decided_at}
                 workflow.final_response = self.build_final_response(workflow)
@@ -364,30 +371,39 @@ class Orchestrator:
                     record.output = {"decision": decision, "note": note, "by": workflow.decision["by"],
                                      "released": workflow.final_response["released"]}
                     record.duration_seconds = seconds_between(record.started_at, decided_at)
-                # Persist first; the audit lines follow once the state is safely on disk.
-                self.transition(workflow, DECISIONS[decision])
+                workflow.state = DECISIONS[decision]
+                self.store.save(workflow)
             except Exception:
-                # Nothing half-applied: the workflow is exactly as it was, still awaiting.
-                workflow.decision, workflow.final_response, workflow.state = snapshot[:3]
-                if record is not None and snapshot[3] is not None:
-                    record.finished_at, record.status, record.output, record.duration_seconds = snapshot[3]
+                restore()
                 raise
-            if record is not None:
-                self.audit.history(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
-                    **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
-                    "fallback": False, "fallback_reason": "", "error": ""})
-            self.audit.coordination(workflow, "human_decision", actor=HUMAN, detail={
-                "decision": decision, "note": note, "by": workflow.decision["by"],
-                "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions,
-            })
-        released = workflow.final_response["released"]
-        self.audit.coordination(workflow, "response_released" if released else "response_withheld", detail={
-            "decision": decision, "with_correction": bool(note) and decision == "partially_accept",
-        })
-        self.audit.history(workflow, "workflow_completed", detail={
-            "decision": decision, "released": released, "revisions": workflow.revisions,
-            "stages": len(workflow.stages),
-        })
+            # Phase 2: the audit lines. If one cannot be written, the decision is taken back on
+            # disk as well, so a restart never serves a released response that no record explains.
+            released = workflow.final_response["released"]
+            try:
+                self.audit.history(workflow, "state_changed", detail={"from": State.AWAITING_HUMAN_REVIEW,
+                                                                      "to": workflow.state})
+                if record is not None:
+                    self.audit.history(workflow, "stage_completed", role=HUMAN, model=HUMAN, detail={
+                        **record.output, "attempt": record.attempt, "duration_seconds": record.duration_seconds,
+                        "fallback": False, "fallback_reason": "", "error": ""})
+                self.audit.coordination(workflow, "human_decision", actor=HUMAN, detail={
+                    "decision": decision, "note": note, "by": workflow.decision["by"],
+                    "review_verdict": (workflow.review or {}).get("verdict"), "revisions": workflow.revisions,
+                })
+                self.audit.coordination(workflow, "response_released" if released else "response_withheld", detail={
+                    "decision": decision, "with_correction": bool(note) and decision == "partially_accept",
+                })
+                self.audit.history(workflow, "workflow_completed", detail={
+                    "decision": decision, "released": released, "revisions": workflow.revisions,
+                    "stages": len(workflow.stages),
+                })
+            except Exception:
+                restore()
+                try:
+                    self.store.save(workflow)
+                except Exception:
+                    pass                           # the disk is failing; memory is at least consistent
+                raise
         return workflow
 
     @staticmethod

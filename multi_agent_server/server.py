@@ -62,7 +62,8 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
         # /health stays open so a probe can tell "down" from "not authorised".
         if not token or request.path == "/health":
             return None
-        if not hmac.compare_digest(request.headers.get("Authorization", ""), f"Bearer {token}"):
+        presented = request.headers.get("Authorization", "").encode("utf-8", "surrogateescape")
+        if not hmac.compare_digest(presented, f"Bearer {token}".encode("utf-8")):
             return jsonify({"error": "missing or invalid bearer token",
                             "hint": "set MULTI_AGENT_API_TOKEN to the server's value for every client"}), 401
         return None

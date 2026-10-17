@@ -9,6 +9,13 @@ every finding must name its analysis task and the api tasks it rests on, and
 every figure in it must appear in the collected evidence. The Reviewer's
 verdict is bound by a completion gate: "accept" needs every criterion met and
 no high-severity defect, otherwise the contract demands "revise" with notes.
+
+Known limits of the number check: it proves that a figure exists in the
+evidence, not that it supports the sentence it appears in ("3 categories went
+over budget" passes when 3 is the budget count), it does not read spelled-out
+numbers, and a total the Worker adds up itself is rejected unless the server
+already computed it (evidence.py adds the totals people ask for). Judging
+whether a figure supports a claim is the Reviewer's job, and the human's.
 """
 
 from __future__ import annotations
