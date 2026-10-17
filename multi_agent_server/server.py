@@ -24,6 +24,7 @@ exists only once a person has decided.
 
 from __future__ import annotations
 
+import socket
 from pathlib import Path
 from typing import Any
 
@@ -271,7 +272,36 @@ def _banner(app: Flask) -> None:
     print(rule)
 
 
-if __name__ == "__main__":
+def port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    """True when something already listens on the port (a connect probe works on every OS).
+
+    On localhost a refused connection is the only sign that nothing is there; a
+    timeout means a listener with a full backlog, so it counts as in use. Any
+    other error also counts as in use: refusing to start is safer than
+    touching another server's data.
+    """
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except ConnectionRefusedError:
+        return False
+    except OSError:
+        return True
+
+
+def main() -> int:
+    # Claim the port before touching the data directory: a second start while a
+    # server is already running must not mark that server's live workflows as
+    # interrupted. create_app() runs the restart recovery, so it comes after.
+    if port_in_use(config.PORT):
+        print(f"error: {config.local_url()} is already in use - is another Multi-Agent Server running? "
+              "Nothing was changed on disk.")
+        return 1
     application = create_app()
     _banner(application)
     application.run(host=config.HOST, port=config.PORT, debug=False, threaded=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

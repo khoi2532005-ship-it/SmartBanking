@@ -293,17 +293,17 @@ class Orchestrator:
         under the gate lock, so a decision can never arrive between the two.
         """
         review = workflow.review or {}
-        with self._gate_lock:
+        with self._gate_lock:                      # no decision can be logged before these records
             self.begin_stage(workflow, HUMAN, model=HUMAN)
             self.transition(workflow, State.AWAITING_HUMAN_REVIEW)
-        self.audit.coordination(workflow, "handoff", detail={
-            "from": reviewer.ROLE, "to": HUMAN, "contract": "review",
-            "verdict": review.get("verdict"), "escalated": bool(review.get("escalated")),
-            "open_defects": len(review.get("defects", [])), "risks": len(review.get("risks", [])),
-        })
-        self.audit.coordination(workflow, "awaiting_decision", detail={
-            "options": list(DECISIONS), "released": False,
-        })
+            self.audit.coordination(workflow, "handoff", detail={
+                "from": reviewer.ROLE, "to": HUMAN, "contract": "review",
+                "verdict": review.get("verdict"), "escalated": bool(review.get("escalated")),
+                "open_defects": len(review.get("defects", [])), "risks": len(review.get("risks", [])),
+            })
+            self.audit.coordination(workflow, "awaiting_decision", detail={
+                "options": list(DECISIONS), "released": False,
+            })
 
     def decide(self, workflow: Workflow, decision: str, note: str = "", by: str = "api") -> Workflow:
         """Apply the person's decision and build the final response."""

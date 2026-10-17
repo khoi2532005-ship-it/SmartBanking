@@ -287,6 +287,16 @@ def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list
     ok_ids = [r["task_id"] for r in evidence if r["status"] == "ok"]
     failed_ids = [r["task_id"] for r in evidence if r["status"] != "ok"]
     allowed = allowed_numbers(plan, evidence, request, context)
+    # A figure the person typed may be repeated ("not more than $500"), but it
+    # is not evidence. Such figures pass the contract and are listed, so the
+    # Reviewer and the human see exactly which numbers rest on the request alone.
+    evidence_allowed = allowed_numbers(plan, evidence, "", context)
+    request_only: list[str] = []
+
+    def note_request_only(text: str) -> None:
+        for number in ungrounded_numbers(text, evidence_allowed):
+            if number not in ungrounded_numbers(text, allowed) and number not in request_only:
+                request_only.append(number)
 
     raw_findings = result.get("findings")
     if raw_findings is None:
@@ -320,6 +330,7 @@ def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list
                 errors.append(f"{label}: evidence task {ref!r} is not an api task of the plan {ok_ids}")
         for number in ungrounded_numbers(statement, allowed):
             errors.append(f"{label}: the number {number} is not in the evidence; copy figures exactly from it or leave them out")
+        note_request_only(statement)
         covered.add(task_id)
         findings.append({"task_id": task_id, "statement": statement, "evidence": refs})
 
@@ -334,6 +345,7 @@ def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list
         errors.append(f"answer must be {MAX_ANSWER_CHARS} characters or fewer")
     for number in ungrounded_numbers(answer, allowed):
         errors.append(f"answer: the number {number} is not in the evidence; copy figures exactly from it or leave them out")
+    note_request_only(answer)
 
     gaps = _string_list(result.get("gaps"))
     if gaps is None:
@@ -341,7 +353,7 @@ def validate_result(result: dict[str, Any], plan: dict[str, Any], evidence: list
 
     if errors:
         raise ContractError(errors)
-    return {"findings": findings, "answer": answer, "gaps": gaps or []}
+    return {"findings": findings, "answer": answer, "gaps": gaps or [], "request_only_numbers": request_only}
 
 
 # ---------------------------------------------------------------- Reviewer verdict

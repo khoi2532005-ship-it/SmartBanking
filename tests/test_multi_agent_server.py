@@ -9,6 +9,7 @@ running feature backend is needed.
 from __future__ import annotations
 
 import json
+import socket
 import sys
 import threading
 import time
@@ -32,6 +33,7 @@ from multi_agent_server.contracts import (  # noqa: E402
 from multi_agent_server.http import FetchResult, UpstreamError  # noqa: E402
 from multi_agent_server.models import State  # noqa: E402
 from multi_agent_server.orchestrator import InlineExecutor  # noqa: E402
+from multi_agent_server import server as server_module  # noqa: E402
 from multi_agent_server.server import create_app  # noqa: E402
 
 CONTEXT = {"customer_id": 1, "month": 9, "year": 2026}
@@ -876,6 +878,15 @@ def test_escalated_workflow_still_waits_for_the_human(tmp_path, api):
     assert body["state"] == State.REJECTED and body["final_response"]["review_verdict"] == "revise"
 
 
+def test_gate_records_are_written_before_a_decision_can_be(client, tmp_path):
+    workflow_id = _start(client)
+    client.post(f"/workflow/{workflow_id}/decision", json={"decision": "accept"})
+    _history, coordination = _audit(tmp_path)
+    gate = [r for r in coordination if r["decision"] in ("handoff", "awaiting_decision", "human_decision")][-3:]
+    assert [r["decision"] for r in gate] == ["handoff", "awaiting_decision", "human_decision"]
+    assert [r["state"] for r in gate] == [State.AWAITING_HUMAN_REVIEW] * 3
+
+
 def test_concurrent_decisions_cannot_both_succeed(client, tmp_path):
     workflow_id = _start(client)
     results = []
@@ -897,6 +908,27 @@ def test_concurrent_decisions_cannot_both_succeed(client, tmp_path):
     assert full["decision"]["decision"] == winner and full["final_response"]["decision"] == winner
     _history, coordination = _audit(tmp_path)
     assert [r["decision"] for r in coordination].count("human_decision") == 1
+
+
+def test_second_server_start_leaves_a_running_servers_data_alone(tmp_path, monkeypatch, capsys):
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(5)
+    port = listener.getsockname()[1]
+
+    def must_not_run(*args, **kwargs):
+        raise AssertionError("create_app must not run while another server holds the port")
+
+    try:
+        assert server_module.port_in_use(port) is True
+        monkeypatch.setattr(config, "PORT", port)
+        monkeypatch.setattr(server_module, "create_app", must_not_run)
+        assert server_module.main() == 1
+        out = capsys.readouterr().out
+        assert "already in use" in out and "Nothing was changed on disk" in out
+    finally:
+        listener.close()
+    assert server_module.port_in_use(port) is False
 
 
 def test_interrupted_workflows_are_closed_on_restart(tmp_path, api):
@@ -1302,6 +1334,29 @@ def test_worker_may_quote_the_period_and_the_figure_the_person_typed(tmp_path, a
     assert [s["fallback"] for s in body["stages"][:3]] == [False, False, False]          # no contract rejection anywhere
     stored = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
     assert stored["meta"]["attempts"] == 1 and stored["answer"].startswith("No. In September 2026")
+    assert stored["request_only_numbers"] == ["500"]                                   # named, not hidden
+    assert '- request_only_numbers: ["500"]' in ask.calls[2]["user"]                   # the Reviewer is told
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["checks"]["request_only_numbers"] == ["500"]
+
+
+def test_request_figure_stated_as_fact_is_flagged_for_the_reviewer(tmp_path, api):
+    api.payloads["/api/transactions"] = [{"amount": -120.5, "category": "Groceries", "type": "Withdrawal", "date": "2026-09-03"}]
+    plan = {**GOOD_PLAN, "tasks": [
+        {"id": "t1", "kind": "api", "title": "Transactions", "endpoint": "/api/transactions",
+         "params": {"customer_id": 1, "month": 9, "year": 2026}, "evidence": "totals"},
+        {"id": "t2", "kind": "analysis", "title": "Judge", "depends_on": ["t1"], "instruction": "total", "evidence": "x"}]}
+    wrong = {"findings": [{"task_id": "t2", "statement": "You spent $500 in September 2026.", "evidence": ["t1"]}],
+             "answer": "You spent $500.", "gaps": []}
+    ask = ScriptedAsk(plan, wrong, LLMUnavailable("quota"))
+    client = make_app(tmp_path, ask).test_client()
+    body = client.post("/workflow", json={"feature": "transactions", "request": "Did I spend more than $500 in September 2026?",
+                                          "context": CONTEXT}).get_json()
+    result = client.get(f"/workflow/{body['workflow_id']}/result").get_json()["result"]
+    assert result["request_only_numbers"] == ["500"]                 # the contract let it through, but says so
+    review = client.get(f"/workflow/{body['workflow_id']}/review").get_json()["review"]
+    assert review["verdict"] == reviewer.ESCALATE
+    assert any("Figures 500 come from the request, not from the evidence" in r for r in review["risks"])
 
 
 @pytest.mark.parametrize("mutate, word", [

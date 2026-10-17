@@ -154,7 +154,7 @@ def _package(accepted: dict[str, Any], evidence: list[dict[str, Any]], meta: dic
         if item not in gaps:
             gaps.append(item)
     return {"evidence": evidence, "findings": accepted["findings"], "answer": accepted["answer"],
-            "gaps": gaps, "meta": meta}
+            "gaps": gaps, "request_only_numbers": accepted.get("request_only_numbers", []), "meta": meta}
 
 
 def _meta(source: str, model: str, attempts: int, rejections: list[list[str]], reason: str,

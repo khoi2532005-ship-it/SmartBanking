@@ -56,6 +56,7 @@ def checks(workflow: Workflow, attempt: int, max_revisions: int | None = None) -
         "finding_count": len(result.get("findings", [])),
         "gap_count": len(result.get("gaps", [])),
         "answer_present": bool(result.get("answer")),
+        "request_only_numbers": result.get("request_only_numbers", []),
         "plan_source": (plan.get("meta") or {}).get("source", "unknown"),
         "result_source": (result.get("meta") or {}).get("source", "unknown"),
         "spending_sources": sorted({str(r["summary"].get("spending_source")) for r in ok
@@ -130,6 +131,9 @@ def fallback_result(workflow: Workflow, reason: str, *, model: str = "", attempt
         risks.append("The Worker result contains no model analysis; the findings are the evidence summaries")
     if facts["evidence_failed"]:
         risks.append(f"{facts['evidence_failed']} of {facts['evidence_tasks']} evidence calls failed")
+    if facts["request_only_numbers"]:
+        risks.append("Figures " + ", ".join(facts["request_only_numbers"])
+                     + " come from the request, not from the evidence; check how the answer uses them")
     if "mock" in facts["spending_sources"]:
         risks.append("Spending figures come from the budgeting service's mock dataset, not the Transactions API")
     plan = workflow.plan or {}
