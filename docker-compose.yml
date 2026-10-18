@@ -214,6 +214,9 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       TRANSACTIONS_SOURCE: ${TRANSACTIONS_SOURCE:-seed}
+      # Extra page origins allowed to call fraud-service from a browser, e.g. a
+      # proxied cloud frontend (comma-separated; see .env.example).
+      FRAUD_FRONTEND_ORIGINS: ${FRAUD_FRONTEND_ORIGINS:-}
     extra_hosts: *host-gateway
     depends_on:
       fraud-database-service:
