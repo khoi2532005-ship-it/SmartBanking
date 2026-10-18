@@ -427,6 +427,8 @@ async function loadHistory() {
 
 document.getElementById("ma-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const start = event.target.querySelector("button[type=submit]");
+    start.disabled = true;  // one workflow per click: every start costs model calls
     stopPolling();
     maMessage("");
     const payload = {
@@ -440,6 +442,8 @@ document.getElementById("ma-form").addEventListener("submit", async (event) => {
         loadWorkflow(result.body.workflow_id);
     } catch (error) {
         show("ma-result", requestFailed(error), false);
+    } finally {
+        start.disabled = false;
     }
 });
 
@@ -461,11 +465,13 @@ document.getElementById("ma-result").addEventListener("click", async (event) => 
             }),
         });
         if (result.ok) return loadWorkflow(workflowId);
-        maMessage(errorHtml(result));  // 400 bad note, 409 decided elsewhere: the card stays
+        maMessage(errorHtml(result));
+        // 409: decided elsewhere, so show what it is now; the message stays above the card.
+        if (result.status === 409) return loadWorkflow(workflowId);
     } catch (error) {
         maMessage(requestFailed(error));
     }
-    buttons.forEach((b) => { b.disabled = false; });
+    buttons.forEach((b) => { b.disabled = false; });  // 400 bad note: fix it and try again
 });
 
 document.getElementById("ma-history").addEventListener("click", (event) => {
