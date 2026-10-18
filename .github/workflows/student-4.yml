@@ -103,6 +103,7 @@ jobs:
           MULTI_AGENT_ENABLED: "false"
         run: |
           python -m tests.test_agent_clients
+          python -m tests.test_multi_agent_client
           python -m tests.test_budget_routes
 
       # Pure-function tests for the shared MCP and RAG servers. They need no
@@ -165,6 +166,8 @@ jobs:
           probe "htmx-mcp-status"  "http://localhost:5004/ui/mcp/status"
           probe "htmx-mcp-tools"   "http://localhost:5004/ui/mcp/tools"
           probe "htmx-rag-status"  "http://localhost:5004/ui/rag/status"
+          # Release 2 panel fragment answers 200 with the Multi-Agent Server disabled
+          probe "htmx-multi-agent-status" "http://localhost:5004/ui/multi-agent/status"
 
       - name: Verify seeded records and budget calculations
         run: |
@@ -195,6 +198,8 @@ jobs:
           assert h["rag"]["enabled"] is False, h["rag"]
           assert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"]
           assert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"]
+          assert h["multi_agent"]["enabled"] is False, h["multi_agent"]
+          assert h["multi_agent"]["url"].startswith("http://host.docker.internal:8300"), h["multi_agent"]
           print("mcp:", h["mcp"]); print("rag:", h["rag"])'
 
           # The panel status lines render the inactive state, never a broken swap
@@ -202,6 +207,8 @@ jobs:
             || { echo "FAIL /ui/mcp/status did not report the inactive state"; exit 1; }
           curl -s http://localhost:5004/ui/rag/status | grep -q "Inactive" \
             || { echo "FAIL /ui/rag/status did not report the inactive state"; exit 1; }
+          curl -s http://localhost:5004/ui/multi-agent/status | grep -q "Inactive" \
+            || { echo "FAIL /ui/multi-agent/status did not report the inactive state"; exit 1; }
 
           # The frontend tab carries both Release 1 panels
           page=$(curl -s http://localhost:3004/tabs/budgets.html)
