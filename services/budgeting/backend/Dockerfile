@@ -12,8 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY services/budgeting/backend/ ./
 COPY prompts/ ./prompts/
 
-# Overridden by docker-compose with service-name URLs. The MCP and RAG servers
-# run on the host (Release 1), so containers reach them via host.docker.internal.
+# Overridden by docker-compose with service-name URLs. The MCP, RAG and
+# Multi-Agent servers run on the host, so containers reach them via
+# host.docker.internal.
 ENV BUDGET_DB_URL=http://budgets-db-api:5014 \
     TRANSACTIONS_SERVICE_URL=http://transactions-api:5005 \
     USE_MOCK_TRANSACTIONS=auto \
@@ -23,7 +24,9 @@ ENV BUDGET_DB_URL=http://budgets-db-api:5014 \
     MCP_ENABLED=true \
     MCP_SERVER_URL=http://host.docker.internal:8100/mcp \
     RAG_ENABLED=true \
-    RAG_SERVER_URL=http://host.docker.internal:8200
+    RAG_SERVER_URL=http://host.docker.internal:8200 \
+    MULTI_AGENT_ENABLED=true \
+    MULTI_AGENT_SERVER_URL=http://host.docker.internal:8300
 
 EXPOSE 5004
 
