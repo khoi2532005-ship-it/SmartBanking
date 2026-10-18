@@ -12,6 +12,7 @@ from html import escape
 
 from flask import Blueprint, request
 
+from routes.agents import decided_by, operator_check
 from services import database_api, insight_service, mcp_client, multi_agent_client, rag_client, transactions_client
 from services.budget_logic import build_summary
 
@@ -739,6 +740,7 @@ def _review_html(review):
 
 
 def _decision_form(workflow_id):
+    workflow_id = escape(str(workflow_id))
     buttons = "".join(
         f'<button type="submit" name="decision" value="{value}" class="btn{" btn-primary" if value == "accept" else ""}">{label}</button>'
         for value, label in DECISION_LABEL.items())
@@ -747,6 +749,7 @@ def _decision_form(workflow_id):
         <h4>Decision</h4>
         <form class="decision-form" hx-post="/ui/multi-agent/workflows/{workflow_id}/decision"
               hx-target="#ma-{workflow_id}" hx-swap="outerHTML" hx-indicator="#ma-{workflow_id} .htmx-indicator">
+          <input type="text" name="reviewer" maxlength="60" placeholder="Reviewer name">
           <textarea name="note" rows="2" maxlength="{multi_agent_client.MAX_NOTE_CHARS}" placeholder="Correction note (required for partially accept)"></textarea>
           <div class="form-actions">{buttons} <span class="htmx-indicator muted">Sending</span></div>
         </form>
@@ -774,7 +777,7 @@ def _response_html(final):
 
 def _workflow_card(full, message=""):
     """The whole workflow as one swappable card; it polls itself while the stages run."""
-    workflow_id = full.get("workflow_id", "")
+    workflow_id = escape(str(full.get("workflow_id", "")))
     state = str(full.get("state", ""))
     running = state not in (multi_agent_client.STATE_AWAITING, *multi_agent_client.TERMINAL_STATES)
     poll = (f' hx-get="/ui/multi-agent/workflows/{workflow_id}" hx-trigger="every 2s" hx-swap="outerHTML"'
@@ -807,7 +810,17 @@ def _load_card(workflow_id, message=""):
         full = multi_agent_client.workflow(workflow_id)
     except _MA_ERRORS as exc:
         return _ma_alert(exc)
+    if not multi_agent_client.is_budgeting(full):
+        return _alert(f"Unknown budgeting workflow {workflow_id}.", "warn")
     return _workflow_card(full, message)
+
+
+def _operator_alert(*, state_changing):
+    """The review desk is for the operator: same-origin marker on POSTs, reviewer token when configured."""
+    refused = operator_check(request.headers, state_changing=state_changing)
+    if refused:
+        return _alert(refused[0], "warn")
+    return None
 
 
 @ui_bp.get("/multi-agent/status")
@@ -822,6 +835,8 @@ def multi_agent_status_fragment():
 
 @ui_bp.post("/multi-agent/workflows")
 def multi_agent_start_fragment():
+    if not (request.headers.get("HX-Request", "").lower() == "true" or request.headers.get("X-Requested-With")):
+        return _alert("Start workflows from the budgeting panel.", "warn")   # a cross-site form cannot set these headers
     text = (request.form.get("request") or "").strip()
     if not text:
         return _alert("Type the request first.", "warn")
@@ -838,15 +853,23 @@ def multi_agent_start_fragment():
 
 @ui_bp.get("/multi-agent/workflows/<workflow_id>")
 def multi_agent_workflow_fragment(workflow_id):
-    return _load_card(workflow_id)
+    """The review desk card: unreleased output, so operator only."""
+    return _operator_alert(state_changing=False) or _load_card(workflow_id)
 
 
 @ui_bp.post("/multi-agent/workflows/<workflow_id>/decision")
 def multi_agent_decision_fragment(workflow_id):
+    refused = _operator_alert(state_changing=True)
+    if refused:
+        return refused
     decision = (request.form.get("decision") or "").strip()
     note = (request.form.get("note") or "").strip()
+    reviewer = (request.form.get("reviewer") or "").strip()[:60]
     try:
-        multi_agent_client.decide(workflow_id, decision, note)
+        summary = multi_agent_client.workflow_status(workflow_id)
+        if not multi_agent_client.is_budgeting(summary):
+            return _alert(f"Unknown budgeting workflow {escape(str(workflow_id))}.", "warn")
+        multi_agent_client.decide(workflow_id, decision, note, by=decided_by(reviewer))
     except multi_agent_client.MultiAgentError as exc:
         if exc.status in (400, 409):
             return _load_card(workflow_id, _alert(f"{str(exc).rstrip('.')}.", "warn"))
