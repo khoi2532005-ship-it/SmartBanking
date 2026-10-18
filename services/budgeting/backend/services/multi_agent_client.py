@@ -12,10 +12,13 @@ waits for a person; nothing is released until that decision is posted.
     response()         GET  /workflow/<id>/response        -> the final response; 409 until decided
     pending()          GET  /workflows/pending
 
-Who may see what: `response()` is the only call whose output may reach a
-customer. `workflow()` carries the Worker's unreleased answer and the
-Reviewer's verdict and exists for the person doing the human review; it
-belongs on the operator's review panel and nowhere else.
+Who may see what: `customer_view(response())` is the only payload that may
+reach a customer: the approved answer and its findings, nothing the Reviewer
+or the operator wrote. `workflow()` carries the Worker's unreleased answer
+and the Reviewer's verdict and exists for the person doing the human review;
+it belongs on the operator's review desk and nowhere else. Every call that
+names a workflow checks the id's shape first, so nothing but a workflow id is
+ever placed in a server URL.
 
 - MULTI_AGENT_ENABLED=false raises MultiAgentDisabled before any network call (CI).
 - A server that is down raises MultiAgentUnreachable with a readable message
@@ -31,6 +34,7 @@ belongs on the operator's review panel and nowhere else.
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 import requests
@@ -46,7 +50,8 @@ DECISIONS = ("accept", "partially_accept", "reject")
 STATE_AWAITING = "awaiting_human_review"
 TERMINAL_STATES = ("accepted", "partially_accepted", "rejected", "failed")
 _SUMMARY_KEYS = ("workflow_id", "state", "stages")
-_RESPONSE_KEYS = ("workflow_id", "decision", "released", "answer", "risks")
+_RESPONSE_KEYS = ("workflow_id", "decision", "released")
+WORKFLOW_ID = re.compile(r"^wf_[0-9a-f]{8}$")
 
 
 class MultiAgentDisabled(RuntimeError):
@@ -115,11 +120,22 @@ def _request(method: str, path: str, body: dict[str, Any] | None = None) -> tupl
         return response.status_code, {"error": response.text[:200] or "non-JSON response"}
 
 
+def check_workflow_id(workflow_id: Any) -> str:
+    """Only a workflow id goes into a server URL; anything else is refused here."""
+    text = str(workflow_id or "").strip()
+    if not WORKFLOW_ID.match(text):
+        raise MultiAgentError(400, "workflow id must look like wf_1a2b3c4d")
+    return text
+
+
 def _expect(status_code: int, payload: Any, ok: tuple[int, ...] = (200,)) -> dict[str, Any]:
     """The payload when the status is one we accept, otherwise a MultiAgentError."""
     if status_code == 401:
         raise MultiAgentError(401, "the Multi-Agent Server requires a bearer token: set MULTI_AGENT_API_TOKEN "
                                    "to the same value the server uses", payload if isinstance(payload, dict) else {})
+    if status_code >= 500:
+        # The server's own failure text stays in its logs; the caller learns only that it failed.
+        raise MultiAgentError(502, f"the Multi-Agent Server failed (HTTP {status_code})")
     if status_code not in ok:
         message = payload.get("error") if isinstance(payload, dict) else None
         raise MultiAgentError(status_code, message or f"Multi-Agent Server returned HTTP {status_code}",
@@ -156,17 +172,25 @@ def start(request_text: str, customer_id: int, month: int, year: int, feature: s
 
 
 def workflow_status(workflow_id: str) -> dict[str, Any]:
+    workflow_id = check_workflow_id(workflow_id)
     status_code, payload = _request("GET", f"/workflow/{workflow_id}/status")
     return _validate_summary(_expect(status_code, payload))
 
 
 def workflow(workflow_id: str) -> dict[str, Any]:
     """The full record: plan, result (unreleased answer) and review. Operator only."""
+    workflow_id = check_workflow_id(workflow_id)
     status_code, payload = _request("GET", f"/workflow/{workflow_id}")
     return _validate_summary(_expect(status_code, payload))
 
 
+def is_budgeting(record: dict[str, Any]) -> bool:
+    """This feature acts only on its own workflows; the shared server holds every feature's."""
+    return record.get("feature") == FEATURE
+
+
 def decide(workflow_id: str, decision: str, note: str = "", by: str = "budgeting-ui") -> dict[str, Any]:
+    workflow_id = check_workflow_id(workflow_id)
     decision = (decision or "").strip().lower().replace(" ", "_").replace("-", "_")
     if decision not in DECISIONS:
         raise MultiAgentError(400, f"decision must be one of {', '.join(DECISIONS)}")
@@ -181,13 +205,43 @@ def decide(workflow_id: str, decision: str, note: str = "", by: str = "budgeting
 
 
 def response(workflow_id: str) -> dict[str, Any]:
-    """The final response. Raises MultiAgentError(409) while the decision is pending."""
+    """The final response as the server holds it (operator view).
+    Raises MultiAgentError(409) while the decision is pending."""
+    workflow_id = check_workflow_id(workflow_id)
     status_code, payload = _request("GET", f"/workflow/{workflow_id}/response")
     payload = _expect(status_code, payload)
     missing = [k for k in _RESPONSE_KEYS if k not in payload]
     if missing:
         raise MultiAgentError(502, f"final response is missing required fields: {', '.join(missing)}", payload)
     return payload
+
+
+def customer_view(final: dict[str, Any]) -> dict[str, Any]:
+    """What a customer may receive: the approved answer, nothing about the review.
+
+    Accept and partially accept release the answer, its findings, the gaps the
+    Worker named, the endpoints the evidence came from (paths only, no internal
+    URLs) and, for a partial accept, the correction the person attached.
+    Reject releases nothing beyond the fact of the decision. The Reviewer's
+    verdict, summary and risks, the operator's name and the rejection note
+    stay on the operator's side.
+    """
+    if not final.get("released"):
+        return {"workflow_id": final.get("workflow_id"), "decision": final.get("decision"), "released": False}
+    view = {
+        "workflow_id": final.get("workflow_id"),
+        "decision": final.get("decision"),
+        "released": True,
+        "released_at": final.get("released_at"),
+        "answer": final.get("answer") or "",
+        "findings": [{"statement": f.get("statement", "")} for f in final.get("findings") or [] if isinstance(f, dict)],
+        "gaps": [str(g) for g in final.get("gaps") or []],
+        "evidence_endpoints": sorted({str(e.get("endpoint")) for e in final.get("evidence_sources") or []
+                                      if isinstance(e, dict) and e.get("endpoint")}),
+    }
+    if final.get("decision") == "partially_accept" and final.get("correction_note"):
+        view["correction_note"] = final["correction_note"]
+    return view
 
 
 def pending() -> dict[str, Any]:

@@ -19,6 +19,7 @@ if str(BASE_DIR) not in sys.path:
 from services import multi_agent_client as ma  # noqa: E402
 
 DEAD_PORT_URL = "http://127.0.0.1:9"
+HX = {"HX-Request": "true"}              # what HTMX sends; a cross-site form cannot
 
 
 class _env:
@@ -226,13 +227,12 @@ def test_decide_validates_before_calling_and_relays_the_server_answer():
 
 
 def test_response_is_409_until_decided_then_the_contract():
-    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()):
         exc = _raises(lambda: ma.response(WID), ma.MultiAgentError)
         assert exc.status == 409 and exc.payload["awaiting_decision"] is True
         ma.decide(WID, "accept")
         final = ma.response(WID)
         assert final["released"] is True and final["answer"].startswith("Two categories")
-        fake.calls.clear()
 
 
 def test_contract_and_auth_errors_are_explained():
@@ -245,9 +245,48 @@ def test_contract_and_auth_errors_are_explained():
         with _stub(lambda m, p, b=None: (401, {"error": "missing or invalid bearer token"})):
             exc = _raises(lambda: ma.pending(), ma.MultiAgentError)
             assert exc.status == 401 and "MULTI_AGENT_API_TOKEN" in str(exc)
-        with _stub(lambda m, p, b=None: (404, {"error": "unknown workflow 'wf_x'"})):
-            exc = _raises(lambda: ma.workflow("wf_x"), ma.MultiAgentError)
+        with _stub(lambda m, p, b=None: (404, {"error": "unknown workflow 'wf_0a1b2c3d'"})):
+            exc = _raises(lambda: ma.workflow("wf_0a1b2c3d"), ma.MultiAgentError)
             assert exc.status == 404 and "unknown workflow" in str(exc)
+
+
+def test_workflow_ids_are_checked_before_anything_reaches_the_server():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
+        for bad in ("wf_x?", "wf_x%3F", "../health", "wf_0A1B2C3D", "wf_0a1b2c3", "", "wf_0a1b2c3d/status"):
+            exc = _raises(lambda: ma.workflow_status(bad), ma.MultiAgentError)
+            assert exc.status == 400 and "wf_1a2b3c4d" in str(exc), bad
+            assert _raises(lambda: ma.decide(bad, "accept"), ma.MultiAgentError).status == 400
+            assert _raises(lambda: ma.response(bad), ma.MultiAgentError).status == 400
+        assert fake.calls == []
+        c = _client()
+        for path in ("/api/multi-agent/workflows/wf_x%3F", "/api/multi-agent/workflows/wf_x%3F/response", "/ui/multi-agent/workflows/wf_x%3F"):
+            r = c.get(path)
+            assert r.status_code in (400, 200), path
+            assert b"wf_1a2b3c4d" in r.data, path
+        assert fake.calls == []
+
+
+def test_server_failures_become_502_without_the_servers_text():
+    with _env(MULTI_AGENT_ENABLED="true"):
+        with _stub(lambda m, p, b=None: (500, {"error": "Traceback (most recent call last): secret path"})):
+            exc = _raises(lambda: ma.workflow_status(WID), ma.MultiAgentError)
+            assert exc.status == 502 and "Traceback" not in str(exc) and "HTTP 500" in str(exc)
+            r = _client().get(f"/api/multi-agent/workflows/{WID}")
+            assert r.status_code == 502 and "Traceback" not in r.get_data(as_text=True)
+
+
+def test_customer_view_keeps_only_the_approved_answer():
+    view = ma.customer_view({**RESPONSE_ACCEPTED, "correction_note": "say the period", "decision": "partially_accept"})
+    assert set(view) == {"workflow_id", "decision", "released", "released_at", "answer", "findings", "gaps", "evidence_endpoints", "correction_note"}
+    assert view["findings"] == [{"statement": RESPONSE_ACCEPTED["findings"][0]["statement"]}]
+    assert view["evidence_endpoints"] == ["/api/budgets/summary"]
+    for leaked in ("risks", "review_summary", "review_verdict", "decided_by", "models", "evidence_sources", "request", "url"):
+        assert leaked not in str(view), leaked
+    accepted = ma.customer_view(RESPONSE_ACCEPTED)
+    assert "correction_note" not in accepted                              # only a partial accept carries a correction
+    rejected = ma.customer_view({**RESPONSE_ACCEPTED, "decision": "reject", "released": False, "answer": None,
+                                 "correction_note": "operator's private reason", "review_summary": "bad"})
+    assert rejected == {"workflow_id": WID, "decision": "reject", "released": False}
 
 
 # ---------------------------------------------------------------- routes
@@ -270,15 +309,15 @@ def test_health_and_agents_status_carry_the_integration():
 def test_routes_report_disabled_and_unreachable_as_503_with_the_start_command():
     with _env(MULTI_AGENT_ENABLED="false"):
         c = _client()
-        r = c.post("/api/multi-agent/workflows", json={"request": "x"})
+        r = c.post("/api/multi-agent/workflows", headers=HX, json={"request": "x"})
         assert r.status_code == 503 and r.get_json()["disabled"] is True
         r = c.get("/ui/multi-agent/status")
         assert r.status_code == 200 and b"Inactive" in r.data and b"MULTI_AGENT_ENABLED=false" in r.data
-        r = c.post("/ui/multi-agent/workflows", data={"request": "x", "customer_id": "1", "month": "9", "year": "2026"})
+        r = c.post("/ui/multi-agent/workflows", headers=HX, data={"request": "x", "customer_id": "1", "month": "9", "year": "2026"})
         assert r.status_code == 200 and b"disabled" in r.data
     with _env(MULTI_AGENT_ENABLED="true", MULTI_AGENT_SERVER_URL=DEAD_PORT_URL):
         c = _client()
-        r = c.post("/api/multi-agent/workflows", json={"request": "x"})
+        r = c.post("/api/multi-agent/workflows", headers=HX, json={"request": "x"})
         assert r.status_code == 503 and r.get_json()["unreachable"] is True
         assert "python -m multi_agent_server.server" in r.get_json()["error"]
         r = c.get("/ui/multi-agent/status")
@@ -288,20 +327,21 @@ def test_routes_report_disabled_and_unreachable_as_503_with_the_start_command():
 def test_routes_validate_input_before_calling_out():
     with _env(MULTI_AGENT_ENABLED="true", MULTI_AGENT_SERVER_URL=DEAD_PORT_URL):
         c = _client()
-        assert c.post("/api/multi-agent/workflows", json={}).status_code == 400
-        assert c.post("/api/multi-agent/workflows", json={"request": "x" * 1001}).status_code == 400
-        assert c.post("/api/multi-agent/workflows", json={"request": "x", "month": "nine"}).status_code == 400
-        assert c.post("/api/multi-agent/workflows", data="[1]", content_type="application/json").status_code == 400
-        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", json={"decision": "maybe"})
+        assert c.post("/api/multi-agent/workflows", headers=HX, json={"request": "x", "month": 9.7}).status_code == 400
+        assert c.post("/api/multi-agent/workflows", headers=HX, json={}).status_code == 400
+        assert c.post("/api/multi-agent/workflows", headers=HX, json={"request": "x" * 1001}).status_code == 400
+        assert c.post("/api/multi-agent/workflows", headers=HX, json={"request": "x", "month": "nine"}).status_code == 400
+        assert c.post("/api/multi-agent/workflows", headers=HX, data="[1]", content_type="application/json").status_code == 400
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "maybe"})
         assert r.status_code == 400 and r.get_json()["options"] == list(ma.DECISIONS)
-        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", json={"decision": "partially_accept"})
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "partially_accept"})
         assert r.status_code == 400 and "note" in r.get_json()["error"]
 
 
 def test_routes_relay_the_workflow_lifecycle():
     with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
         c = _client()
-        r = c.post("/api/multi-agent/workflows", json={"request": "Which categories went over?", "customer_id": 1, "month": 9, "year": 2026})
+        r = c.post("/api/multi-agent/workflows", headers=HX, json={"request": "Which categories went over?", "customer_id": 1, "month": 9, "year": 2026})
         assert r.status_code == 202 and r.get_json()["workflow_id"] == WID
         assert c.get(f"/api/multi-agent/workflows/{WID}").get_json()["state"] == "awaiting_human_review"
         panel = c.get(f"/api/multi-agent/workflows/{WID}/review-panel").get_json()
@@ -310,14 +350,96 @@ def test_routes_relay_the_workflow_lifecycle():
         r = c.get(f"/api/multi-agent/workflows/{WID}/response")
         assert r.status_code == 409 and r.get_json()["awaiting_decision"] is True
         assert c.get("/api/multi-agent/pending").get_json()["count"] == 1
-        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", json={"decision": "accept"})
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "accept"})
         assert r.status_code == 200 and r.get_json()["state"] == "accepted" and r.get_json()["final_response"]["released"] is True
         assert fake.calls[-1][2]["by"] == "budgeting-ui"
         r = c.get(f"/api/multi-agent/workflows/{WID}/response")
         assert r.status_code == 200 and r.get_json()["released"] is True
-        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", json={"decision": "reject", "note": "x"})
+        assert set(r.get_json()) == {"workflow_id", "decision", "released", "released_at", "answer", "findings", "gaps", "evidence_endpoints"}
+        assert r.get_json()["evidence_endpoints"] == ["/api/budgets/summary"] and "url" not in str(r.get_json())
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "reject", "note": "x"})
         assert r.status_code == 409 and r.get_json()["state"] == "accepted"
-        assert c.get("/api/multi-agent/workflows/wf_nope").status_code == 404
+        assert c.get("/api/multi-agent/workflows/wf_nope").status_code == 400          # not even a workflow id
+        assert c.get("/api/multi-agent/workflows/wf_ffffffff").status_code == 404      # a well-formed id the server lacks
+
+
+def test_other_features_workflows_do_not_exist_here():
+    loans = FakeServer()
+    loans_summary = {**SUMMARY_AWAITING, "feature": "loans"}
+
+    def answer(method, path, body=None):
+        status, payload = loans(method, path, body)
+        if isinstance(payload, dict) and payload.get("feature") == "budgeting":
+            payload = {**payload, "feature": "loans"}
+        if path == "/workflows/pending":
+            payload = {**payload, "workflows": [loans_summary]}
+        return status, payload
+
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(answer):
+        c = _client()
+        assert c.get(f"/api/multi-agent/workflows/{WID}").status_code == 404
+        assert c.get(f"/api/multi-agent/workflows/{WID}/review-panel").status_code == 404
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "accept"})
+        assert r.status_code == 404 and loans.decision is None                # never decided
+        assert c.get(f"/api/multi-agent/workflows/{WID}/response").status_code in (404, 409)
+        pending = c.get("/api/multi-agent/pending").get_json()
+        assert pending["count"] == 0 and pending["workflows"] == []
+        page = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
+        assert "Unknown budgeting workflow" in page and "Dining Out" not in page
+
+
+def test_posts_need_the_same_origin_marker():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
+        c = _client()
+        r = c.post("/api/multi-agent/workflows", json={"request": "x"})
+        assert r.status_code == 403 and "HX-Request" in r.get_json()["error"]
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", json={"decision": "accept"})
+        assert r.status_code == 403 and r.get_json()["operator_route"] is True
+        r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", data={"decision": "accept"})
+        assert r.status_code == 200 and b"HX-Request" in r.data
+        r = c.post("/ui/multi-agent/workflows", data={"request": "x", "customer_id": "1"})
+        assert r.status_code == 200 and b"budgeting panel" in r.data
+        assert fake.decision is None and all(m == "GET" or p != f"/workflow/{WID}/decision" for m, p, _b in fake.calls)
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers={"X-Requested-With": "XMLHttpRequest"},
+                   json={"decision": "accept", "reviewer": "Bao"})
+        assert r.status_code == 200 and fake.decision["by"] == "budgeting-ui:Bao"
+
+
+def test_reviewer_token_guards_the_operator_routes_only():
+    with _env(MULTI_AGENT_ENABLED="true", BUDGET_REVIEWER_TOKEN="rev-123"), _stub(FakeServer()) as fake:
+        c = _client()
+        assert c.get("/api/agents/status").get_json()["multi_agent"]["reviewer_token_required"] is True
+        assert c.get(f"/api/multi-agent/workflows/{WID}").status_code == 200           # customer polling: no token
+        assert c.get(f"/api/multi-agent/workflows/{WID}/response").status_code == 409  # customer response: no token
+        assert c.post("/api/multi-agent/workflows", headers=HX, json={"request": "x"}).status_code == 202
+        for path in (f"/api/multi-agent/workflows/{WID}/review-panel", "/api/multi-agent/pending"):
+            r = c.get(path)
+            assert r.status_code == 403 and "X-Reviewer-Token" in r.get_json()["error"], path
+            assert c.get(path, headers={"X-Reviewer-Token": "rev-123"}).status_code == 200, path
+            assert c.get(path, headers={"X-Reviewer-Token": "wrong"}).status_code == 403, path
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "accept"})
+        assert r.status_code == 403 and fake.decision is None
+        page = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
+        assert "X-Reviewer-Token" in page and "Dining Out" not in page                  # the desk card is withheld too
+        page = c.get(f"/ui/multi-agent/workflows/{WID}", headers={"X-Reviewer-Token": "rev-123"}).get_data(as_text=True)
+        assert "Dining Out" in page
+        r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers={**HX, "X-Reviewer-Token": "rev-123"}, json={"decision": "accept"})
+        assert r.status_code == 200 and fake.decision["decision"] == "accept"
+
+
+def test_cors_allows_the_frontend_origins_only():
+    with _env(MULTI_AGENT_ENABLED="false"):
+        c = _client()
+        for origin in ("http://localhost:3004", "http://127.0.0.1:3004", "http://20.1.2.3:3004", "http://localhost:3000"):
+            r = c.get("/api/health", headers={"Origin": origin})
+            assert r.headers.get("Access-Control-Allow-Origin") == origin, origin
+        for origin in ("http://evil.example", "http://localhost:5004", "http://localhost:30040"):
+            r = c.get("/api/health", headers={"Origin": origin})
+            assert r.headers.get("Access-Control-Allow-Origin") is None, origin
+    with _env(MULTI_AGENT_ENABLED="false", BUDGET_FRONTEND_ORIGINS="https://demo.example.edu"):
+        from app import create_app
+        r = create_app().test_client().get("/api/health", headers={"Origin": "https://demo.example.edu"})
+        assert r.headers.get("Access-Control-Allow-Origin") == "https://demo.example.edu"
 
 
 # ---------------------------------------------------------------- fragments
@@ -333,7 +455,7 @@ def test_status_fragment_shows_pipeline_and_pending_when_reachable():
 def test_workflow_card_polls_while_running_and_stops_at_the_gate():
     with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer(state="working")) as fake:
         c = _client()
-        r = c.post("/ui/multi-agent/workflows", data={"request": "Which categories went over?", "customer_id": "1", "month": "9", "year": "2026"})
+        r = c.post("/ui/multi-agent/workflows", headers=HX, data={"request": "Which categories went over?", "customer_id": "1", "month": "9", "year": "2026"})
         page = r.get_data(as_text=True)
         assert r.status_code == 200 and f'id="ma-{WID}"' in page
         assert f'hx-get="/ui/multi-agent/workflows/{WID}"' in page and 'hx-trigger="every 2s"' in page
@@ -351,14 +473,14 @@ def test_workflow_card_polls_while_running_and_stops_at_the_gate():
 def test_decision_fragment_renders_the_released_or_withheld_response():
     with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
         c = _client()
-        r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", data={"decision": "partially_accept", "note": ""})
+        r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "partially_accept", "note": ""})
         assert r.status_code == 200 and b"needs a note" in r.data            # the card comes back with the reason
         assert fake.decision is None
-        page = c.post(f"/ui/multi-agent/workflows/{WID}/decision", data={"decision": "partially_accept", "note": "Say the period"}).get_data(as_text=True)
+        page = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "partially_accept", "note": "Say the period"}).get_data(as_text=True)
         assert "partially_accepted" in page and "Final response" in page and "Two categories" in page and "Say the period" in page
         assert 'name="decision"' not in page                                 # no second decision offered
     with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
-        page = _client().post(f"/ui/multi-agent/workflows/{WID}/decision", data={"decision": "reject", "note": "wrong month"}).get_data(as_text=True)
+        page = _client().post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "reject", "note": "wrong month"}).get_data(as_text=True)
         assert "rejected" in page and "withheld" in page and "wrong month" in page and "Two categories" not in page.split("Final response")[-1]
 
 
@@ -371,9 +493,9 @@ def test_failed_workflow_card_shows_the_structured_error():
 def test_fragment_validates_the_form_before_calling_out():
     with _env(MULTI_AGENT_ENABLED="true", MULTI_AGENT_SERVER_URL=DEAD_PORT_URL):
         c = _client()
-        r = c.post("/ui/multi-agent/workflows", data={"request": "", "customer_id": "1"})
+        r = c.post("/ui/multi-agent/workflows", headers=HX, data={"request": "", "customer_id": "1"})
         assert r.status_code == 200 and b"request" in r.data.lower()
-        r = c.post("/ui/multi-agent/workflows", data={"request": "x" * 1001, "customer_id": "1"})
+        r = c.post("/ui/multi-agent/workflows", headers=HX, data={"request": "x" * 1001, "customer_id": "1"})
         assert r.status_code == 200 and b"1000" in r.data
 
 

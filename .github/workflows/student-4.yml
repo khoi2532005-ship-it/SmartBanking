@@ -104,6 +104,7 @@ jobs:
         run: |
           python -m tests.test_agent_clients
           python -m tests.test_multi_agent_client
+          python -m tests.test_multi_agent_contract
           python -m tests.test_budget_routes
 
       # Pure-function tests for the shared MCP and RAG servers. They need no
@@ -290,6 +291,13 @@ jobs:
           | budgeting-service | \`GET http://localhost:5004/api/budgets\` |
           | budgeting-service | \`GET http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026\` (seeded period) |
           | budgeting-service | \`GET http://localhost:5004/ui/mcp/status\`, \`GET http://localhost:5004/ui/rag/status\` (inactive in CI) |
+          | budgeting-service | \`GET http://localhost:5004/ui/multi-agent/status\` (inactive in CI: MULTI_AGENT_ENABLED=false) |
+
+          ## Release 2 surface (unit-tested, disabled in the smoke stack)
+
+          \`/api/multi-agent/workflows\` (start, poll), \`/review-panel\`, \`/decision\`, \`/pending\` (operator),
+          \`/response\` (customer view); settings MULTI_AGENT_ENABLED, MULTI_AGENT_SERVER_URL,
+          MULTI_AGENT_API_TOKEN, BUDGET_REVIEWER_TOKEN, BUDGET_FRONTEND_ORIGINS.
           | budgeting-frontend-service | \`GET http://localhost:3004/tabs/budgets.html\` |
           MD
 
