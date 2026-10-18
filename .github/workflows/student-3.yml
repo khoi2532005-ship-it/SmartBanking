@@ -83,13 +83,18 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        # requirements-mcp.txt: the MCP server tests in tests/ need the mcp SDK.
-        # The fraud unit tests import the backend itself and run the shared
-        # Multi-Agent Server in process, so both of their requirements come too.
-        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-multi-agent.txt -r services/fraud-alerts/backend/requirements.txt
+        # requirements-mcp.txt: the MCP server tests in tests/ need the mcp SDK
+        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
 
       - name: Run agentic loop engine tests
         run: python -m pytest tests/ -q
+
+      - name: Install the fraud backend's dependencies
+        # Only after the engine tests. With Flask installed, the loans and
+        # transactions backend tests in tests/ stop skipping, and their two
+        # `app` modules clash in one process. The fraud unit tests import the
+        # backend itself and run the shared Multi-Agent Server in process.
+        run: pip install -r requirements-multi-agent.txt -r services/fraud-alerts/backend/requirements.txt
 
       - name: Run fraud backend unit tests
         # Release 2: the Multi-Agent client and routes (against the real
