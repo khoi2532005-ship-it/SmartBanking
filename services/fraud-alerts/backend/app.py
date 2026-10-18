@@ -35,6 +35,7 @@ from routes.detection import detection_bp
 from routes.ai import ai_bp
 from routes.mcp import mcp_bp
 from routes.rag import rag_bp
+from routes.agents import agents_bp
 from services import mcp_client, multi_agent_client, rag_client
 
 
@@ -48,6 +49,7 @@ def create_app():
     app.register_blueprint(ai_bp)
     app.register_blueprint(mcp_bp)
     app.register_blueprint(rag_bp)
+    app.register_blueprint(agents_bp)
 
     @app.get("/api/health")
     def health():
