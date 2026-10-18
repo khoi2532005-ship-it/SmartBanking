@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify
 
-from services import database_api, mcp_client
+from services import database_api, llm_client, mcp_client
 from services.explain import fetch_alert_history, generate_explanation
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
@@ -10,6 +10,10 @@ ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
 
 @ai_bp.get("/alerts/<int:alert_id>/explain")
 def explain_alert(alert_id):
+    # Switched off is not an error to retry: say so before touching the database.
+    if not llm_client.enabled():
+        return jsonify({"error": llm_client.DISABLED_MESSAGE, "disabled": True}), 503
+
     try:
         response = database_api.get_alert_response(alert_id)
     except Exception as exc:

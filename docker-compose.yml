@@ -49,6 +49,10 @@ x-llm-env: &llm-env
   MULTI_AGENT_ENABLED: ${MULTI_AGENT_ENABLED:-true}
   MULTI_AGENT_SERVER_URL: http://host.docker.internal:8300
   MULTI_AGENT_API_TOKEN: ${MULTI_AGENT_API_TOKEN:-}
+  # Release 2: AI-Mode itself (a backend's own LLM calls) has the same kind of
+  # switch, so CI and the cloud baseline can show it off in /api/health. Fraud
+  # reads it first; the other backends use the same name.
+  AI_MODE_ENABLED: ${AI_MODE_ENABLED:-true}
 
 # Docker Desktop resolves host.docker.internal by itself; plain Linux Docker
 # (CI runners, the demo VM) needs this mapping on every backend that calls the

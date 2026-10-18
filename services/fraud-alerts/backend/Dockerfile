@@ -25,6 +25,7 @@ ENV FRAUD_DB_URL=http://fraud-database-service:5013 \
     TRANSACTIONS_SERVICE_URL=http://transactions:5005 \
     TRANSACTIONS_SOURCE=seed \
     LLM_PROVIDER=gemini \
+    AI_MODE_ENABLED=true \
     GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ \
     GEMINI_MODEL=gemini-flash-lite-latest \
     MCP_ENABLED=true \

@@ -36,7 +36,7 @@ from routes.ai import ai_bp
 from routes.mcp import mcp_bp
 from routes.rag import rag_bp
 from routes.agents import agents_bp
-from services import mcp_client, multi_agent_client, rag_client
+from services import llm_client, mcp_client, multi_agent_client, rag_client
 
 
 def create_app():
@@ -59,6 +59,7 @@ def create_app():
         return jsonify({
             "service": "fraud-service",
             "status": "running",
+            "ai_mode": {"enabled": llm_client.enabled(), "provider": llm_client.provider()},
             "mcp": {"enabled": mcp_client.enabled(), "url": mcp_client.server_url()},
             "rag": {"enabled": rag_client.enabled(), "url": rag_client.server_url()},
             "multi_agent": {"enabled": multi_agent_client.enabled(), "url": multi_agent_client.server_url()},
