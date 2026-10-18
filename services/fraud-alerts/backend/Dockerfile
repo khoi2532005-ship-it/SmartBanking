@@ -17,9 +17,9 @@ COPY services/fraud-alerts/backend/ ./
 # "prompts" folder, so /app/prompts is the first candidate it finds.
 COPY prompts/ ./prompts/
 
-# Overridden by docker-compose with service-name URLs. The shared MCP and RAG
-# servers run on the host (Release 1), so the container reaches them through
-# host.docker.internal; CI sets MCP_ENABLED/RAG_ENABLED=false.
+# Overridden by docker-compose with service-name URLs. The shared MCP, RAG
+# (Release 1) and Multi-Agent (Release 2) servers run on the host, so the
+# container reaches them through host.docker.internal; CI switches them off.
 ENV FRAUD_DB_URL=http://fraud-database-service:5013 \
     ACCOUNTS_SERVICE_URL=http://accounts:5001 \
     TRANSACTIONS_SERVICE_URL=http://transactions:5005 \
@@ -30,7 +30,9 @@ ENV FRAUD_DB_URL=http://fraud-database-service:5013 \
     MCP_ENABLED=true \
     MCP_SERVER_URL=http://host.docker.internal:8100/mcp \
     RAG_ENABLED=true \
-    RAG_SERVER_URL=http://host.docker.internal:8200
+    RAG_SERVER_URL=http://host.docker.internal:8200 \
+    MULTI_AGENT_ENABLED=true \
+    MULTI_AGENT_SERVER_URL=http://host.docker.internal:8300
 
 EXPOSE 5003
 

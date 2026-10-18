@@ -35,7 +35,7 @@ from routes.detection import detection_bp
 from routes.ai import ai_bp
 from routes.mcp import mcp_bp
 from routes.rag import rag_bp
-from services import mcp_client, rag_client
+from services import mcp_client, multi_agent_client, rag_client
 
 
 def create_app():
@@ -51,13 +51,15 @@ def create_app():
 
     @app.get("/api/health")
     def health():
-        # Configuration only, no calls out, so health stays instant. CI reads
-        # the flags to show MCP and RAG are present but switched off.
+        # Configuration only, no calls out, so health stays instant. CI and the
+        # cloud deploy read the flags to show each integration is present but
+        # switched off.
         return jsonify({
             "service": "fraud-service",
             "status": "running",
             "mcp": {"enabled": mcp_client.enabled(), "url": mcp_client.server_url()},
             "rag": {"enabled": rag_client.enabled(), "url": rag_client.server_url()},
+            "multi_agent": {"enabled": multi_agent_client.enabled(), "url": multi_agent_client.server_url()},
         })
 
     return app
