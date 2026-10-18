@@ -1,10 +1,11 @@
-"""Settings and failure types shared by the MCP and RAG clients (Release 1).
+"""Settings and failure types shared by the MCP and RAG clients (Release 1)
+and the Multi-Agent client (Release 2).
 
-Both shared servers run on the host, never in Compose, so this backend reaches
+The shared servers run on the host, never in Compose, so this backend reaches
 them over HTTP: http://host.docker.internal:<port> from inside Docker,
 localhost when run directly. Each integration has an on/off flag
-(MCP_ENABLED, RAG_ENABLED) so CI can run the image with both switched off
-while the integration code stays in place.
+(MCP_ENABLED, RAG_ENABLED, MULTI_AGENT_ENABLED) so CI can run the image with
+them switched off while the integration code stays in place.
 """
 
 import os

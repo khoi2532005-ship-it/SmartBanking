@@ -21,6 +21,7 @@
         /* The theme's button:hover is dark brand; chip text is brand too, so it vanished. */
         .examples .chip:hover { background: var(--brand); color: #fff; }
         .source-list { margin: 0.25rem 0 0; padding-left: 1.2rem; }
+        .panel h3 { margin: 0.9rem 0 0.3rem; font-size: 1rem; }
         /* Tab strip linking the Normal and AI Mode views. */
         .tab-strip { margin: 0 0 1rem; }
         .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
@@ -84,6 +85,31 @@
             <button type="button" class="chip" data-question="What will the ASX 200 close at tomorrow?">off-topic question</button>
         </div>
         <div id="rag-result" class="panel is-hidden"></div>
+    </section>
+
+    <section class="card">
+        <h2>Multi-Agent Review <span class="muted">via the Multi-Agent Server</span></h2>
+        <p class="muted">fraud-service starts a Planner &rarr; Worker &rarr; Reviewer workflow on the shared
+            Multi-Agent Server. Nothing is released until you decide.</p>
+        <form id="ma-form" class="row">
+            <div><label for="ma_customer">Customer ID</label>
+                <input id="ma_customer" type="number" min="1" value="1" required></div>
+            <div class="grow"><label for="ma_task">Task</label>
+                <input id="ma_task" maxlength="1000" required
+                       placeholder="Summarise this customer's fraud alerts by severity and status."></div>
+            <button type="submit">Start workflow</button>
+        </form>
+        <p class="muted">Name the customer by ID only. The task text goes to the AI model, so leave out names,
+            emails and account numbers.</p>
+        <div id="ma-examples" class="chips examples">Try:
+            <button type="button" class="chip" data-task="Summarise this customer's fraud alerts by severity and status.">alert summary</button>
+            <button type="button" class="chip" data-task="How many of this customer's alerts are still new, and which should an analyst review first?">what to review first</button>
+            <button type="button" class="chip" data-task="List the detection rules that are currently enabled.">enabled rules</button>
+        </div>
+        <div id="ma-message"></div>
+        <div id="ma-result" class="panel is-hidden"></div>
+        <h3>History</h3>
+        <div id="ma-history"></div>
     </section>
 </main>
 
@@ -271,6 +297,197 @@ document.querySelectorAll(".examples [data-question]").forEach((button) => {
         askRag(button.dataset.question);
     });
 });
+
+// ---------------------------------------------------------------- Multi-Agent
+
+// A workflow stops changing in these states: polling stops and History reloads.
+const MA_DONE = ["awaiting_human_review", "accepted", "partially_accepted", "rejected", "failed"];
+const MA_DECISIONS = [["accept", "Accept"], ["partially_accept", "Partially accept (correct)"], ["reject", "Reject"]];
+const MA_POLL_MS = 2000;
+let maTimer = null;
+let maGeneration = 0;
+
+function stopPolling() {
+    clearTimeout(maTimer);
+    maGeneration += 1;  // a load still in flight will neither render nor poll again
+}
+
+function maMessage(html) {
+    document.getElementById("ma-message").innerHTML = html;
+}
+
+function stateBadge(state) {
+    const cls = { accepted: "badge-ok", partially_accepted: "badge-ok", rejected: "badge-over", failed: "badge-over" }[state];
+    return `<span class="badge ${cls || "badge-near"}">${esc(state)}</span>`;
+}
+
+function maList(items) {
+    return (items || []).length
+        ? `<ul class="source-list">${items.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : "";
+}
+
+function planHtml(plan) {
+    if (!plan) return "";
+    const tasks = (plan.tasks || []).map((t) => t.kind === "api"
+        ? `GET ${t.endpoint} ${JSON.stringify(t.params || {})}`
+        : `${t.id} (after ${(t.depends_on || []).join(", ")}): ${t.instruction}`);
+    return `<h3>Plan</h3><p>${esc(plan.objective)}</p>${maList(tasks)}
+        <p class="muted">Success criteria</p>${maList(plan.success_criteria)}`;
+}
+
+function resultHtml(result) {
+    if (!result) return "";
+    const rows = (result.evidence || []).map((e) => `<tr><td>${esc(e.task_id)}</td><td><code>${esc(e.endpoint)}</code></td>
+        <td>${esc(e.status)}</td><td>${esc(e.status === "ok" ? `HTTP ${e.http_status}` : e.error)}</td></tr>`).join("");
+    return `<h3>Worker</h3>
+        <div class="table-scroll"><table><tr><th>Task</th><th>Endpoint</th><th>Status</th><th>Detail</th></tr>${rows}</table></div>
+        <p class="muted">Findings</p>${maList((result.findings || []).map((f) => f.statement))}
+        <p><strong>Answer:</strong> ${esc(result.answer)}</p>
+        ${(result.gaps || []).length ? `<p class="muted">Gaps</p>${maList(result.gaps)}` : ""}`;
+}
+
+function reviewHtml(review) {
+    if (!review) return "";
+    const met = { true: "met", false: "not met" };
+    const criteria = (review.criteria || []).map((c) => `${met[c.met] || "not evaluated"}: ${c.note || ""}`);
+    const defects = (review.defects || []).map((d) => `[${d.severity}] ${d.about || ""}: ${d.note || ""}`);
+    return `<h3>Review <span class="badge">${esc(review.verdict)}</span></h3><p>${esc(review.summary)}</p>
+        <p class="muted">Criteria</p>${maList(criteria)}
+        ${defects.length ? `<p class="muted">Defects</p>${maList(defects)}` : ""}
+        ${(review.risks || []).length ? `<p class="muted">Risks</p>${maList(review.risks)}` : ""}`;
+}
+
+function decisionHtml(w) {
+    if (w.state !== "awaiting_human_review") return "";
+    const buttons = MA_DECISIONS.map(([value, label]) =>
+        `<button type="button" data-decision="${value}">${esc(label)}</button>`).join(" ");
+    return `<h3>Decision</h3>
+        <div class="row">
+            <div><label for="ma_reviewer">Reviewer</label>
+                <input id="ma_reviewer" maxlength="60" placeholder="Your name (recorded in the audit)"></div>
+            <div class="grow"><label for="ma_note">Note</label>
+                <textarea id="ma_note" rows="2" maxlength="1000"
+                          placeholder="Correction note (required for Partially accept)"></textarea></div>
+        </div>
+        <div class="row" data-workflow-id="${esc(w.workflow_id)}">${buttons}</div>`;
+}
+
+function finalHtml(f) {
+    if (!f) return "";
+    const badge = f.released ? '<span class="badge badge-ok">released</span>' : '<span class="badge badge-over">withheld</span>';
+    return `<h3>Final response ${badge}</h3>
+        <p class="muted">Decision ${esc(f.decision)} by ${esc(f.decided_by)}${f.released_at ? ` at ${esc(f.released_at)}` : ""}</p>
+        ${f.released ? `<p>${esc(f.answer)}</p>` : ""}
+        ${f.correction_note ? `<p><strong>Note:</strong> ${esc(f.correction_note)}</p>` : ""}`;
+}
+
+function workflowHtml(w) {
+    const stages = (w.stages || []).map((s) => `${s.role} ${s.status}`
+        + (s.duration_seconds != null ? ` ${s.duration_seconds}s` : "") + (s.model ? ` (${s.model})` : ""));
+    return `<p><span class="chip">${esc(w.workflow_id)}</span> ${stateBadge(w.state)}
+            <span class="muted">customer ${esc((w.context || {}).customer_id)} &middot; ${esc(w.request)}</span></p>
+        ${maList(stages)}${planHtml(w.plan)}${resultHtml(w.result)}${reviewHtml(w.review)}
+        ${decisionHtml(w)}${finalHtml(w.final_response)}
+        ${w.error ? `<p class="alert alert-error">${esc(w.error)}</p>` : ""}`;
+}
+
+async function loadWorkflow(workflowId) {
+    stopPolling();
+    const generation = maGeneration;  // only the newest load may render or schedule the next poll
+    let result;
+    try {
+        result = await api(`/api/agents/workflow/${encodeURIComponent(workflowId)}`);
+    } catch (error) {
+        if (generation === maGeneration) show("ma-result", requestFailed(error), false);
+        return;
+    }
+    if (generation !== maGeneration) return;
+    if (!result.ok) return show("ma-result", errorHtml(result), false);
+    show("ma-result", workflowHtml(result.body), false);
+    if (MA_DONE.includes(result.body.state)) return loadHistory();
+    maTimer = setTimeout(() => loadWorkflow(workflowId), MA_POLL_MS);
+}
+
+async function loadHistory() {
+    const el = document.getElementById("ma-history");
+    try {
+        const result = await api("/api/agents/workflows");
+        if (!result.ok) {
+            el.innerHTML = errorHtml(result);
+            return;
+        }
+        const items = (result.body.workflows || []).slice(0, 10).map((w) => `<li>
+            <button type="button" class="btn-secondary btn-small" data-workflow="${esc(w.workflow_id)}">${esc(w.workflow_id)}</button>
+            ${stateBadge(w.state)} <span class="muted">${esc(w.created_at)}</span></li>`).join("");
+        el.innerHTML = items ? `<ul class="source-list">${items}</ul>` : '<p class="muted">No fraud workflows yet.</p>';
+    } catch (error) {
+        el.innerHTML = requestFailed(error);
+    }
+}
+
+document.getElementById("ma-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const start = event.target.querySelector("button[type=submit]");
+    start.disabled = true;  // one workflow per click: every start costs model calls
+    stopPolling();
+    maMessage("");
+    const payload = {
+        task: document.getElementById("ma_task").value.trim(),
+        customer_id: document.getElementById("ma_customer").value.trim(),
+    };
+    show("ma-result", "<p>Starting the workflow...</p>", false);
+    try {
+        const result = await api("/api/agents/workflow", { method: "POST", body: JSON.stringify(payload) });
+        if (result.status !== 202) return show("ma-result", errorHtml(result), false);
+        loadWorkflow(result.body.workflow_id);
+    } catch (error) {
+        show("ma-result", requestFailed(error), false);
+    } finally {
+        start.disabled = false;
+    }
+});
+
+document.getElementById("ma-result").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-decision]");
+    if (!button) return;
+    const row = button.parentElement;
+    const workflowId = row.dataset.workflowId;
+    const buttons = row.querySelectorAll("button");
+    buttons.forEach((b) => { b.disabled = true; });  // one decision per click
+    maMessage("");
+    try {
+        const result = await api(`/api/agents/workflow/${encodeURIComponent(workflowId)}/review`, {
+            method: "POST",
+            body: JSON.stringify({
+                decision: button.dataset.decision,
+                note: document.getElementById("ma_note").value,
+                reviewer: document.getElementById("ma_reviewer").value,
+            }),
+        });
+        if (result.ok) return loadWorkflow(workflowId);
+        maMessage(errorHtml(result));
+        // 409: decided elsewhere, so show what it is now; the message stays above the card.
+        if (result.status === 409) return loadWorkflow(workflowId);
+    } catch (error) {
+        maMessage(requestFailed(error));
+    }
+    buttons.forEach((b) => { b.disabled = false; });  // 400 bad note: fix it and try again
+});
+
+document.getElementById("ma-history").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-workflow]");
+    if (!button) return;
+    maMessage("");
+    loadWorkflow(button.dataset.workflow);
+});
+
+document.querySelectorAll("#ma-examples [data-task]").forEach((button) => {
+    button.addEventListener("click", () => {
+        document.getElementById("ma_task").value = button.dataset.task;
+    });
+});
+
+loadHistory();
 </script>
 </body>
 </html>
