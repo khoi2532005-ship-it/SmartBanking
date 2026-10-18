@@ -94,8 +94,9 @@ def run_detection():
                         "ai_explanation": explanation,
                         "explanation_generated_at": datetime.now(timezone.utc).isoformat(),
                     })
-                except Exception:
-                    pass  # alert itself is still valid even if the explanation didn't persist
+                except Exception as exc:
+                    # The alert itself is still valid; only its explanation was not kept.
+                    logger.warning("Act: explanation for alert %s was not saved: %s", alert_id, exc)
                 full_alert["ai_explanation"] = explanation
 
         new_alerts.append(full_alert)

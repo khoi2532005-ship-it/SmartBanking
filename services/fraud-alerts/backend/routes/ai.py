@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify
@@ -6,6 +7,8 @@ from services import database_api, llm_client, mcp_client
 from services.explain import fetch_alert_history, generate_explanation
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
+
+logger = logging.getLogger("fraud.ai")
 
 
 @ai_bp.get("/alerts/<int:alert_id>/explain")
@@ -40,8 +43,9 @@ def explain_alert(alert_id):
                 "ai_explanation": explanation,
                 "explanation_generated_at": datetime.now(timezone.utc).isoformat(),
             })
-        except Exception:
-            pass  # explanation still returned to the caller even if it didn't persist
+        except Exception as exc:
+            # Still returned to the caller; the log says it was not kept.
+            logger.warning("Explanation for alert %s was not saved: %s", alert_id, exc)
 
     counts, problem = history
     return jsonify({
