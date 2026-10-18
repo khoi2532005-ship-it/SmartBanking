@@ -1,4 +1,8 @@
-"""Read endpoint: GET /api/alerts (list_alerts) and its validated filters."""
+"""Read endpoint: GET /api/alerts (list_alerts) and its validated filters.
+
+Nothing here assumes freshly seeded data: as the post-deploy CRUD check this
+runs against a long-lived database that analysts have been working in. CI's
+smoke step checks the seed itself."""
 
 import pytest
 import requests
@@ -10,17 +14,20 @@ def alerts(api, **params):
     return requests.get(f"{api}/api/alerts", params=params, timeout=5)
 
 
-def test_list_returns_the_seeded_alerts_newest_first(api):
+def test_list_returns_alerts_newest_first(api):
     r = alerts(api)
     assert r.status_code == 200
     rows = r.json()
-    assert len(rows) >= 10 and all(REQUIRED <= set(row) for row in rows)
+    assert rows and all(REQUIRED <= set(row) for row in rows)
     assert [row["alert_id"] for row in rows] == sorted((row["alert_id"] for row in rows), reverse=True)
 
 
-@pytest.mark.parametrize("field, value", [("status", "new"), ("customer_id", 1)])
-def test_filters_return_exactly_the_matching_alerts(api, field, value):
-    everything, matching = alerts(api).json(), alerts(api, **{field: value}).json()
+@pytest.mark.parametrize("field", ["status", "customer_id"])
+def test_filters_return_exactly_the_matching_alerts(api, field):
+    everything = alerts(api).json()
+    assert everything, "no alerts to filter: the database holds none"
+    value = everything[0][field]  # a value the data actually has
+    matching = alerts(api, **{field: value}).json()
     assert matching and all(row[field] == value for row in matching)
     assert len(matching) == sum(1 for row in everything if row[field] == value)
 
