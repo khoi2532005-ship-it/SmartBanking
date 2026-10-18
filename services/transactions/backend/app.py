@@ -11,7 +11,7 @@ if str(BASE_DIR) not in sys.path:
 from routes.agents import agents_bp
 from routes.transactions import transactions_bp
 from routes.ui import ui_bp
-from services import llm_client, mcp_client, rag_client
+from services import llm_client, mcp_client, multi_agent_client, rag_client
 
 
 def create_app():
@@ -30,6 +30,7 @@ def create_app():
             "llm": llm_client.provider(),
             "mcp": {"enabled": mcp_client.enabled(), "url": mcp_client.server_url()},
             "rag": {"enabled": rag_client.enabled(), "url": rag_client.server_url()},
+            "multi_agent": {"enabled": multi_agent_client.enabled(), "url": multi_agent_client.server_url()},
         })
 
     return app
