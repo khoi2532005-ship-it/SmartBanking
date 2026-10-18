@@ -1,5 +1,7 @@
 import logging
+import os
 from pathlib import Path
+import re
 import sys
 
 from dotenv import load_dotenv
@@ -39,9 +41,22 @@ from routes.agents import agents_bp
 from services import llm_client, mcp_client, multi_agent_client, rag_client
 
 
+# Browsers call this API from the fraud tabs on port 3003 only - also when the
+# home page frames them, since a framed page keeps its own origin. No other
+# website may read the responses or send JSON, which keeps the Multi-Agent
+# decision route out of their reach. FRAUD_FRONTEND_ORIGINS adds more
+# (comma-separated); server-side callers send no Origin and are unaffected.
+FRAUD_TAB_ORIGIN = re.compile(r"^https?://[^/]+:3003$")
+
+
+def allowed_origins():
+    extra = [origin.strip() for origin in os.getenv("FRAUD_FRONTEND_ORIGINS", "").split(",") if origin.strip()]
+    return [FRAUD_TAB_ORIGIN, *extra]
+
+
 def create_app():
     app = Flask(__name__)
-    CORS(app)
+    CORS(app, origins=allowed_origins())
 
     app.register_blueprint(rules_bp)
     app.register_blueprint(alerts_bp)
