@@ -83,8 +83,10 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The budgeting contract test runs the shared Multi-Agent Server app in
+      # process, so the shared servers' requirements are installed up front.
       - name: Install dependencies
-        run: pip install -r services/budgeting/backend/requirements.txt
+        run: pip install -r services/budgeting/backend/requirements.txt -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-multi-agent.txt
 
       - name: Seed the database
         run: python services/budgeting/database/init_db.py
@@ -110,9 +112,6 @@ jobs:
       # Pure-function tests for the shared MCP and RAG servers. They need no
       # running server, no ChromaDB and no API key: MCP and RAG stay disabled
       # in CI, only their maths and contracts are checked.
-      - name: Install shared MCP/RAG test dependencies
-        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-multi-agent.txt
-
       - name: Run shared MCP and RAG unit tests
         run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py tests/test_multi_agent_server.py -q
 
