@@ -14,6 +14,6 @@ MCP (8100), RAG (8200) and Multi-Agent (8300) servers as host processes, with Ge
 
 The screenshots were taken with headless Chromium (Playwright) driving the real pages.
 
-Still to add:
-- the CI run link and endpoint-test results (`docs/release-2/ci/student-3/`), once `student-3.yml` has run on GitHub;
-- `docs/release-2/security/student-3-precommit.txt`, once the group's `.pre-commit-config.yaml` is on main.
+The CI run link and endpoint-test results are in `docs/release-2/ci/student-3/`.
+
+Still to add: `docs/release-2/security/student-3-precommit.txt`, once the group's `.pre-commit-config.yaml` is on main.

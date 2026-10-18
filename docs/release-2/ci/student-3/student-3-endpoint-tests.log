@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0 -- /opt/hostedtoolcache/Python/3.12.15/x64/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/SmartBanking/SmartBanking/services/fraud-alerts/backend
+collecting ... collected 14 items
+
+tests/post_commit/test_alerts_endpoint.py::test_list_returns_alerts_newest_first PASSED [  7%]
+tests/post_commit/test_alerts_endpoint.py::test_filters_return_exactly_the_matching_alerts[status] PASSED [ 14%]
+tests/post_commit/test_alerts_endpoint.py::test_filters_return_exactly_the_matching_alerts[customer_id] PASSED [ 21%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params0-status must be one of new, reviewed, dismissed, confirmed] PASSED [ 28%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params1-min_amount must be a number] PASSED [ 35%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params2-customer_id must be a positive integer] PASSED [ 42%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params3-date_from must be an ISO date] PASSED [ 50%]
+tests/post_commit/test_rules_endpoint.py::test_rule_crud_cycle PASSED    [ 57%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body0-rule_name is required] PASSED [ 64%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body1-rule_type must be one of] PASSED [ 71%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body2-velocity needs threshold_secondary] PASSED [ 78%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body3-start and end hours must differ] PASSED [ 85%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body4-threshold_value must be a finite number] PASSED [ 92%]
+tests/post_commit/test_rules_endpoint.py::test_form_posts_are_400 PASSED [100%]
+
+- generated xml file: /home/runner/work/SmartBanking/SmartBanking/services/fraud-alerts/backend/reports/student-3-endpoint-tests.xml -
+============================== 14 passed in 0.21s ==============================
