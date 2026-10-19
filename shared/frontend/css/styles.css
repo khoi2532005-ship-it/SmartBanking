@@ -353,6 +353,7 @@ td.num { white-space: nowrap; }
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 1rem;
+    margin-bottom: 1.25rem;
 }
 
 .feature-card {
@@ -401,6 +402,11 @@ td.num { white-space: nowrap; }
 .nav-item:hover { background: var(--brand-tint); color: var(--brand-dark);
                   border-color: transparent; }
 .nav-item.is-active { background: var(--brand); color: #fff; }
+
+/* Tab strip inside a feature tab (Normal | AI Mode), the same nav-item look
+   without the header: used by the budgeting tabs, matches the fraud tabs. */
+.tab-strip { margin: 0 0 1rem; }
+.tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
 
 /* Feature cards are buttons now (htmx-driven), so reset button chrome. */
 button.feature-card {

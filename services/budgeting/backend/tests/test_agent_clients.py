@@ -307,7 +307,7 @@ def test_null_or_missing_body_falls_back_to_defaults():
 # Release 1 panels - status fragments and the frontend wiring
 # ---------------------------------------------------------------------------
 
-FRONTEND_TAB = BASE_DIR.parent / "frontend" / "tabs" / "budgets.html"
+FRONTEND_TAB = BASE_DIR.parent / "frontend" / "tabs" / "ai-mode.html"      # Release 2: the AI panels moved to the AI Mode tab
 
 
 def test_status_fragments_render_the_inactive_state_without_network():
