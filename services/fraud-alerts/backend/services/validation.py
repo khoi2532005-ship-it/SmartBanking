@@ -1,4 +1,4 @@
-"""Request validation for the rules and alerts routes.
+"""Request validation for the rules, alerts and Multi-Agent routes.
 
 Pure functions, so the rules they enforce can be unit-tested without a running
 database service. Each raises ValidationError with a message that is safe to
@@ -6,12 +6,20 @@ show a person; the routes turn it into a 400.
 """
 
 import math
+import re
 from datetime import datetime
 
-from services.constants import ALERT_STATUSES, RULE_TYPES, SEVERITIES
+from services.constants import ALERT_STATUSES, RULE_TYPES, SEVERITIES, WORKFLOW_DECISIONS
 
 RULE_FIELDS = ("rule_name", "rule_type", "threshold_value", "threshold_secondary", "severity", "enabled")
 MAX_RULE_NAME_LENGTH = 100
+
+# The Multi-Agent Server's own limits, checked here so a bad value never makes
+# the round trip. "fraud-ui:<reviewer>" stays inside the server's 100-character "by".
+WORKFLOW_ID = re.compile(r"wf_[0-9a-f]{8}")
+MAX_TASK_LENGTH = 1000
+MAX_NOTE_LENGTH = 1000
+MAX_REVIEWER_LENGTH = 60
 
 
 class ValidationError(ValueError):
@@ -167,3 +175,46 @@ def validate_alert_filters(args):
     if args.get("q"):
         filters["q"] = args["q"]
     return filters
+
+
+def workflow_id(value):
+    """A Multi-Agent workflow id: the only thing this service puts in a server URL.
+    fullmatch, because "$" would also accept a trailing newline."""
+    text = value if isinstance(value, str) else ""
+    if not WORKFLOW_ID.fullmatch(text):
+        raise ValidationError("workflow id must look like wf_1a2b3c4d")
+    return text
+
+
+def validate_workflow_start(data):
+    """(task, customer_id) for a new workflow. Every workflow is about one customer."""
+    task = data.get("task")
+    task = task.strip() if isinstance(task, str) else ""
+    if not task:
+        raise ValidationError("task is required")
+    if len(task) > MAX_TASK_LENGTH:
+        raise ValidationError(f"task must be {MAX_TASK_LENGTH} characters or fewer")
+    return task, positive_int(data.get("customer_id"), "customer_id")
+
+
+def _optional_text(data, field, limit):
+    value = data.get(field)
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValidationError(f"{field} must be text")
+    value = value.strip()
+    if len(value) > limit:
+        raise ValidationError(f"{field} must be {limit} characters or fewer")
+    return value
+
+
+def validate_review(data):
+    """(decision, note, reviewer) for the analyst's decision. Partially accept
+    releases the answer with a correction attached, so it needs the correction."""
+    decision = choice(data.get("decision"), "decision", WORKFLOW_DECISIONS)
+    note = _optional_text(data, "note", MAX_NOTE_LENGTH)
+    reviewer = _optional_text(data, "reviewer", MAX_REVIEWER_LENGTH)
+    if decision == "partially_accept" and not note:
+        raise ValidationError("partially_accept needs a note saying what to correct")
+    return decision, note, reviewer

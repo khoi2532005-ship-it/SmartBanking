@@ -1,0 +1,376 @@
+{
+  "kind": "multi-agent-terminal-validation",
+  "timestamp": "20261017T093135Z",
+  "server_url": "http://localhost:8300",
+  "implementation_version": "27e5ea5",
+  "degraded_stages": [],
+  "model_participation": true,
+  "workflow_ids": [
+    "wf_2440429e",
+    "wf_96da3de4"
+  ],
+  "audit_snapshot": [
+    "docs/evidence/multi_agent/validation-20261017T093135Z/workflow_history.jsonl",
+    "docs/evidence/multi_agent/validation-20261017T093135Z/coordination_audit.jsonl"
+  ],
+  "records": [
+    {
+      "n": 1,
+      "check": "server reachable",
+      "call": "GET /health",
+      "arguments": {},
+      "expected": "service multi-agent-server with a four-stage pipeline",
+      "observed": "HTTP 200; pipeline planner -> worker -> reviewer -> human; roles ['planner', 'worker', 'reviewer']; models {'planner': 'shared AI-Mode model', 'reviewer': 'shared AI-Mode model', 'worker': 'shared AI-Mode model'}; max_revisions 1",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "pipeline": [
+          "planner",
+          "worker",
+          "reviewer",
+          "human"
+        ],
+        "roles": [
+          "planner",
+          "worker",
+          "reviewer"
+        ],
+        "models": {
+          "planner": "shared AI-Mode model",
+          "reviewer": "shared AI-Mode model",
+          "worker": "shared AI-Mode model"
+        },
+        "max_revisions": 1,
+        "stage_timeout_seconds": 60.0,
+        "auth": "open",
+        "audit": {
+          "coordination_audit": "multi_agent_server/data/audit/coordination_audit.jsonl",
+          "workflow_history": "multi_agent_server/data/audit/workflow_history.jsonl"
+        }
+      }
+    },
+    {
+      "n": 2,
+      "check": "full workflow reaches the human gate",
+      "call": "POST /workflow + poll /status",
+      "arguments": {
+        "feature": "budgeting",
+        "request": "Which budget categories went over the limit in September 2026 and by how much?",
+        "context": {
+          "customer_id": 1,
+          "month": 9,
+          "year": 2026
+        }
+      },
+      "expected": "planner, worker and reviewer complete; state awaiting_human_review with plan, evidence and review",
+      "observed": "wf_2440429e -> awaiting_human_review; stages ['planner#1 completed 1.937s', 'worker#1 completed 1.547s', 'reviewer#1 completed 1.8s', 'human#1 running']; plan 2 tasks (model); evidence 1/1 ok; review accept (model)",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "workflow_ids": {
+          "accept": "wf_2440429e"
+        },
+        "stages": [
+          "planner#1 completed 1.937s",
+          "worker#1 completed 1.547s",
+          "reviewer#1 completed 1.8s",
+          "human#1 running"
+        ],
+        "fallbacks": [],
+        "revisions": 0,
+        "plan_source": "model",
+        "plan_tasks": [
+          "t1 api /api/budgets/summary",
+          "t2 analysis"
+        ],
+        "evidence": [
+          "t1 /api/budgets/summary ok"
+        ],
+        "spending_sources": [
+          "transactions-api"
+        ],
+        "finding_count": 1,
+        "result_source": "model",
+        "review_verdict": "accept",
+        "review_source": "model",
+        "criteria_met": "2/2",
+        "defects": 0,
+        "risks": [],
+        "escalated": false
+      }
+    },
+    {
+      "n": 3,
+      "check": "response withheld until a person decides",
+      "call": "GET /workflow/<id>/response",
+      "arguments": {
+        "workflow_id": "wf_2440429e"
+      },
+      "expected": "HTTP 409 with awaiting_decision true; the workflow is listed under /workflows/pending",
+      "observed": "HTTP 409: no response yet: the workflow has not been decided by a human; pending 1 incl. this one: True",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "status": 409,
+        "pending_count": 1,
+        "options": [
+          "accept",
+          "partially_accept",
+          "reject"
+        ]
+      }
+    },
+    {
+      "n": 4,
+      "check": "accept releases the final response",
+      "call": "POST /workflow/<id>/decision",
+      "arguments": {
+        "decision": "accept",
+        "note": "",
+        "by": "validate"
+      },
+      "expected": "state accepted; GET /response is 200 with released true and the Worker's answer",
+      "observed": "decision HTTP 200 -> accepted; response HTTP 200, released True, answer 214 chars, decided_by validate",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "answer": "In September 2026, two budget categories went over their limits. Dining Out exceeded its 300.0 limit by 25.2, with a total spend of 325.2, and Shopping exceeded its 400.0 limit by 74.9, with a total spend of 474.9.",
+        "risks": [],
+        "evidence_sources": [
+          {
+            "endpoint": "/api/budgets/summary",
+            "status": "ok",
+            "task_id": "t1",
+            "url": "http://localhost:5004/api/budgets/summary"
+          }
+        ]
+      }
+    },
+    {
+      "n": 5,
+      "check": "rejected workflow recorded, nothing released",
+      "call": "POST /workflow, then decision reject",
+      "arguments": {
+        "feature": "budgeting",
+        "request": "What did I spend most on in September 2026, and is my overall budget on track?",
+        "context": {
+          "customer_id": 1,
+          "month": 9,
+          "year": 2026
+        },
+        "decision": "reject",
+        "note": "Validation run: rejected on purpose to record the withheld path."
+      },
+      "expected": "state rejected; GET /response is 200 with released false and the note kept",
+      "observed": "wf_96da3de4 -> rejected; response HTTP 200, released False, answer None, note kept True",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "workflow_ids": {
+          "accept": "wf_2440429e",
+          "reject": "wf_96da3de4"
+        },
+        "stages": [
+          "planner#1 completed 2.073s",
+          "worker#1 completed 1.469s",
+          "reviewer#1 completed 4.263s",
+          "human#1 running"
+        ],
+        "fallbacks": [],
+        "revisions": 0,
+        "review_verdict": "accept"
+      }
+    },
+    {
+      "n": 6,
+      "check": "audit files written",
+      "call": "read workflow_history.jsonl and coordination_audit.jsonl",
+      "arguments": {
+        "coordination_audit": "multi_agent_server/data/audit/coordination_audit.jsonl",
+        "workflow_history": "multi_agent_server/data/audit/workflow_history.jsonl"
+      },
+      "expected": "for each workflow above: created, every stage started and finished, the gate state, the exact decision this run posted, and workflow_completed",
+      "observed": "36 history records, 22 coordination records for 2 workflows; per workflow: created, every stage started and finished, the gate state, the decision posted and workflow_completed - all present",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "history_records": 36,
+        "coordination_records": 22,
+        "events": [
+          "stage_completed",
+          "stage_started",
+          "state_changed",
+          "workflow_completed",
+          "workflow_created"
+        ],
+        "decisions": [
+          "awaiting_decision",
+          "handoff",
+          "human_decision",
+          "plan_accepted",
+          "request_accepted",
+          "response_released",
+          "response_withheld",
+          "result_accepted",
+          "review_accepted",
+          "verdict_recorded"
+        ],
+        "human_decisions": [
+          "accept",
+          "reject"
+        ],
+        "missing": [],
+        "workflow_ids": {
+          "accept": "wf_2440429e",
+          "reject": "wf_96da3de4"
+        }
+      }
+    },
+    {
+      "n": 7,
+      "check": "handoff contracts reject off-contract outputs",
+      "call": "contracts.validate_plan / validate_result / validate_review",
+      "arguments": {
+        "plan": "unknown endpoint + another customer",
+        "result": "invented figure",
+        "review": "accept with an unmet criterion"
+      },
+      "expected": "each is rejected with the reasons listed; nothing off-contract reaches the next role",
+      "observed": "plan: task t1: endpoint '/api/customers' is not in the budgeting catalogue ['/api/budgets/summary', '/api/transactions/spending', '/api/budgets', '/api/budgets/insights', '/api/categories']; result: finding 1: the number 9999.00 is not in the evidence; copy figures exactly from it or leave them out; review: verdict accept is not allowed while criteria [1] are unmet; return revise with revision_notes",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "plan": {
+          "rejected": true,
+          "errors": [
+            "task t1: endpoint '/api/customers' is not in the budgeting catalogue ['/api/budgets/summary', '/api/transactions/spending', '/api/budgets', '/api/budgets/insights', '/api/categories']",
+            "task t2: customer_id=2 does not match the context (1)",
+            "task t2: /api/budgets/summary requires customer_id",
+            "at least one analysis task is required, so the Worker has a conclusion to draw from the evidence"
+          ]
+        },
+        "result": {
+          "rejected": true,
+          "errors": [
+            "finding 1: the number 9999.00 is not in the evidence; copy figures exactly from it or leave them out",
+            "answer: the number 9999.00 is not in the evidence; copy figures exactly from it or leave them out"
+          ]
+        },
+        "review": {
+          "rejected": true,
+          "errors": [
+            "verdict accept is not allowed while criteria [1] are unmet; return revise with revision_notes"
+          ]
+        }
+      }
+    },
+    {
+      "n": 8,
+      "check": "feature API down -> structured error, no invented result",
+      "call": "in-process server, budgeting -> http://127.0.0.1:9",
+      "arguments": {
+        "feature": "budgeting",
+        "request": "Which budget categories went over the limit in September 2026 and by how much?",
+        "context": {
+          "customer_id": 1,
+          "month": 9,
+          "year": 2026
+        }
+      },
+      "expected": "state failed; error names the unreachable URL; evidence records carry the errors; worker_blocked audited",
+      "observed": "wf_8625978d -> failed; error: worker: no feature API answered: budgeting service unavailable: connection refused at http://127.0.0.1:9/api/budgets/summary - is the service running?",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "state": "failed",
+        "error": "worker: no feature API answered: budgeting service unavailable: connection refused at http://127.0.0.1:9/api/budgets/summary - is the service running?",
+        "evidence_errors": [
+          "budgeting service unavailable: connection refused at http://127.0.0.1:9/api/budgets/summary - is the service running?",
+          "budgeting service unavailable: connection refused at http://127.0.0.1:9/api/transactions/spending - is the service running?"
+        ],
+        "worker_blocked": true,
+        "result_source": "blocked",
+        "coordination": [
+          "request_accepted",
+          "fallback_applied",
+          "handoff",
+          "worker_blocked",
+          "workflow_failed"
+        ]
+      }
+    },
+    {
+      "n": 9,
+      "check": "coordination metrics computed from the audit files",
+      "call": "GET /metrics",
+      "arguments": {
+        "workflows": "wf_2440429e,wf_96da3de4"
+      },
+      "expected": "rates and stage times derived from the two JSONL files, covering the workflows above",
+      "observed": "HTTP 200; workflows 2 (2 decided); plan acceptance 1.0, worker completion 1.0, handoff success 1.0, defect yield 0.0, rework 0.0, fallback 0.0, human acceptance 0.5; stage s {'human': 0.5, 'planner': 2.005, 'reviewer': 3.031, 'worker': 1.508}; end-to-end s {'to_decision': 7.0, 'to_human_gate': 6.5}",
+      "passed": true,
+      "skipped": false,
+      "detail": {
+        "counts": {
+          "contract_rejections": 0,
+          "coordination_records": 22,
+          "escalations": 0,
+          "fallbacks": 0,
+          "handoff_anomalies": 0,
+          "handoffs": 6,
+          "history_records": 36,
+          "revisions_requested": 0,
+          "stages_finished": {
+            "human": 2,
+            "planner": 2,
+            "reviewer": 2,
+            "worker": 2
+          },
+          "stages_started": {
+            "human": 2,
+            "planner": 2,
+            "reviewer": 2,
+            "worker": 2
+          },
+          "timeouts": 0
+        },
+        "end_to_end_seconds": {
+          "to_decision": 7.0,
+          "to_human_gate": 6.5
+        },
+        "escalation_rate": 0.0,
+        "fallback_rate": 0.0,
+        "handoff_success_rate": 1.0,
+        "human_acceptance_rate": 0.5,
+        "human_decisions": {
+          "accept": 1,
+          "reject": 1
+        },
+        "plan_acceptance_rate": 1.0,
+        "reviewer_defect_yield": 0.0,
+        "rework_ratio": 0.0,
+        "scope": [
+          "wf_2440429e",
+          "wf_96da3de4"
+        ],
+        "stage_seconds": {
+          "human": 0.5,
+          "planner": 2.005,
+          "reviewer": 3.031,
+          "worker": 1.508
+        },
+        "worker_completion_rate": 1.0,
+        "workflows": {
+          "by_final_state": {
+            "accepted": 1,
+            "rejected": 1
+          },
+          "decided": 2,
+          "failed": 0,
+          "total": 2
+        }
+      }
+    }
+  ],
+  "passed": true
+}

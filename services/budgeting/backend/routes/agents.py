@@ -1,30 +1,50 @@
-"""Release 1 JSON API: Frontend -> this backend -> shared MCP server / shared RAG server.
+"""JSON API: Frontend -> this backend -> the shared MCP, RAG and Multi-Agent servers.
 
-The frontend never talks to the shared servers directly; every MCP and RAG
-request goes through here. This is where the feature's own boundary lives:
-only known read-only tools can be invoked, inputs are checked before they
-leave the container, and a server that is down or disabled becomes one
-readable JSON error rather than a stack trace.
+The frontend never talks to the shared servers directly; every request goes
+through here. This is where the feature's own boundary lives: only known
+read-only tools can be invoked, inputs are checked before they leave the
+container, and a server that is down or disabled becomes one readable JSON
+error rather than a stack trace.
 
-    GET  /api/agents/status   both integrations: enabled? reachable? which tools?
+    GET  /api/agents/status   every integration: enabled? reachable? which tools?
     GET  /api/mcp/tools       tools/list relayed from the shared MCP server
     POST /api/mcp/tool        {"tool"?, "arguments"?}  -> structured tool result
     POST /api/rag/query       {"query", "k"?}          -> grounded answer contract
 
+Release 2, the shared Multi-Agent Server (Planner -> Worker -> Reviewer -> human):
+
+    POST /api/multi-agent/workflows                  {"request", "customer_id"?, "month"?, "year"?} -> 202 summary
+    GET  /api/multi-agent/workflows/<id>             summary, for polling (budgeting workflows only)
+    GET  /api/multi-agent/workflows/<id>/review-panel plan, result and review: operator only
+    POST /api/multi-agent/workflows/<id>/decision    {"decision": accept|partially_accept|reject, "note"?, "reviewer"?}: operator only
+    GET  /api/multi-agent/workflows/<id>/response    the approved answer only; 409 until the decision is made
+    GET  /api/multi-agent/pending                    budgeting workflows waiting for a decision: operator only
+
+Two boundaries apply to the Multi-Agent routes. This feature acts only on
+its own workflows: another feature's id is a 404 here. And the operator
+routes (review-panel, decision, pending) are for the person doing the human
+review: every POST must carry the HX-Request or X-Requested-With header,
+which a cross-site form cannot send, and when BUDGET_REVIEWER_TOKEN is set
+the X-Reviewer-Token header must match. A customer only ever receives the
+customer view of the final response.
+
 Status codes: 200 success (including a grounded "insufficient context"
-answer, which is a valid response); 400 bad request; 422 the MCP tool itself
+answer, which is a valid response); 202 workflow started; 400 bad request;
+409 the workflow is not in the state the call needs; 422 the MCP tool itself
 returned isError; 502 protocol error; 503 integration disabled, server
 unreachable, or the RAG server's LLM provider unavailable.
 """
 
 from __future__ import annotations
 
+import hmac
+import os
 from datetime import date
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from routes import json_object
-from services import mcp_client, rag_client
+from services import mcp_client, multi_agent_client, rag_client
 
 agents_bp = Blueprint("agents", __name__)
 
@@ -47,12 +67,23 @@ def _current_period() -> tuple[int, int]:
 
 def _integration_error(exc: Exception):
     """One place that maps client exceptions to (json, status)."""
-    if isinstance(exc, (mcp_client.MCPDisabled, rag_client.RAGDisabled)):
+    if isinstance(exc, (mcp_client.MCPDisabled, rag_client.RAGDisabled, multi_agent_client.MultiAgentDisabled)):
         return jsonify({"error": str(exc), "disabled": True}), 503
-    if isinstance(exc, (mcp_client.MCPUnreachable, rag_client.RAGUnreachable)):
+    if isinstance(exc, (mcp_client.MCPUnreachable, rag_client.RAGUnreachable, multi_agent_client.MultiAgentUnreachable)):
         return jsonify({"error": str(exc), "unreachable": True}), 503
     if isinstance(exc, mcp_client.MCPProtocolError):
         return jsonify({"error": str(exc)}), 502
+    if isinstance(exc, multi_agent_client.MultiAgentError):
+        # The server's own status and reason pass through (400, 404, 409, 413); a
+        # token mismatch is configuration, so it is reported like an unreachable server.
+        body = {"error": str(exc)}
+        for key in ("state", "awaiting_decision", "options", "links"):
+            if key in exc.payload:
+                body[key] = exc.payload[key]
+        if exc.status == 401:
+            body["unreachable"] = True
+            return jsonify(body), 503
+        return jsonify(body), exc.status if 400 <= exc.status < 600 else 502
     if isinstance(exc, rag_client.RAGError):
         body = {"error": str(exc)}
         # A 503 from the RAG server means its LLM was unavailable; it still
@@ -68,7 +99,9 @@ def _integration_error(exc: Exception):
 
 @agents_bp.get("/api/agents/status")
 def agents_status():
-    return jsonify({"mcp": mcp_client.status(), "rag": rag_client.status()})
+    multi_agent = multi_agent_client.status()
+    multi_agent["reviewer_token_required"] = bool(reviewer_token())
+    return jsonify({"mcp": mcp_client.status(), "rag": rag_client.status(), "multi_agent": multi_agent})
 
 
 @agents_bp.get("/api/mcp/tools")
@@ -154,3 +187,173 @@ def rag_query():
         return _integration_error(exc)
     answer["server"] = rag_client.server_url()
     return jsonify(answer)
+
+
+# ---------------------------------------------------------------------------
+# Release 2: the shared Multi-Agent Server
+# ---------------------------------------------------------------------------
+
+_MA_ERRORS = (multi_agent_client.MultiAgentDisabled, multi_agent_client.MultiAgentUnreachable,
+              multi_agent_client.MultiAgentError)
+MAX_REVIEWER_CHARS = 60
+
+
+def reviewer_token() -> str:
+    return os.getenv("BUDGET_REVIEWER_TOKEN", "").strip()
+
+
+def same_origin_marker(headers) -> bool:
+    """HTMX sends HX-Request on every call; scripts send X-Requested-With. A
+    plain cross-site form cannot set either, which is what stops it."""
+    return headers.get("HX-Request", "").lower() == "true" or bool(headers.get("X-Requested-With"))
+
+
+def operator_check(headers, *, state_changing: bool):
+    """None when the caller may use an operator route, else (reason, status)."""
+    if state_changing and not same_origin_marker(headers):
+        return ("this route is for the budgeting panel: send the HX-Request or X-Requested-With header", 403)
+    token = reviewer_token()
+    if token:
+        presented = headers.get("X-Reviewer-Token", "").encode("utf-8", "surrogateescape")
+        if not hmac.compare_digest(presented, token.encode("utf-8")):
+            return ("a reviewer token is required: send X-Reviewer-Token (BUDGET_REVIEWER_TOKEN)", 403)
+    return None
+
+
+def _operator_guard(*, state_changing: bool):
+    refused = operator_check(request.headers, state_changing=state_changing)
+    if refused:
+        reason, status = refused
+        return jsonify({"error": reason, "operator_route": True}), status
+    return None
+
+
+def _budgeting_only(record):
+    """A workflow of another feature does not exist as far as this feature is concerned."""
+    if not multi_agent_client.is_budgeting(record):
+        return jsonify({"error": f"unknown budgeting workflow {record.get('workflow_id')!r}"}), 404
+    return None
+
+
+def _period_from(data):
+    """customer_id, month and year from a JSON body, with the API's usual defaults."""
+    month, year = _current_period()
+    values = {"customer_id": data.get("customer_id", 1), "month": data.get("month") or month, "year": data.get("year") or year}
+    clean = {}
+    for key, value in values.items():
+        if isinstance(value, bool) or (isinstance(value, float) and not value.is_integer()):
+            return None, (jsonify({"error": f"{key} must be an integer"}), 400)
+        try:
+            clean[key] = int(value)
+        except (TypeError, ValueError):
+            return None, (jsonify({"error": f"{key} must be an integer"}), 400)
+    return clean, None
+
+
+@agents_bp.post("/api/multi-agent/workflows")
+def multi_agent_start():
+    if not same_origin_marker(request.headers):          # the panel starts workflows; a cross-site form cannot
+        return jsonify({"error": "send the HX-Request or X-Requested-With header to start a workflow"}), 403
+    data, error = json_object()
+    if error:
+        return error
+    text = str(data.get("request") or "").strip()
+    if not text:
+        return jsonify({"error": "request is required"}), 400
+    if len(text) > multi_agent_client.MAX_REQUEST_CHARS:
+        return jsonify({"error": f"request must be {multi_agent_client.MAX_REQUEST_CHARS} characters or fewer"}), 400
+    scope, error = _period_from(data)
+    if error:
+        return error
+    try:
+        summary = multi_agent_client.start(text, scope["customer_id"], scope["month"], scope["year"])
+    except _MA_ERRORS as exc:
+        return _integration_error(exc)
+    summary["server"] = multi_agent_client.server_url()
+    return jsonify(summary), 202
+
+
+@agents_bp.get("/api/multi-agent/workflows/<workflow_id>")
+def multi_agent_workflow_status(workflow_id):
+    try:
+        summary = multi_agent_client.workflow_status(workflow_id)
+    except _MA_ERRORS as exc:
+        return _integration_error(exc)
+    return _budgeting_only(summary) or jsonify(summary)
+
+
+@agents_bp.get("/api/multi-agent/workflows/<workflow_id>/review-panel")
+def multi_agent_review_panel(workflow_id):
+    """Plan, Worker result and review for the person doing the human review.
+    The Worker's answer here is unreleased: operator route, never a customer's."""
+    refused = _operator_guard(state_changing=False)
+    if refused:
+        return refused
+    try:
+        full = multi_agent_client.workflow(workflow_id)
+    except _MA_ERRORS as exc:
+        return _integration_error(exc)
+    return _budgeting_only(full) or jsonify({key: full.get(key) for key in (
+        "workflow_id", "state", "request", "context", "stages", "revisions", "plan", "result", "review",
+        "decision", "final_response", "error")})
+
+
+@agents_bp.post("/api/multi-agent/workflows/<workflow_id>/decision")
+def multi_agent_decision(workflow_id):
+    refused = _operator_guard(state_changing=True)
+    if refused:
+        return refused
+    data, error = json_object()
+    if error:
+        return error
+    decision = str(data.get("decision") or "").strip()
+    note = str(data.get("note") or "").strip()
+    reviewer = str(data.get("reviewer") or "").strip()
+    if decision.lower().replace(" ", "_").replace("-", "_") not in multi_agent_client.DECISIONS:
+        return jsonify({"error": f"decision must be one of {', '.join(multi_agent_client.DECISIONS)}",
+                        "options": list(multi_agent_client.DECISIONS)}), 400
+    if len(reviewer) > MAX_REVIEWER_CHARS:
+        return jsonify({"error": f"reviewer must be {MAX_REVIEWER_CHARS} characters or fewer"}), 400
+    normalised = decision.lower().replace(" ", "_").replace("-", "_")
+    if normalised == "partially_accept" and not note:
+        return jsonify({"error": "partially_accept needs a note saying what to correct"}), 400
+    if len(note) > multi_agent_client.MAX_NOTE_CHARS:
+        return jsonify({"error": f"note must be {multi_agent_client.MAX_NOTE_CHARS} characters or fewer"}), 400
+    try:
+        multi_agent_client.check_workflow_id(workflow_id)        # the body is valid; now the server
+        summary = multi_agent_client.workflow_status(workflow_id)
+        refused = _budgeting_only(summary)
+        if refused:
+            return refused
+        body = multi_agent_client.decide(workflow_id, decision, note, by=decided_by(reviewer))
+    except _MA_ERRORS as exc:
+        return _integration_error(exc)
+    return jsonify(body)
+
+
+def decided_by(reviewer: str) -> str:
+    """Who decided, for the audit: this feature's panel, and the name the reviewer gave."""
+    return f"budgeting-ui:{reviewer}" if reviewer else "budgeting-ui"
+
+
+@agents_bp.get("/api/multi-agent/workflows/<workflow_id>/response")
+def multi_agent_response(workflow_id):
+    """The only Multi-Agent payload that may reach a customer: the approved answer."""
+    try:
+        final = multi_agent_client.response(workflow_id)
+    except _MA_ERRORS as exc:
+        return _integration_error(exc)
+    return _budgeting_only(final) or jsonify(multi_agent_client.customer_view(final))
+
+
+@agents_bp.get("/api/multi-agent/pending")
+def multi_agent_pending():
+    refused = _operator_guard(state_changing=False)
+    if refused:
+        return refused
+    try:
+        listing = multi_agent_client.pending()
+    except _MA_ERRORS as exc:
+        return _integration_error(exc)
+    mine = [w for w in listing.get("workflows") or [] if multi_agent_client.is_budgeting(w)]
+    return jsonify({**listing, "count": len(mine), "workflows": mine})

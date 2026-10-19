@@ -3,3 +3,6 @@ RULE_TYPES = ("amount_over", "velocity", "unusual_time", "new_recipient_high_val
 SEVERITIES = ("low", "medium", "high")
 
 ALERT_STATUSES = ("new", "reviewed", "dismissed", "confirmed")
+
+# The human's answers on the shared Multi-Agent Server (Lecture 10).
+WORKFLOW_DECISIONS = ("accept", "partially_accept", "reject")

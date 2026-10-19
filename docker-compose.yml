@@ -42,6 +42,17 @@ x-llm-env: &llm-env
   MCP_SERVER_URL: http://host.docker.internal:8100/mcp
   RAG_ENABLED: ${RAG_ENABLED:-true}
   RAG_SERVER_URL: http://host.docker.internal:8200
+  # Release 2: the shared Multi-Agent Server is a host process as well (port
+  # 8300). Same pattern as MCP/RAG: the backends read the flag (defaults on;
+  # CI and the cloud baseline set it off) and the URL; the optional token is
+  # forwarded so a backend can talk to a server that requires one.
+  MULTI_AGENT_ENABLED: ${MULTI_AGENT_ENABLED:-true}
+  MULTI_AGENT_SERVER_URL: http://host.docker.internal:8300
+  MULTI_AGENT_API_TOKEN: ${MULTI_AGENT_API_TOKEN:-}
+  # Release 2: AI-Mode itself (a backend's own LLM calls) has the same kind of
+  # switch, so CI and the cloud baseline can show it off in /api/health. Fraud
+  # reads it first; the other backends use the same name.
+  AI_MODE_ENABLED: ${AI_MODE_ENABLED:-true}
 
 # Docker Desktop resolves host.docker.internal by itself; plain Linux Docker
 # (CI runners, the demo VM) needs this mapping on every backend that calls the
@@ -203,6 +214,9 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       TRANSACTIONS_SOURCE: ${TRANSACTIONS_SOURCE:-seed}
+      # Extra page origins allowed to call fraud-service from a browser, e.g. a
+      # proxied cloud frontend (comma-separated; see .env.example).
+      FRAUD_FRONTEND_ORIGINS: ${FRAUD_FRONTEND_ORIGINS:-}
     extra_hosts: *host-gateway
     depends_on:
       fraud-database-service:

@@ -17,6 +17,9 @@ on:
       - 'rag_server/**'
       - 'prompts/_rag/**'
       - 'prompts/_mcp/**'
+      - 'prompts/_multi_agent/**'
+      - 'multi_agent_server/**'
+      - 'requirements-multi-agent.txt'
       - 'agentic/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
@@ -33,6 +36,9 @@ on:
       - 'rag_server/**'
       - 'prompts/_rag/**'
       - 'prompts/_mcp/**'
+      - 'prompts/_multi_agent/**'
+      - 'multi_agent_server/**'
+      - 'requirements-multi-agent.txt'
       - 'agentic/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
@@ -77,8 +83,10 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The budgeting contract test runs the shared Multi-Agent Server app in
+      # process, so the shared servers' requirements are installed up front.
       - name: Install dependencies
-        run: pip install -r services/budgeting/backend/requirements.txt
+        run: pip install -r services/budgeting/backend/requirements.txt -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-multi-agent.txt
 
       - name: Seed the database
         run: python services/budgeting/database/init_db.py
@@ -94,18 +102,18 @@ jobs:
         env:
           MCP_ENABLED: "false"
           RAG_ENABLED: "false"
+          MULTI_AGENT_ENABLED: "false"
         run: |
           python -m tests.test_agent_clients
+          python -m tests.test_multi_agent_client
+          python -m tests.test_multi_agent_contract
           python -m tests.test_budget_routes
 
       # Pure-function tests for the shared MCP and RAG servers. They need no
       # running server, no ChromaDB and no API key: MCP and RAG stay disabled
       # in CI, only their maths and contracts are checked.
-      - name: Install shared MCP/RAG test dependencies
-        run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
-
       - name: Run shared MCP and RAG unit tests
-        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py -q
+        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py tests/test_multi_agent_server.py -q
 
   # =====================================================================
   # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200
@@ -120,6 +128,7 @@ jobs:
     env:
       MCP_ENABLED: "false"
       RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -157,6 +166,8 @@ jobs:
           probe "htmx-mcp-status"  "http://localhost:5004/ui/mcp/status"
           probe "htmx-mcp-tools"   "http://localhost:5004/ui/mcp/tools"
           probe "htmx-rag-status"  "http://localhost:5004/ui/rag/status"
+          # Release 2 panel fragment answers 200 with the Multi-Agent Server disabled
+          probe "htmx-multi-agent-status" "http://localhost:5004/ui/multi-agent/status"
 
       - name: Verify seeded records and budget calculations
         run: |
@@ -187,6 +198,8 @@ jobs:
           assert h["rag"]["enabled"] is False, h["rag"]
           assert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"]
           assert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"]
+          assert h["multi_agent"]["enabled"] is False, h["multi_agent"]
+          assert h["multi_agent"]["url"].startswith("http://host.docker.internal:8300"), h["multi_agent"]
           print("mcp:", h["mcp"]); print("rag:", h["rag"])'
 
           # The panel status lines render the inactive state, never a broken swap
@@ -194,6 +207,8 @@ jobs:
             || { echo "FAIL /ui/mcp/status did not report the inactive state"; exit 1; }
           curl -s http://localhost:5004/ui/rag/status | grep -q "Inactive" \
             || { echo "FAIL /ui/rag/status did not report the inactive state"; exit 1; }
+          curl -s http://localhost:5004/ui/multi-agent/status | grep -q "Inactive" \
+            || { echo "FAIL /ui/multi-agent/status did not report the inactive state"; exit 1; }
 
           # The frontend tab carries both Release 1 panels
           page=$(curl -s http://localhost:3004/tabs/budgets.html)
@@ -275,6 +290,13 @@ jobs:
           | budgeting-service | \`GET http://localhost:5004/api/budgets\` |
           | budgeting-service | \`GET http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026\` (seeded period) |
           | budgeting-service | \`GET http://localhost:5004/ui/mcp/status\`, \`GET http://localhost:5004/ui/rag/status\` (inactive in CI) |
+          | budgeting-service | \`GET http://localhost:5004/ui/multi-agent/status\` (inactive in CI: MULTI_AGENT_ENABLED=false) |
+
+          ## Release 2 surface (unit-tested, disabled in the smoke stack)
+
+          \`/api/multi-agent/workflows\` (start, poll), \`/review-panel\`, \`/decision\`, \`/pending\` (operator),
+          \`/response\` (customer view); settings MULTI_AGENT_ENABLED, MULTI_AGENT_SERVER_URL,
+          MULTI_AGENT_API_TOKEN, BUDGET_REVIEWER_TOKEN, BUDGET_FRONTEND_ORIGINS.
           | budgeting-frontend-service | \`GET http://localhost:3004/tabs/budgets.html\` |
           MD
 

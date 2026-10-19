@@ -160,6 +160,49 @@ The MCP client (`backend/services/mcp_client.py`) speaks JSON-RPC 2.0 over
 plain HTTP to the stateless streamable-HTTP server, so the image carries no
 MCP SDK. Checks: `python -m tests.test_agent_clients` from `backend/`.
 
+### Release 2: shared Multi-Agent Server
+
+The shared Multi-Agent Server (`python -m multi_agent_server.server`, port
+8300) runs Planner -> Worker -> Reviewer and then waits for a person. This
+backend is the only thing the frontend talks to; `backend/services/multi_agent_client.py`
+is the typed client (flag, 2 s connect timeout, readable message with the
+start command when the server is down, bearer token when one is configured).
+
+| Method | Endpoint | Who | Purpose |
+|---|---|---|---|
+| `POST` | `/api/multi-agent/workflows` | panel | `{"request", "customer_id"?, "month"?, "year"?}` -> 202 summary. Needs the `HX-Request` or `X-Requested-With` header |
+| `GET` | `/api/multi-agent/workflows/<id>` | panel | Summary for polling (budgeting workflows only) |
+| `GET` | `/api/multi-agent/workflows/<id>/review-panel` | operator | Plan, Worker result (unreleased answer) and review |
+| `POST` | `/api/multi-agent/workflows/<id>/decision` | operator | `{"decision": accept \| partially_accept \| reject, "note"?, "reviewer"?}`. Recorded in the audit as `budgeting-ui:<reviewer>` |
+| `GET` | `/api/multi-agent/workflows/<id>/response` | customer | The approved answer only: `answer`, `findings[].statement`, `gaps`, `evidence_endpoints`, and `correction_note` on a partial accept. 409 until the decision is made. A rejected workflow returns only `{workflow_id, decision, released: false}` |
+| `GET` | `/api/multi-agent/pending` | operator | Budgeting workflows waiting for a decision |
+
+Two boundaries: this feature acts only on its own workflows (another
+feature's id is a 404 here), and the operator routes require the same-origin
+marker on every POST (`HX-Request`, which HTMX sends, or `X-Requested-With`)
+plus the `X-Reviewer-Token` header whenever `BUDGET_REVIEWER_TOKEN` is set.
+CORS allows only the frontend origins (ports 3004 and 3000 on any host, plus
+`BUDGET_FRONTEND_ORIGINS`), so another website can neither drive the review
+desk nor read an unreleased answer. The Reviewer's verdict, summary and risks,
+the operator's name and a rejection note never leave the operator routes.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MULTI_AGENT_ENABLED` | `true` | `false` makes every Multi-Agent route answer 503 without any network call. Compose passes it through; CI sets `false` |
+| `MULTI_AGENT_SERVER_URL` | `http://localhost:8300` | Compose sets `http://host.docker.internal:8300` |
+| `MULTI_AGENT_API_TOKEN` | empty | Sent as a bearer token when the server requires one |
+| `MULTI_AGENT_CLIENT_TIMEOUT` | `10` | Read timeout in seconds; every call answers quickly because the server runs the stages in the background |
+| `BUDGET_REVIEWER_TOKEN` | empty | When set, the operator routes and the review-desk fragments require `X-Reviewer-Token` |
+| `BUDGET_FRONTEND_ORIGINS` | empty | Extra browser origins allowed by CORS, comma-separated |
+
+Fragments: `GET /ui/multi-agent/status` (status line), `POST /ui/multi-agent/workflows`
+(start, returns the workflow card), `GET /ui/multi-agent/workflows/<id>` (the
+card polls itself every 2 s until the gate, operator only) and
+`POST /ui/multi-agent/workflows/<id>/decision` (operator only). Checks:
+`python -m tests.test_multi_agent_client` (stubbed transport) and
+`python -m tests.test_multi_agent_contract` (the real server app, in process)
+from `backend/`.
+
 ### HTMX fragments
 
 `/ui/*` returns HTML fragments for the frontend to swap in. The `/api/*` JSON
@@ -186,8 +229,10 @@ cd services\budgeting\backend
 ..\..\.venv\Scripts\python.exe -m tests.test_budget_logic
 ```
 
-13 checks over the budget maths and the mock transactions client. Run in CI by
-`.github/workflows/student-4.yml`.
+13 checks over the budget maths and the mock transactions client, plus
+`tests.test_agent_clients` (MCP and RAG), `tests.test_multi_agent_client` and
+`tests.test_multi_agent_contract` (Release 2) and `tests.test_budget_routes`.
+All run in CI by `.github/workflows/student-4.yml`.
 
 ## Prompts
 

@@ -1,0 +1,21 @@
+Feature: ${feature}
+Request: ${request}
+Plan objective: ${objective}
+
+Success criteria the Reviewer will check:
+${success_criteria}
+
+Analysis tasks to complete:
+${analysis_tasks}
+
+Evidence collected, one block per api task (status, then the summarised response):
+${evidence}
+${feedback}
+Return exactly this JSON shape:
+{
+  "findings": [
+    {"task_id": "<id of the analysis task>", "statement": "<one finding, its figures copied from the evidence>", "evidence": ["<api task id>"]}
+  ],
+  "answer": "<two to five sentences answering the request from the findings>",
+  "gaps": ["<what the evidence could not answer, or an empty list>"]
+}

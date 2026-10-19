@@ -1,6 +1,6 @@
 import logging
 
-from services import account_context, mcp_client
+from services import account_context, llm_client, mcp_client
 from services.llm_client import create_chat_completion, describe_error
 from services.local_servers import BadServerResponse, ServerDisabled, ServerUnavailable
 from services.prompt_loader import load_prompt
@@ -121,7 +121,13 @@ def generate_explanation(alert, rule, history=None):
     run, or the on-demand /explain endpoint) can keep going instead of crashing
     when the LLM is unavailable (e.g. no API key configured). Only the on-demand
     endpoint passes history, so a bulk run makes no MCP call per alert.
+
+    With AI-Mode switched off (AI_MODE_ENABLED=false) it stops before the
+    evidence is built: no Accounts call, no LLM call, a degraded result.
     """
+    if not llm_client.enabled():
+        return f"AI explanation unavailable: {llm_client.DISABLED_MESSAGE}", True
+
     evidence = _build_evidence(alert, rule, history)
 
     try:
