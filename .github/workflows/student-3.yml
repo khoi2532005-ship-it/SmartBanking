@@ -87,7 +87,11 @@ jobs:
         run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
 
       - name: Run agentic loop engine tests
-        run: python -m pytest tests/ -q
+        run: |
+          python -m pytest \
+            tests/test_agentic_loop.py \
+            tests/test_agentic_validation_modes.py \
+            -q
 
       - name: Install the fraud backend's dependencies
         # Only after the engine tests. With Flask installed, the loans and
