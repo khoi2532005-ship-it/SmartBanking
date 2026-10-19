@@ -13,6 +13,9 @@ on:
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-3.yml'
+      - 'multi_agent_server/**'
+      - 'prompts/_multi_agent/**'
+      - 'requirements-multi-agent.txt'
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +28,9 @@ on:
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-3.yml'
+      - 'multi_agent_server/**'
+      - 'prompts/_multi_agent/**'
+      - 'requirements-multi-agent.txt'
   workflow_dispatch:
 
 env:
@@ -83,6 +89,29 @@ jobs:
       - name: Run agentic loop engine tests
         run: python -m pytest tests/ -q
 
+      - name: Install the fraud backend's dependencies
+        # Only after the engine tests. With Flask installed, the loans and
+        # transactions backend tests in tests/ stop skipping, and their two
+        # `app` modules clash in one process. The fraud unit tests import the
+        # backend itself and run the shared Multi-Agent Server in process.
+        run: pip install -r requirements-multi-agent.txt -r services/fraud-alerts/backend/requirements.txt
+
+      - name: Run fraud backend unit tests
+        # Release 2: the Multi-Agent client and routes (against the real
+        # server app, in process), the AI-Mode switch and the CORS rule. No
+        # service, no network, no API key.
+        working-directory: services/fraud-alerts/backend
+        run: python -m pytest tests/unit -q --junitxml=reports/student-3-unit-tests.xml
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-3-unit-tests
+          path: services/fraud-alerts/backend/reports/student-3-unit-tests.xml
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Verify every prompt file the loop loads is non-empty
         run: |
           missing=0
@@ -114,28 +143,22 @@ jobs:
     # a step's own `env:` block is not visible to that step's `if:`.
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Every AI integration stays in the image but is switched off in CI,
+      # where no LLM, MCP, RAG or Multi-Agent server runs for the app. The
+      # compose anchor reads these. GEMINI_API_KEY above feeds only the
+      # host-side, non-blocking agentic-loop step, not the app's AI-Mode.
+      AI_MODE_ENABLED: "false"
+      MCP_ENABLED: "false"
+      RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start the fraud stack (MCP and RAG switched off)
+      - name: Start the fraud stack (every AI integration switched off)
         # fraud-service depends_on accounts and transactions (service_started),
-        # so compose pulls those in too. No API key is needed: the compose
-        # anchor defaults GEMINI_API_KEY to empty and none of the probed
-        # endpoints call the LLM.
-        #
-        # Release 1: the MCP and RAG integration stays in the image but is
-        # switched off in CI, where no MCP or RAG server runs. A throwaway
-        # override sets the flags without editing the shared compose file.
-        run: |
-          cat > "$RUNNER_TEMP/mcp-rag-off.yml" <<'YAML'
-          services:
-            fraud-service:
-              environment:
-                MCP_ENABLED: "false"
-                RAG_ENABLED: "false"
-          YAML
-          docker compose -f "$COMPOSE_FILE" -f "$RUNNER_TEMP/mcp-rag-off.yml" up -d \
-            fraud-database-service fraud-service fraud-frontend-service
+        # so compose pulls those in too. The flags come from the job env
+        # through the compose anchor.
+        run: docker compose -f "$COMPOSE_FILE" up -d fraud-database-service fraud-service fraud-frontend-service
 
       - name: Probe required endpoints
         run: |
@@ -162,15 +185,16 @@ jobs:
           probe "frontend-normal"  "http://localhost:3003/tabs/normal.html"
           probe "frontend-ai-mode" "http://localhost:3003/tabs/ai-mode.html"
 
-      - name: Verify MCP and RAG are retained but switched off
+      - name: Verify every AI integration is retained but switched off
         # Retained: the routes are in the image. Switched off: they answer
         # 503 "disabled" without calling out, and /api/health says so.
         run: |
           curl -s http://localhost:5003/api/health | python3 -c '
           import json, sys
           health = json.load(sys.stdin)
-          assert health["mcp"]["enabled"] is False and health["rag"]["enabled"] is False, health
-          print("PASS /api/health: mcp", health["mcp"], "rag", health["rag"])'
+          for name in ("ai_mode", "mcp", "rag", "multi_agent"):
+              assert health[name]["enabled"] is False, (name, health[name])
+          print("PASS /api/health: every AI integration off:", {n: health[n] for n in ("ai_mode", "mcp", "rag", "multi_agent")})'
 
           disabled() {
             local method="$1" path="$2" body="${3:-}"
@@ -187,6 +211,13 @@ jobs:
           disabled GET  /api/mcp/tools
           disabled POST /api/mcp/tool  '{"customer_id": 1}'
           disabled POST /api/rag/query '{"query": "How does the Fraud Alerts feature get transaction data?"}'
+          disabled GET  /api/ai/alerts/1/explain
+          disabled POST /api/agents/workflow '{"task": "Summarise the alerts by severity", "customer_id": 1}'
+          disabled GET  /api/agents/workflows
+
+          curl -s http://localhost:3003/tabs/ai-mode.html | grep -q 'id="ma-form"' \
+            || { echo "FAIL ai-mode.html lacks the Multi-Agent panel"; exit 1; }
+          echo "PASS ai-mode.html carries the Multi-Agent panel"
 
       - name: Verify seeded records
         # Deliverable: 10+ records in every table this feature owns.
@@ -262,12 +293,77 @@ jobs:
         run: docker compose -f "$COMPOSE_FILE" down -v
 
   # =====================================================================
-  # 4. Evidence gate - run-linked report for the technical report
+  # 4. Endpoint gate - pytest against the running backend (Release 2)
+  #
+  # One read endpoint (GET /api/alerts) and one write endpoint (POST
+  # /api/rules, through a full create-read-update-delete cycle), with every
+  # AI integration switched off. JUnit XML and the log are uploaded for the
+  # report and the agentic loop's testing_review mode.
+  # =====================================================================
+  endpoint-tests:
+    name: Endpoint tests
+    runs-on: ubuntu-latest
+    needs: [build-images, unit-checks]
+    timeout-minutes: 15
+    env:
+      AI_MODE_ENABLED: "false"
+      MCP_ENABLED: "false"
+      RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
+      FRAUD_API_URL: http://localhost:5003
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install pytest requests
+
+      - name: Start fraud-database-service and fraud-service
+        # --no-deps: neither endpoint needs Accounts or Transactions, so a
+        # teammate's image cannot turn this gate red.
+        run: docker compose -f "$COMPOSE_FILE" up -d --build --no-deps fraud-database-service fraud-service
+
+      - name: Wait for the API
+        run: |
+          for attempt in $(seq 1 15); do
+            curl -sf "$FRAUD_API_URL/api/rules" -o /dev/null && { echo "fraud-service ready (attempt $attempt)"; exit 0; }
+            sleep 2
+          done
+          echo "FAIL fraud-service did not answer /api/rules"; exit 1
+
+      - name: Run endpoint tests
+        working-directory: services/fraud-alerts/backend
+        run: |
+          mkdir -p reports
+          python -m pytest tests/post_commit -v --junitxml=reports/student-3-endpoint-tests.xml 2>&1 | tee reports/student-3-endpoint-tests.log
+          exit "${PIPESTATUS[0]}"
+
+      - name: Upload endpoint test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-3-endpoint-tests
+          path: services/fraud-alerts/backend/reports/
+          retention-days: 30
+
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose -f "$COMPOSE_FILE" logs --tail 100 fraud-service fraud-database-service
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" down -v
+
+  # =====================================================================
+  # 5. Evidence gate - run-linked report for the technical report
   # =====================================================================
   evidence-pack:
     name: Evidence pack
     runs-on: ubuntu-latest
-    needs: smoke-check
+    needs: [smoke-check, endpoint-tests]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -290,7 +386,8 @@ jobs:
               "compose": "passed",
               "unit": "passed",
               "smoke": "passed",
-              "mcp_rag_disabled": "passed"
+              "endpoint_tests": "passed",
+              "ai_integrations_disabled": "passed"
             }
           }
           JSON
@@ -309,12 +406,18 @@ jobs:
           ## Gates
 
           - Build: three images built from their Dockerfiles; compose definition validated
-          - Unit: agentic loop engine tests passed; loop prompt files non-empty
+          - Unit: agentic loop engine tests passed; loop prompt files non-empty;
+            fraud backend unit tests passed (JUnit artifact \`student-3-unit-tests\`)
           - Smoke: ports 5013, 5003 and 3003 returned HTTP 200
           - Seed: alert_rules and alerts each hold 10+ records
-          - MCP and RAG: integration retained but switched off (MCP_ENABLED=false,
-            RAG_ENABLED=false); /api/mcp/tools, /api/mcp/tool and /api/rag/query
-            answered 503 "disabled" and /api/health reported both off
+          - AI integrations: AI-Mode, MCP, RAG and Multi-Agent retained but switched
+            off (AI_MODE_ENABLED, MCP_ENABLED, RAG_ENABLED and MULTI_AGENT_ENABLED all
+            false); /api/ai/alerts/1/explain, /api/mcp/tools, /api/mcp/tool,
+            /api/rag/query, /api/agents/workflow and /api/agents/workflows answered
+            503 "disabled" and /api/health reported all four off
+          - Endpoint tests: pytest against the running backend - GET /api/alerts
+            (read) and the POST /api/rules create-read-update-delete cycle (write);
+            JUnit XML and log in the artifact \`student-3-endpoint-tests\`
           - Teardown: \`docker compose down -v\` ran
 
           ## Validated endpoints
@@ -325,6 +428,8 @@ jobs:
           | fraud-service | \`GET http://localhost:5003/api/health\` |
           | fraud-service | \`GET http://localhost:5003/api/rules\` |
           | fraud-service | \`GET http://localhost:5003/api/alerts\` |
+          | fraud-service | \`POST http://localhost:5003/api/agents/workflow\` (503 disabled in CI) |
+          | fraud-service | \`GET http://localhost:5003/api/agents/workflows\` (503 disabled in CI) |
           | fraud-frontend-service | \`GET http://localhost:3003/tabs/normal.html\` |
           | fraud-frontend-service | \`GET http://localhost:3003/tabs/ai-mode.html\` |
 

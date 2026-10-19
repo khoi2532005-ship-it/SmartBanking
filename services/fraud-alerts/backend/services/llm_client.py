@@ -2,7 +2,22 @@ import os
 
 from openai import OpenAI
 
+from services.local_servers import flag_enabled
+
 _PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+
+DISABLED_MESSAGE = "AI-Mode is switched off in this environment (AI_MODE_ENABLED=false)"
+
+
+def enabled():
+    """AI-Mode's own switch (Release 2), read per call like MCP_ENABLED. CI and
+    the cloud baseline turn it off: Explain then answers 503 and detection
+    writes alerts without explanations."""
+    return flag_enabled("AI_MODE_ENABLED")
+
+
+def provider():
+    return _PROVIDER
 
 if _PROVIDER == "ollama":
     _BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
