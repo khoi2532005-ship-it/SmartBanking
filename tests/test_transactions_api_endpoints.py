@@ -10,10 +10,31 @@ import pytest
 TRANSACTIONS_BACKEND = (
     Path(__file__).resolve().parent.parent / "services" / "transactions" / "backend"
 )
-sys.path.insert(0, str(TRANSACTIONS_BACKEND))
 
-from app import app  # noqa: E402
-from routes import transactions as transactions_routes  # noqa: E402
+# Load this backend in isolation so the same pytest process does not leak its
+# top-level `routes` / `services` modules into unrelated feature tests.
+existing_modules = {
+    name: module
+    for name, module in list(sys.modules.items())
+    if name in {"app", "routes", "services"}
+    or name.startswith("app.")
+    or name.startswith("routes.")
+    or name.startswith("services.")
+}
+for name in list(existing_modules):
+    del sys.modules[name]
+
+sys.path.insert(0, str(TRANSACTIONS_BACKEND))
+try:
+    import app as transactions_app  # noqa: E402
+    from routes import transactions as transactions_routes  # noqa: E402
+finally:
+    for name in list(sys.modules):
+        if name in {"app", "routes", "services"} or name.startswith("app.") or name.startswith("routes.") or name.startswith("services."):
+            del sys.modules[name]
+    sys.modules.update(existing_modules)
+
+app = transactions_app.app
 
 
 @pytest.fixture()
