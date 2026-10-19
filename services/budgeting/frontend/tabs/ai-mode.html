@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Budgeting AI Mode - SmartBank</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <!-- Vendored locally so the demo does not depend on network access. -->
+    <script src="/js/htmx.min.js"></script>
+    <style>
+        .inline-edit { display: flex; gap: 0.3rem; align-items: center; }
+        .inline-edit input { width: 92px; }
+        td.actions { white-space: nowrap; }
+        td.actions .btn { margin-left: 0.25rem; }
+        .category { font-weight: 600; }
+        .over-by { color: var(--over); font-weight: 600; }
+        .summary-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .stat {
+            background: var(--ground);
+            border: 1px solid var(--line-soft);
+            border-radius: var(--radius-small);
+            padding: 0.7rem 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+        .stat-label { font-size: 0.74rem; text-transform: uppercase;
+                      letter-spacing: 0.04em; color: var(--ink-faint);
+                      font-weight: 700; }
+        .stat-value { font-size: 1.15rem; font-weight: 650; }
+        .stat-sub { font-size: 0.8rem; color: var(--ink-soft); }
+        .stat-over { background: var(--over-tint); border-color: #f3c2bd; }
+        .stat-over .stat-value { color: var(--over); font-size: 0.95rem; }
+        .stat-ok { background: var(--ok-tint); border-color: #b7e0c7; }
+        .stat-ok .stat-value { color: var(--ok); font-size: 0.95rem; }
+        .insight-card h3 { margin: 0 0 0.5rem; font-size: 0.98rem; }
+        .insight-card p { margin: 0 0 0.6rem; }
+        .insight-meta { margin-bottom: 0 !important; }
+        .insight-history { list-style: none; padding: 0; margin: 0; }
+        .insight-history li { border-top: 1px solid var(--line-soft);
+                              padding: 0.7rem 0; }
+        .insight-history li:first-child { border-top: 0; }
+        .history-head { display: flex; gap: 0.5rem; align-items: center;
+                        margin-bottom: 0.3rem; flex-wrap: wrap; }
+        .insight-history p { margin: 0; font-size: 0.9rem; }
+        .source-note { margin-bottom: 0; }
+        .unbudgeted { margin: 0.5rem 0 0; }
+        /* Release 1: shared MCP and RAG server panels */
+        .status-line { display: flex; gap: 0.5rem; align-items: center;
+                       flex-wrap: wrap; margin: 0.25rem 0 0.9rem;
+                       font-size: 0.87rem; color: var(--ink-soft); }
+        .status-line .status-text { flex: 1 1 240px; min-width: 0; }
+        .status-line .badge { margin-left: 0; }
+        .status-line .btn-small { margin-left: auto; }
+        .rag-form .grow { flex: 1 1 320px; }
+        .rag-form .grow input { width: 100%; }
+        .chips { margin: 0.6rem 0 0; }
+        .chip-btn { border: 1px solid transparent; cursor: pointer; font: inherit;
+                    font-size: 0.78rem; font-weight: 600; line-height: 1.4; }
+        .chip-btn:hover { background: var(--brand-tint); border-color: var(--brand);
+                          color: var(--brand-dark); }
+        .rag-answer { border-left: 4px solid var(--ok); padding-left: 0.75rem; }
+        .rag-insufficient { border-left: 4px solid var(--warn); padding-left: 0.75rem; }
+        .insight-card h4 { margin: 0.7rem 0 0.2rem; font-size: 0.78rem;
+                           text-transform: uppercase; letter-spacing: 0.04em; }
+        /* Release 2: shared Multi-Agent Server panel and review desk */
+        .ma-form .grow { flex: 1 1 320px; }
+        .ma-form .grow textarea { width: 100%; min-height: 3.2rem; resize: vertical; }
+        .ma-card .history-head .badge { margin-left: 0; }
+        .ma-section { border-top: 1px solid var(--line-soft); padding-top: 0.5rem; margin-top: 0.6rem; }
+        .ma-section ul { margin: 0.2rem 0 0.4rem; padding-left: 1.2rem; }
+        .ma-final { border-left: 4px solid var(--ok); padding-left: 0.75rem; }
+        .decision-form textarea, .decision-form input { width: 100%; margin-bottom: 0.4rem; }
+        .decision-form .form-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .desk-row { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 0.6rem; }
+        .desk-row input { width: 220px; }
+        /* Tab strip linking the Normal and AI Mode views, as the fraud tabs do. */
+        .tab-strip { margin: 0 0 1rem; }
+        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
+    </style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="app-shell">
+        <a class="brand" href="http://localhost:3000/">
+            <span class="brand-mark">SB</span>
+            SmartBank
+        </a>
+    </div>
+</header>
+
+<main class="app-shell">
+
+    <nav class="feature-nav tab-strip" aria-label="Budgeting views">
+        <a class="nav-item" href="/tabs/budgets.html">Normal</a>
+        <a class="nav-item is-active" href="/tabs/ai-mode.html" aria-current="page">AI Mode</a>
+    </nav>
+
+    <section class="card">
+        <h2>Budgeting AI Mode</h2>
+        <p class="muted">Customer and period for every panel on this page.</p>
+        <form class="row" id="period-form">
+            <div>
+                <label for="customer_id">Customer</label>
+                <select id="customer_id" name="customer_id">
+                    <option value="1">Customer 1</option>
+                    <option value="2">Customer 2</option>
+                </select>
+            </div>
+            <div>
+                <label for="month">Month</label>
+                <select id="month" name="month">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9" selected>September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div>
+                <label for="year">Year</label>
+                <input id="year" name="year" type="number" value="2026"
+                       min="2020" max="2100" step="1">
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>AI insight</h2>
+        <p class="muted">
+            Sends your budget-versus-actual summary to Gemini and returns advice
+            in plain English.
+        </p>
+
+        <div class="row">
+            <div>
+                <button type="button" class="btn btn-ai"
+                        hx-post="/ui/insight"
+                        hx-target="#insight-panel"
+                        hx-swap="innerHTML"
+                        hx-include="#period-form"
+                        hx-indicator="#insight-spinner">Get AI Insight</button>
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary"
+                        hx-get="/ui/insights"
+                        hx-target="#history-panel"
+                        hx-swap="innerHTML"
+                        hx-include="#period-form">Insight history</button>
+            </div>
+            <div>
+                <span id="insight-spinner" class="htmx-indicator spinner">
+                    Asking the model, this can take a few seconds...
+                </span>
+            </div>
+        </div>
+
+        <div id="insight-panel" class="panel">
+            <p class="empty">No insight requested yet.</p>
+        </div>
+
+        <div id="history-panel" class="panel is-hidden"></div>
+    </section>
+
+    <section class="card">
+        <h2>Budget summary <span class="muted">via MCP</span></h2>
+        <p class="status-line">
+            <span id="mcp-status" class="status-text"
+                  hx-get="/ui/mcp/status"
+                  hx-trigger="load"
+                  hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/mcp/status"
+                    hx-target="#mcp-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
+
+        <div class="row">
+            <div>
+                <button type="button" class="btn btn-ai"
+                        hx-post="/ui/mcp/tool"
+                        hx-target="#mcp-panel"
+                        hx-swap="innerHTML"
+                        hx-include="#period-form"
+                        hx-indicator="#mcp-spinner">Run budgeting_summary</button>
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary"
+                        hx-get="/ui/mcp/tools"
+                        hx-target="#mcp-tools-panel"
+                        hx-swap="innerHTML"
+                        hx-indicator="#mcp-spinner">Registered tools</button>
+            </div>
+            <div>
+                <span id="mcp-spinner" class="htmx-indicator spinner">
+                    Calling...
+                </span>
+            </div>
+        </div>
+
+        <div id="mcp-panel" class="panel">
+            <p class="empty">No tool call made yet.</p>
+        </div>
+
+        <div id="mcp-tools-panel" class="panel is-hidden"></div>
+    </section>
+
+    <section class="card">
+        <h2>Ask the project documents <span class="muted">via RAG</span></h2>
+        <p class="status-line">
+            <span id="rag-status" class="status-text"
+                  hx-get="/ui/rag/status"
+                  hx-trigger="load"
+                  hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/rag/status"
+                    hx-target="#rag-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
+
+        <form class="row rag-form" id="rag-form"
+              hx-post="/ui/rag/query"
+              hx-target="#rag-panel"
+              hx-swap="innerHTML"
+              hx-indicator="#rag-spinner">
+            <div class="grow">
+                <label for="rag-query">Question</label>
+                <input id="rag-query" name="query" type="text" maxlength="1000" required
+                       placeholder="e.g. What does NEAR_LIMIT mean for a budget?">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-ai">Ask</button>
+            </div>
+            <div>
+                <span id="rag-spinner" class="htmx-indicator spinner">
+                    Asking...
+                </span>
+            </div>
+        </form>
+
+        <div class="chips">
+            Try:
+            <button type="button" class="chip chip-btn"
+                    data-question="What does NEAR_LIMIT mean for a budget?">Budget status</button>
+            <button type="button" class="chip chip-btn"
+                    data-question="Which feature is the source of record for customers and accounts?">Source of record</button>
+            <button type="button" class="chip chip-btn"
+                    data-question="Which tools does the shared MCP server expose?">MCP tools</button>
+            <button type="button" class="chip chip-btn"
+                    data-question="What is the weather in Sydney today?">Off-topic</button>
+        </div>
+
+        <div id="rag-panel" class="panel">
+            <p class="empty">No question asked yet.</p>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Budget question <span class="muted">via the Multi-Agent server</span></h2>
+        <p class="status-line">
+            <span id="ma-status" class="status-text"
+                  hx-get="/ui/multi-agent/status"
+                  hx-trigger="load"
+                  hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/multi-agent/status"
+                    hx-target="#ma-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
+
+        <form class="row ma-form" id="ma-form"
+              hx-post="/ui/multi-agent/workflows"
+              hx-target="#ma-panel"
+              hx-swap="innerHTML"
+              hx-include="#period-form"
+              hx-indicator="#ma-spinner"
+              hx-disabled-elt="find button[type=submit]">
+            <div class="grow">
+                <label for="ma-request">Request</label>
+                <textarea id="ma-request" name="request" maxlength="1000" required
+                          placeholder="e.g. Which budget categories went over the limit this period, and by how much?"></textarea>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-ai">Start</button>
+            </div>
+            <div>
+                <span id="ma-spinner" class="htmx-indicator spinner">
+                    Starting...
+                </span>
+            </div>
+        </form>
+
+        <div class="chips">
+            Try:
+            <button type="button" class="chip ma-chip"
+                    data-request="Which budget categories went over the limit this period, and by how much each?">Over budget</button>
+            <button type="button" class="chip ma-chip"
+                    data-request="What did I spend most on this period, and how does it compare with that category's budget?">Top spending</button>
+            <button type="button" class="chip ma-chip"
+                    data-request="Which budgets are close to their limit, and how much is left in each?">Near limit</button>
+        </div>
+
+        <div id="ma-panel" class="panel">
+            <p class="empty">No request started yet.</p>
+        </div>
+    </section>
+
+    <section class="card" id="ma-desk">
+        <h2>Review desk <span class="muted">human review</span></h2>
+        <form class="desk-row" id="ma-desk-form" onsubmit="return false">
+            <div>
+                <label for="ma-token">Reviewer token</label>
+                <input id="ma-token" type="password" autocomplete="off" placeholder="only if the backend requires one">
+            </div>
+            <div>
+                <label for="ma-reviewer-name">Reviewer</label>
+                <input id="ma-reviewer-name" type="text" maxlength="60" placeholder="your name">
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary" id="ma-desk-toggle">Open review desk</button>
+            </div>
+        </form>
+        <div id="ma-desk-body" class="is-hidden">
+            <p class="status-line">
+                <span class="status-text">Pending workflows</span>
+                <button type="button" class="btn btn-secondary btn-small" id="ma-pending-refresh"
+                        hx-get="/ui/multi-agent/pending"
+                        hx-target="#ma-pending"
+                        hx-swap="innerHTML"
+                        hx-trigger="click, ma-decided from:body"
+                        hx-indicator="#ma-desk-spinner">Refresh</button>
+                <span id="ma-desk-spinner" class="htmx-indicator spinner">Loading...</span>
+            </p>
+            <div id="ma-pending" class="panel">
+                <p class="empty">Press Refresh.</p>
+            </div>
+            <div id="ma-desk-card" class="panel"></div>
+        </div>
+    </section>
+
+</main>
+
+<script>
+// The frontend is a separate microservice, so HTMX requests must be sent to
+// the budgets backend/API service rather than to this static host.
+const BUDGETS_API = window.BUDGETS_API || `http://${window.location.hostname}:5004`;
+
+document.body.addEventListener("htmx:configRequest", (event) => {
+    // Only the review desk's requests carry the reviewer token and name: the
+    // pending list, the desk card and the decision. The customer's own
+    // requests (start, response) never do.
+    const path = event.detail.path;
+    const deskRequest = path === "/ui/multi-agent/pending"
+        || (path.startsWith("/ui/multi-agent/workflows/") && !path.endsWith("/response"));
+    if (deskRequest) {
+        const token = document.getElementById("ma-token").value.trim();
+        if (token) event.detail.headers["X-Reviewer-Token"] = token;
+        const reviewer = document.getElementById("ma-reviewer-name").value.trim();
+        if (reviewer && path.endsWith("/decision")) event.detail.parameters["reviewer"] = reviewer;
+    }
+    if (event.detail.path.startsWith("/ui/")) {
+        event.detail.path = BUDGETS_API + event.detail.path;
+    }
+});
+
+// Release 2: the review desk stays closed until opened; the token and name are
+// kept for this browser tab only.
+(function () {
+    const token = document.getElementById("ma-token");
+    const reviewer = document.getElementById("ma-reviewer-name");
+    try {
+        token.value = sessionStorage.getItem("ma-token") || "";
+        reviewer.value = sessionStorage.getItem("ma-reviewer") || "";
+    } catch (e) { /* storage unavailable: the fields still work for this page */ }
+    token.addEventListener("input", () => { try { sessionStorage.setItem("ma-token", token.value); } catch (e) {} });
+    reviewer.addEventListener("input", () => { try { sessionStorage.setItem("ma-reviewer", reviewer.value); } catch (e) {} });
+    const toggle = document.getElementById("ma-desk-toggle");
+    const body = document.getElementById("ma-desk-body");
+    toggle.addEventListener("click", () => {
+        const open = body.classList.toggle("is-hidden") === false;
+        toggle.textContent = open ? "Close review desk" : "Open review desk";
+        if (open) htmx.trigger(body.querySelector("[hx-get]"), "click");
+    });
+})();
+
+// Example requests for the Multi-Agent panel: fill the box, the person presses Start.
+document.body.addEventListener("click", (event) => {
+    const chip = event.target.closest(".ma-chip");
+    if (!chip) return;
+    document.getElementById("ma-request").value = chip.dataset.request;
+});
+
+// Reveal hidden panels the first time they are populated.
+const REVEAL_ON_SWAP = new Set(["history-panel", "mcp-tools-panel"]);
+document.body.addEventListener("htmx:afterSwap", (event) => {
+    if (REVEAL_ON_SWAP.has(event.detail.target.id)) {
+        event.detail.target.classList.remove("is-hidden");
+    }
+});
+
+// Example questions for the RAG panel: fill the box and submit the form.
+document.body.addEventListener("click", (event) => {
+    const chip = event.target.closest(".chip-btn");
+    if (!chip) return;
+    document.getElementById("rag-query").value = chip.dataset.question;
+    const form = document.getElementById("rag-form");
+    form.requestSubmit ? form.requestSubmit() : htmx.trigger(form, "submit");
+});
+
+// Clear the create form once a budget has been created successfully.
+document.body.addEventListener("htmx:afterRequest", (event) => {
+    const form = document.getElementById("create-form");
+    if (event.detail.elt === form && event.detail.successful) {
+        form.reset();
+    }
+});
+
+// Surface network/server failures instead of leaving the panel blank.
+document.body.addEventListener("htmx:responseError", (event) => {
+    event.detail.target.innerHTML =
+        '<p class="alert alert-error">Request failed (HTTP ' +
+        event.detail.xhr.status + "). Is the budgets API running on " +
+        BUDGETS_API + "?</p>";
+});
+
+document.body.addEventListener("htmx:sendError", (event) => {
+    event.detail.target.innerHTML =
+        '<p class="alert alert-error">Could not reach the budgets API at ' +
+        BUDGETS_API + ". Start budgets-api and try again.</p>";
+});
+</script>
+
+</body>
+</html>

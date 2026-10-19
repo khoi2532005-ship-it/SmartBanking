@@ -156,6 +156,7 @@ jobs:
           probe "database-service" "http://localhost:5014/"
           probe "backend-api"      "http://localhost:5004/api/health"
           probe "frontend"         "http://localhost:3004/tabs/budgets.html"
+          probe "frontend-ai-mode" "http://localhost:3004/tabs/ai-mode.html"
           probe "budget-crud"      "http://localhost:5004/api/budgets"
           # The seed is a fixed demo period (September 2026); the current month may
           # legitimately have no budgets, so the summary checks name the period.
@@ -211,8 +212,10 @@ jobs:
           curl -s http://localhost:5004/ui/multi-agent/status | grep -q "Inactive" \
             || { echo "FAIL /ui/multi-agent/status did not report the inactive state"; exit 1; }
 
-          # The frontend tab carries both Release 1 panels
-          page=$(curl -s http://localhost:3004/tabs/budgets.html)
+          # The AI Mode tab carries the Release 1 and Release 2 panels; the Normal tab links to it
+          curl -s http://localhost:3004/tabs/budgets.html | grep -qF 'href="/tabs/ai-mode.html"' \
+            || { echo "FAIL budgets.html lacks the AI Mode tab link"; exit 1; }
+          page=$(curl -s http://localhost:3004/tabs/ai-mode.html)
           for needle in 'hx-post="/ui/mcp/tool"' 'hx-get="/ui/mcp/tools"' 'hx-post="/ui/rag/query"' 'hx-post="/ui/multi-agent/workflows"' 'id="ma-desk"'; do
             printf '%s' "$page" | grep -qF "$needle" \
               || { echo "FAIL frontend tab lacks $needle"; exit 1; }

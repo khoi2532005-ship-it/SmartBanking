@@ -203,12 +203,18 @@ desk card with plan, evidence, findings, review and the decision form) and
 `POST /ui/multi-agent/workflows/<id>/decision` are operator only. The Budgets
 tab carries the panel (status line, request form, customer card) and a Review
 desk section that stays closed until opened, with the reviewer token and name
-fields whose values travel as `X-Reviewer-Token` and `reviewer`. Checks:
+fields whose values travel as `X-Reviewer-Token` and `reviewer`; both are on
+the AI Mode tab. Checks:
 `python -m tests.test_multi_agent_client` (stubbed transport) and
 `python -m tests.test_multi_agent_contract` (the real server app, in process)
 from `backend/`.
 
 ### HTMX fragments
+
+The frontend has two tabs, as fraud and accounts do: `tabs/budgets.html`
+(Normal: the period form, create a budget, budgets this period) and
+`tabs/ai-mode.html` (AI Mode: AI insight, the MCP and RAG panels, the
+Multi-Agent panel and the review desk), linked by a tab strip.
 
 `/ui/*` returns HTML fragments for the frontend to swap in. The `/api/*` JSON
 endpoints are the contract other features consume. Release 1 adds two panels

@@ -57,9 +57,11 @@ Restrict CORS to your frontend origins the way `app.py` does. Add
 ## 4. The fragments and the panel
 
 Copy the Release 2 block at the end of `services/budgeting/backend/routes/ui.py`
-and the two sections at the end of `services/budgeting/frontend/tabs/budgets.html`
+and the two sections at the end of `services/budgeting/frontend/tabs/ai-mode.html`
 (the panel and the review desk), plus the `htmx:configRequest` lines that add
-the token header and the reviewer name. The customer card polls
+the token header and the reviewer name. Budgeting keeps its AI panels on an AI
+Mode tab next to the Normal tab, as the brief describes and as fraud and
+accounts do. The customer card polls
 `/ui/multi-agent/workflows/<id>/response`; the desk card polls itself.
 
 ## 5. Configuration

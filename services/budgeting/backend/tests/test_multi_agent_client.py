@@ -549,7 +549,14 @@ def test_pending_fragment_lists_budgeting_workflows_for_the_desk():
 
 
 def test_frontend_tab_wires_the_multi_agent_panel_and_desk():
-    html = (BASE_DIR.parent / "frontend" / "tabs" / "budgets.html").read_text(encoding="utf-8")
+    tabs = BASE_DIR.parent / "frontend" / "tabs"
+    html = (tabs / "ai-mode.html").read_text(encoding="utf-8")
+    normal = (tabs / "budgets.html").read_text(encoding="utf-8")
+    # the Normal tab keeps the budget sections and links to the AI Mode tab; every AI panel lives on the AI Mode tab
+    assert 'href="/tabs/ai-mode.html"' in normal and 'id="create-form"' in normal and 'hx-get="/ui/budgets"' in normal
+    for ai_only in ('hx-post="/ui/insight"', 'hx-post="/ui/mcp/tool"', 'hx-post="/ui/rag/query"', 'hx-post="/ui/multi-agent/workflows"', 'id="ma-desk"'):
+        assert ai_only not in normal and ai_only in html, ai_only
+    assert 'href="/tabs/budgets.html"' in html and 'id="period-form"' in html
     for needle in (
         'hx-get="/ui/multi-agent/status"', 'hx-post="/ui/multi-agent/workflows"', 'hx-get="/ui/multi-agent/pending"',
         'id="ma-panel"', 'id="ma-desk"', 'id="ma-desk-card"', 'id="ma-pending"', 'name="request"', 'maxlength="1000"',
