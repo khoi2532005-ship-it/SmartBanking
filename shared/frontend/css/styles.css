@@ -353,7 +353,7 @@ td.num { white-space: nowrap; }
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 1rem;
-    margin-bottom: 1.25rem;   /* same spacing as .card, so the card below does not touch the grid */
+    margin-bottom: 1.25rem;
 }
 
 .feature-card {
