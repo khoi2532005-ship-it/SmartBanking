@@ -3,31 +3,25 @@
 The server is a host process (python -m multi_agent_server.server) reached at
 MULTI_AGENT_SERVER_URL (http://host.docker.internal:8300 in Compose). A
 request becomes a workflow that runs Planner -> Worker -> Reviewer and then
-waits for a person; nothing is released until that decision is posted.
+waits for a person; the final response exists only after that decision.
 
-    start()            POST /workflow                      -> 202 summary {workflow_id, state, stages}
-    workflow_status()  GET  /workflow/<id>/status          -> summary, for polling
-    workflow()         GET  /workflow/<id>                 -> plan, result and review (operator only)
-    decide()           POST /workflow/<id>/decision        -> accept | partially_accept | reject (+ note)
-    response()         GET  /workflow/<id>/response        -> the final response; 409 until decided
-    pending()          GET  /workflows/pending
+    start()            POST /workflow                 -> 202 summary {workflow_id, state, stages}
+    workflow_status()  GET  /workflow/<id>/status     -> summary: state, stages, decision, released
+    workflow()         GET  /workflow/<id>            -> the whole record: plan, result, review, decision, final_response
+    decide()           POST /workflow/<id>/decision   -> accept | partially_accept | reject (+ note, by)
+    history()          GET  /workflows                -> every workflow the server holds, newest first
 
-Who may see what: `customer_view(response())` is the only payload that may
-reach a customer: the approved answer and its findings, nothing the Reviewer
-or the operator wrote. `workflow()` carries the Worker's unreleased answer
-and the Reviewer's verdict and exists for the person doing the human review;
-it belongs on the operator's review desk and nowhere else. Every call that
-names a workflow checks the id's shape first, so nothing but a workflow id is
-ever placed in a server URL.
+Every call that names a workflow checks the id's shape first, so nothing but
+a workflow id is ever placed in a server URL. The routes keep this feature to
+its own workflows with is_budgeting().
 
 - MULTI_AGENT_ENABLED=false raises MultiAgentDisabled before any network call (CI).
 - A server that is down raises MultiAgentUnreachable with a readable message
-  and a 2s connect timeout. Every call here answers quickly (the server runs
+  and a 2 s connect timeout. Every call here answers quickly (the server runs
   the stages in the background), so the read timeout is short
-  (MULTI_AGENT_CLIENT_TIMEOUT, default 10s).
+  (MULTI_AGENT_CLIENT_TIMEOUT, default 10 s).
 - A non-2xx reply raises MultiAgentError carrying the status and the server's
-  own error message; a 409 from response() means the workflow is still
-  waiting for its decision, which the UI shows as such.
+  own error message; a 409 from decide() means the workflow is not waiting.
 - MULTI_AGENT_API_TOKEN, when set, is sent as a bearer token on every call.
 """
 
@@ -50,7 +44,6 @@ DECISIONS = ("accept", "partially_accept", "reject")
 STATE_AWAITING = "awaiting_human_review"
 TERMINAL_STATES = ("accepted", "partially_accepted", "rejected", "failed")
 _SUMMARY_KEYS = ("workflow_id", "state", "stages")
-_RESPONSE_KEYS = ("workflow_id", "decision", "released")
 WORKFLOW_ID = re.compile(r"^wf_[0-9a-f]{8}$")
 
 
@@ -178,7 +171,7 @@ def workflow_status(workflow_id: str) -> dict[str, Any]:
 
 
 def workflow(workflow_id: str) -> dict[str, Any]:
-    """The full record: plan, result (unreleased answer) and review. Operator only."""
+    """The whole record: stages, plan, result, review, decision and final response."""
     workflow_id = check_workflow_id(workflow_id)
     status_code, payload = _request("GET", f"/workflow/{workflow_id}")
     return _validate_summary(_expect(status_code, payload))
@@ -204,67 +197,14 @@ def decide(workflow_id: str, decision: str, note: str = "", by: str = "budgeting
     return _validate_summary(_expect(status_code, payload))
 
 
-def response(workflow_id: str) -> dict[str, Any]:
-    """The final response as the server holds it (operator view).
-    Raises MultiAgentError(409) while the decision is pending."""
-    workflow_id = check_workflow_id(workflow_id)
-    status_code, payload = _request("GET", f"/workflow/{workflow_id}/response")
-    payload = _expect(status_code, payload)
-    missing = [k for k in _RESPONSE_KEYS if k not in payload]
-    if missing:
-        raise MultiAgentError(502, f"final response is missing required fields: {', '.join(missing)}", payload)
-    return payload
-
-
-def customer_summary(summary: dict[str, Any]) -> dict[str, Any]:
-    """The poll view for the person who asked: progress only. The reviewer's
-    name, a rejection note and internal error text stay on the operator side."""
-    decision = summary.get("decision") or {}
-    return {
-        "workflow_id": summary.get("workflow_id"),
-        "feature": summary.get("feature"),
-        "state": summary.get("state"),
-        "created_at": summary.get("created_at"),
-        "updated_at": summary.get("updated_at"),
-        "stages": [{"role": s.get("role"), "status": s.get("status"), "duration_seconds": s.get("duration_seconds")}
-                   for s in summary.get("stages") or []],
-        "decision": decision.get("decision"),
-        "released": bool(summary.get("released")),
-        "failed": summary.get("state") == "failed",
-    }
-
-
-def customer_view(final: dict[str, Any]) -> dict[str, Any]:
-    """What a customer may receive: the approved answer, nothing about the review.
-
-    Accept and partially accept release the answer, its findings, the gaps the
-    Worker named, the endpoints the evidence came from (paths only, no internal
-    URLs) and, for a partial accept, the correction the person attached.
-    Reject releases nothing beyond the fact of the decision. The Reviewer's
-    verdict, summary and risks, the operator's name and the rejection note
-    stay on the operator's side.
-    """
-    if not final.get("released"):
-        return {"workflow_id": final.get("workflow_id"), "decision": final.get("decision"), "released": False}
-    view = {
-        "workflow_id": final.get("workflow_id"),
-        "decision": final.get("decision"),
-        "released": True,
-        "released_at": final.get("released_at"),
-        "answer": final.get("answer") or "",
-        "findings": [{"statement": f.get("statement", "")} for f in final.get("findings") or [] if isinstance(f, dict)],
-        "gaps": [str(g) for g in final.get("gaps") or []],
-        "evidence_endpoints": sorted({str(e.get("endpoint")) for e in final.get("evidence_sources") or []
-                                      if isinstance(e, dict) and e.get("endpoint")}),
-    }
-    if final.get("decision") == "partially_accept" and final.get("correction_note"):
-        view["correction_note"] = final["correction_note"]
-    return view
-
-
-def pending() -> dict[str, Any]:
-    status_code, payload = _request("GET", "/workflows/pending")
-    return _expect(status_code, payload)
+def history() -> list[dict[str, Any]]:
+    """Every workflow the server holds, all features, newest first."""
+    status_code, payload = _request("GET", "/workflows")
+    if status_code != 200:
+        _expect(status_code, payload)                      # raises with the server's reason
+    if not isinstance(payload, list) or not all(isinstance(w, dict) for w in payload):
+        raise MultiAgentError(502, "Multi-Agent Server returned a non-list workflow listing")
+    return sorted(payload, key=lambda w: str(w.get("created_at") or ""), reverse=True)
 
 
 def health() -> dict[str, Any]:

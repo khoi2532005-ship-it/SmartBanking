@@ -151,7 +151,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
         state = request.args.get("state")
         if state and not is_valid_state(state):
             return jsonify({"error": f"unknown state {state!r}", "states": list(State.ALL)}), 400
-        return jsonify([w.summary() for w in store.list(state)])
+        return jsonify([{**w.summary(), "request": w.request, "context": w.context} for w in store.list(state)])
 
     @app.get("/workflow/<workflow_id>")
     def get_workflow(workflow_id: str):

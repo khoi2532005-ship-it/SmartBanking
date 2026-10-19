@@ -168,23 +168,18 @@ backend is the only thing the frontend talks to; `backend/services/multi_agent_c
 is the typed client (flag, 2 s connect timeout, readable message with the
 start command when the server is down, bearer token when one is configured).
 
-| Method | Endpoint | Who | Purpose |
-|---|---|---|---|
-| `POST` | `/api/multi-agent/workflows` | panel | `{"request", "customer_id"?, "month"?, "year"?}` -> 202 summary. Needs the `HX-Request` or `X-Requested-With` header |
-| `GET` | `/api/multi-agent/workflows/<id>` | panel | Summary for polling (budgeting workflows only) |
-| `GET` | `/api/multi-agent/workflows/<id>/review-panel` | operator | Plan, Worker result (unreleased answer) and review |
-| `POST` | `/api/multi-agent/workflows/<id>/decision` | operator | `{"decision": accept \| partially_accept \| reject, "note"?, "reviewer"?}`. Recorded in the audit as `budgeting-ui:<reviewer>` |
-| `GET` | `/api/multi-agent/workflows/<id>/response` | customer | The approved answer only: `answer`, `findings[].statement`, `gaps`, `evidence_endpoints`, and `correction_note` on a partial accept. 409 until the decision is made. A rejected workflow returns only `{workflow_id, decision, released: false}` |
-| `GET` | `/api/multi-agent/pending` | operator | Budgeting workflows waiting for a decision |
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/multi-agent/workflows` | `{"request", "customer_id"?, "month"?, "year"?}` -> 202 summary. Needs the `HX-Request` or `X-Requested-With` header |
+| `GET` | `/api/multi-agent/workflows` | The most recent budgeting workflows, newest first (history) |
+| `GET` | `/api/multi-agent/workflows/<id>` | The whole workflow: stages, plan, Worker result, review, decision and final response (budgeting workflows only) |
+| `POST` | `/api/multi-agent/workflows/<id>/decision` | `{"decision": accept \| partially_accept \| reject, "note"?, "reviewer"?}`. Recorded in the audit as `budgeting-ui:<reviewer>` |
 
 Two boundaries: this feature acts only on its own workflows (another
-feature's id is a 404 here), and the operator routes require the same-origin
-marker on every POST (`HX-Request`, which HTMX sends, or `X-Requested-With`)
-plus the `X-Reviewer-Token` header whenever `BUDGET_REVIEWER_TOKEN` is set.
-CORS allows only the frontend origins (ports 3004 and 3000 on any host, plus
-`BUDGET_FRONTEND_ORIGINS`), so another website can neither drive the review
-desk nor read an unreleased answer. The Reviewer's verdict, summary and risks,
-the operator's name and a rejection note never leave the operator routes.
+feature's id is a 404 here), and every POST needs the same-origin marker
+(`HX-Request`, which HTMX sends, or `X-Requested-With`), which a cross-site
+form cannot set. CORS allows only the frontend origins (ports 3004 and 3000
+on any host, plus `BUDGET_FRONTEND_ORIGINS`).
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -192,19 +187,18 @@ the operator's name and a rejection note never leave the operator routes.
 | `MULTI_AGENT_SERVER_URL` | `http://localhost:8300` | Compose sets `http://host.docker.internal:8300` |
 | `MULTI_AGENT_API_TOKEN` | empty | Sent as a bearer token when the server requires one |
 | `MULTI_AGENT_CLIENT_TIMEOUT` | `10` | Read timeout in seconds; every call answers quickly because the server runs the stages in the background |
-| `BUDGET_REVIEWER_TOKEN` | empty | When set, the operator routes and the review-desk fragments require `X-Reviewer-Token` |
 | `BUDGET_FRONTEND_ORIGINS` | empty | Extra browser origins allowed by CORS, comma-separated |
 
 Fragments: `GET /ui/multi-agent/status` (status line); `POST /ui/multi-agent/workflows`
-(start) and `GET /ui/multi-agent/workflows/<id>/response` return the customer
-card, which polls itself every 2 s and ends with only the approved answer;
-`GET /ui/multi-agent/pending`, `GET /ui/multi-agent/workflows/<id>` (the review
-desk card with plan, evidence, findings, review and the decision form) and
-`POST /ui/multi-agent/workflows/<id>/decision` are operator only. The Budgets
-tab carries the panel (status line, request form, customer card) and a Review
-desk section that stays closed until opened, with the reviewer token and name
-fields whose values travel as `X-Reviewer-Token` and `reviewer`; both are on
-the AI Mode tab. Checks:
+(start) and `GET /ui/multi-agent/workflows/<id>` return the one card that
+carries the whole workflow: it polls itself every 2 s while the stages run,
+shows the plan, the evidence and findings, and the review with its risks, and
+once the state is `awaiting_human_review` the decision block (reviewer name,
+note, Accept / Partially accept / Reject) appears inside the same card.
+`POST /ui/multi-agent/workflows/<id>/decision` returns the card with the
+final response, released or withheld; `GET /ui/multi-agent/history` lists the
+most recent budgeting workflows with an Open button each. The panel sits on
+the AI Mode tab under the MCP and RAG panels. Checks:
 `python -m tests.test_multi_agent_client` (stubbed transport) and
 `python -m tests.test_multi_agent_contract` (the real server app, in process)
 from `backend/`.
@@ -213,8 +207,9 @@ from `backend/`.
 
 The frontend has two tabs, as fraud and accounts do: `tabs/budgets.html`
 (Normal: the period form, create a budget, budgets this period) and
-`tabs/ai-mode.html` (AI Mode: AI insight, the MCP and RAG panels, the
-Multi-Agent panel and the review desk), linked by a tab strip.
+`tabs/ai-mode.html` (AI Mode: AI insight, the MCP and RAG panels and the
+Multi-Agent panel), linked by a tab strip. Neither tab carries its own
+SmartBank header: the shared home page on port 3000 frames them.
 
 `/ui/*` returns HTML fragments for the frontend to swap in. The `/api/*` JSON
 endpoints are the contract other features consume. Release 1 adds two panels

@@ -14,19 +14,14 @@ error rather than a stack trace.
 Release 2, the shared Multi-Agent Server (Planner -> Worker -> Reviewer -> human):
 
     POST /api/multi-agent/workflows                  {"request", "customer_id"?, "month"?, "year"?} -> 202 summary
-    GET  /api/multi-agent/workflows/<id>             progress only, for polling (budgeting workflows only)
-    GET  /api/multi-agent/workflows/<id>/review-panel plan, result and review: operator only
-    POST /api/multi-agent/workflows/<id>/decision    {"decision": accept|partially_accept|reject, "note"?, "reviewer"?}: operator only
-    GET  /api/multi-agent/workflows/<id>/response    the approved answer only; 409 until the decision is made
-    GET  /api/multi-agent/pending                    budgeting workflows waiting for a decision: operator only
+    GET  /api/multi-agent/workflows                  the most recent budgeting workflows (history)
+    GET  /api/multi-agent/workflows/<id>             the whole workflow: stages, plan, result, review, decision, final response
+    POST /api/multi-agent/workflows/<id>/decision    {"decision": accept|partially_accept|reject, "note"?, "reviewer"?}
 
 Two boundaries apply to the Multi-Agent routes. This feature acts only on
-its own workflows: another feature's id is a 404 here. And the operator
-routes (review-panel, decision, pending) are for the person doing the human
-review: every POST must carry the HX-Request or X-Requested-With header,
-which a cross-site form cannot send, and when BUDGET_REVIEWER_TOKEN is set
-the X-Reviewer-Token header must match. A customer only ever receives the
-customer view of the final response.
+its own workflows: another feature's id is a 404 here. And every POST must
+carry the HX-Request or X-Requested-With header, which a cross-site form
+cannot send, so no other website can start a workflow or decide one.
 
 Status codes: 200 success (including a grounded "insufficient context"
 answer, which is a valid response); 202 workflow started; 400 bad request;
@@ -37,8 +32,6 @@ unreachable, or the RAG server's LLM provider unavailable.
 
 from __future__ import annotations
 
-import hmac
-import os
 from datetime import date
 
 from flask import Blueprint, jsonify, request
@@ -99,9 +92,7 @@ def _integration_error(exc: Exception):
 
 @agents_bp.get("/api/agents/status")
 def agents_status():
-    multi_agent = multi_agent_client.status()
-    multi_agent["reviewer_token_required"] = bool(reviewer_token())
-    return jsonify({"mcp": mcp_client.status(), "rag": rag_client.status(), "multi_agent": multi_agent})
+    return jsonify({"mcp": mcp_client.status(), "rag": rag_client.status(), "multi_agent": multi_agent_client.status()})
 
 
 @agents_bp.get("/api/mcp/tools")
@@ -196,10 +187,9 @@ def rag_query():
 _MA_ERRORS = (multi_agent_client.MultiAgentDisabled, multi_agent_client.MultiAgentUnreachable,
               multi_agent_client.MultiAgentError)
 MAX_REVIEWER_CHARS = 60
-
-
-def reviewer_token() -> str:
-    return os.getenv("BUDGET_REVIEWER_TOKEN", "").strip()
+HISTORY_LIMIT = 10
+WORKFLOW_KEYS = ("workflow_id", "feature", "state", "request", "context", "created_at", "updated_at", "stages",
+                 "revisions", "plan", "result", "review", "decision", "final_response", "error")
 
 
 def same_origin_marker(headers) -> bool:
@@ -208,23 +198,9 @@ def same_origin_marker(headers) -> bool:
     return headers.get("HX-Request", "").lower() == "true" or bool(headers.get("X-Requested-With"))
 
 
-def operator_check(headers, *, state_changing: bool):
-    """None when the caller may use an operator route, else (reason, status)."""
-    if state_changing and not same_origin_marker(headers):
-        return ("this route is for the budgeting panel: send the HX-Request or X-Requested-With header", 403)
-    token = reviewer_token()
-    if token:
-        presented = headers.get("X-Reviewer-Token", "").encode("utf-8", "surrogateescape")
-        if not hmac.compare_digest(presented, token.encode("utf-8")):
-            return ("a reviewer token is required: send X-Reviewer-Token (BUDGET_REVIEWER_TOKEN)", 403)
-    return None
-
-
-def _operator_guard(*, state_changing: bool):
-    refused = operator_check(request.headers, state_changing=state_changing)
-    if refused:
-        reason, status = refused
-        return jsonify({"error": reason, "operator_route": True}), status
+def _same_origin_guard():
+    if not same_origin_marker(request.headers):
+        return jsonify({"error": "this route is for the budgeting panel: send the HX-Request or X-Requested-With header"}), 403
     return None
 
 
@@ -252,8 +228,9 @@ def _period_from(data):
 
 @agents_bp.post("/api/multi-agent/workflows")
 def multi_agent_start():
-    if not same_origin_marker(request.headers):          # the panel starts workflows; a cross-site form cannot
-        return jsonify({"error": "send the HX-Request or X-Requested-With header to start a workflow"}), 403
+    refused = _same_origin_guard()
+    if refused:
+        return refused
     data, error = json_object()
     if error:
         return error
@@ -273,34 +250,32 @@ def multi_agent_start():
     return jsonify(summary), 202
 
 
-@agents_bp.get("/api/multi-agent/workflows/<workflow_id>")
-def multi_agent_workflow_status(workflow_id):
+@agents_bp.get("/api/multi-agent/workflows")
+def multi_agent_history():
+    """The most recent budgeting workflows, newest first, for the panel's history list."""
     try:
-        summary = multi_agent_client.workflow_status(workflow_id)
+        listing = multi_agent_client.history()
     except _MA_ERRORS as exc:
         return _integration_error(exc)
-    return _budgeting_only(summary) or jsonify(multi_agent_client.customer_summary(summary))
+    mine = [w for w in listing if multi_agent_client.is_budgeting(w)][:HISTORY_LIMIT]
+    return jsonify({"count": len(mine), "workflows": mine})
 
 
-@agents_bp.get("/api/multi-agent/workflows/<workflow_id>/review-panel")
-def multi_agent_review_panel(workflow_id):
-    """Plan, Worker result and review for the person doing the human review.
-    The Worker's answer here is unreleased: operator route, never a customer's."""
-    refused = _operator_guard(state_changing=False)
-    if refused:
-        return refused
+@agents_bp.get("/api/multi-agent/workflows/<workflow_id>")
+def multi_agent_workflow(workflow_id):
+    """The whole workflow, for polling and for the panel: the stages while it
+    runs, then the plan, the Worker result and the review, and once the
+    person has decided, the decision and the final response."""
     try:
         full = multi_agent_client.workflow(workflow_id)
     except _MA_ERRORS as exc:
         return _integration_error(exc)
-    return _budgeting_only(full) or jsonify({key: full.get(key) for key in (
-        "workflow_id", "state", "request", "context", "stages", "revisions", "plan", "result", "review",
-        "decision", "final_response", "error")})
+    return _budgeting_only(full) or jsonify({key: full.get(key) for key in WORKFLOW_KEYS})
 
 
 @agents_bp.post("/api/multi-agent/workflows/<workflow_id>/decision")
 def multi_agent_decision(workflow_id):
-    refused = _operator_guard(state_changing=True)
+    refused = _same_origin_guard()
     if refused:
         return refused
     data, error = json_object()
@@ -309,12 +284,12 @@ def multi_agent_decision(workflow_id):
     decision = str(data.get("decision") or "").strip()
     note = str(data.get("note") or "").strip()
     reviewer = str(data.get("reviewer") or "").strip()
-    if decision.lower().replace(" ", "_").replace("-", "_") not in multi_agent_client.DECISIONS:
+    normalised = decision.lower().replace(" ", "_").replace("-", "_")
+    if normalised not in multi_agent_client.DECISIONS:
         return jsonify({"error": f"decision must be one of {', '.join(multi_agent_client.DECISIONS)}",
                         "options": list(multi_agent_client.DECISIONS)}), 400
     if len(reviewer) > MAX_REVIEWER_CHARS:
         return jsonify({"error": f"reviewer must be {MAX_REVIEWER_CHARS} characters or fewer"}), 400
-    normalised = decision.lower().replace(" ", "_").replace("-", "_")
     if normalised == "partially_accept" and not note:
         return jsonify({"error": "partially_accept needs a note saying what to correct"}), 400
     if len(note) > multi_agent_client.MAX_NOTE_CHARS:
@@ -334,26 +309,3 @@ def multi_agent_decision(workflow_id):
 def decided_by(reviewer: str) -> str:
     """Who decided, for the audit: this feature's panel, and the name the reviewer gave."""
     return f"budgeting-ui:{reviewer}" if reviewer else "budgeting-ui"
-
-
-@agents_bp.get("/api/multi-agent/workflows/<workflow_id>/response")
-def multi_agent_response(workflow_id):
-    """The only Multi-Agent payload that may reach a customer: the approved answer."""
-    try:
-        final = multi_agent_client.response(workflow_id)
-    except _MA_ERRORS as exc:
-        return _integration_error(exc)
-    return _budgeting_only(final) or jsonify(multi_agent_client.customer_view(final))
-
-
-@agents_bp.get("/api/multi-agent/pending")
-def multi_agent_pending():
-    refused = _operator_guard(state_changing=False)
-    if refused:
-        return refused
-    try:
-        listing = multi_agent_client.pending()
-    except _MA_ERRORS as exc:
-        return _integration_error(exc)
-    mine = [w for w in listing.get("workflows") or [] if multi_agent_client.is_budgeting(w)]
-    return jsonify({**listing, "count": len(mine), "workflows": mine})

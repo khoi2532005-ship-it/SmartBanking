@@ -98,9 +98,8 @@ def _run_contract(check):
     if SERVER_IMPORT_ERROR is not None:
         raise AssertionError(f"multi_agent_server not importable: {SERVER_IMPORT_ERROR}")
     saved_request, saved_fetch = ma._request, evidence.fetch
-    saved_env = {k: os.environ.get(k) for k in ("MULTI_AGENT_ENABLED", "BUDGET_REVIEWER_TOKEN")}
+    saved_env = {k: os.environ.get(k) for k in ("MULTI_AGENT_ENABLED",)}
     os.environ["MULTI_AGENT_ENABLED"] = "true"
-    os.environ.pop("BUDGET_REVIEWER_TOKEN", None)
     try:
         with tempfile.TemporaryDirectory() as tmp:
             h = Harness(tmp)
@@ -123,39 +122,41 @@ def _start_budgeting(h):
     return r.get_json()["workflow_id"]
 
 
-def test_reject_releases_nothing_but_the_decision():
+def test_reject_withholds_the_answer_and_records_the_decision():
     def check(h):
         wid = _start_budgeting(h)
-        assert h.client.get(f"/api/multi-agent/workflows/{wid}").get_json()["state"] == "awaiting_human_review"
-        assert h.client.get(f"/api/multi-agent/workflows/{wid}/response").status_code == 409
-        panel = h.client.get(f"/api/multi-agent/workflows/{wid}/review-panel").get_json()
-        assert panel["result"]["answer"].startswith("One category") and panel["review"]["verdict"] == "accept"
+        full = h.client.get(f"/api/multi-agent/workflows/{wid}").get_json()
+        assert full["state"] == "awaiting_human_review" and full["final_response"] is None
+        assert full["result"]["answer"].startswith("One category") and full["review"]["verdict"] == "accept"
+        card = h.client.get(f"/ui/multi-agent/workflows/{wid}").get_data(as_text=True)
+        assert "ma-decision" in card and "One category" in card and 'hx-trigger="every 2s"' not in card   # the gate, in the card
         r = h.client.post(f"/api/multi-agent/workflows/{wid}/decision", headers=HX,
                           json={"decision": "reject", "note": "Figures are from the wrong month", "reviewer": "Khoi"})
         assert r.status_code == 200 and r.get_json()["state"] == "rejected"
-        r = h.client.get(f"/api/multi-agent/workflows/{wid}/response")
-        assert r.status_code == 200
-        assert r.get_json() == {"workflow_id": wid, "decision": "reject", "released": False}
+        final = h.client.get(f"/api/multi-agent/workflows/{wid}").get_json()["final_response"]
+        assert final["released"] is False and final["answer"] is None and final["decided_by"] == "budgeting-ui:Khoi"
+        assert final["correction_note"] == "Figures are from the wrong month"
+        card = h.client.get(f"/ui/multi-agent/workflows/{wid}").get_data(as_text=True)
+        assert "withheld" in card and "ma-decision" not in card
         _history, coordination = h.audit()
         decided = [c for c in coordination if c["decision"] == "human_decision"]
         assert len(decided) == 1 and decided[0]["detail"]["by"] == "budgeting-ui:Khoi" and decided[0]["detail"]["decision"] == "reject"
     _run_contract(check)
 
 
-def test_accept_releases_the_customer_view_only():
+def test_accept_releases_the_final_response_in_the_card():
     def check(h):
         wid = _start_budgeting(h)
-        r = h.client.post(f"/api/multi-agent/workflows/{wid}/decision", headers=HX, json={"decision": "accept"})
-        assert r.status_code == 200
-        view = h.client.get(f"/api/multi-agent/workflows/{wid}/response").get_json()
-        assert set(view) == {"workflow_id", "decision", "released", "released_at", "answer", "findings", "gaps", "evidence_endpoints"}
-        assert view["answer"] == BUDGET_RESULT["answer"] and view["evidence_endpoints"] == ["/api/budgets/summary"]
-        text = json.dumps(view)
-        for leaked in ("Internal risk", "match the evidence", "budgeting-ui", "http://", "verdict"):
-            assert leaked not in text, leaked
-        # the server's own response still carries the operator fields; only this feature's customer route filters
-        full = h.server_client.get(f"/workflow/{wid}/response").get_json()
-        assert full["risks"] == REVIEW["risks"] and full["decided_by"] == "budgeting-ui"
+        r = h.client.post(f"/ui/multi-agent/workflows/{wid}/decision", headers=HX, data={"decision": "accept", "reviewer": "Bao"})
+        page = r.get_data(as_text=True)
+        assert r.status_code == 200 and r.headers.get("HX-Trigger") == "ma-decided"
+        assert "accepted" in page and "released" in page and BUDGET_RESULT["answer"] in page and "budgeting-ui:Bao" in page
+        full = h.client.get(f"/api/multi-agent/workflows/{wid}").get_json()
+        assert full["final_response"]["released"] is True and full["final_response"]["answer"] == BUDGET_RESULT["answer"]
+        assert full["final_response"]["risks"] == REVIEW["risks"]            # the panel shows the review's risks with the answer
+        history = h.client.get("/api/multi-agent/workflows").get_json()
+        assert history["count"] == 1 and history["workflows"][0]["state"] == "accepted"
+        assert history["workflows"][0]["request"].startswith("Which categories") and history["workflows"][0]["context"] == CONTEXT
     _run_contract(check)
 
 
@@ -165,14 +166,15 @@ def test_another_features_workflow_is_invisible_and_undecidable_here():
         loans_id = r.get_json()["workflow_id"]
         assert r.get_json()["state"] == "awaiting_human_review"
         assert h.client.get(f"/api/multi-agent/workflows/{loans_id}").status_code == 404
-        assert h.client.get(f"/api/multi-agent/workflows/{loans_id}/review-panel").status_code == 404
         r = h.client.post(f"/api/multi-agent/workflows/{loans_id}/decision", headers=HX, json={"decision": "accept"})
         assert r.status_code == 404
         assert h.server_client.get(f"/workflow/{loans_id}/status").get_json()["state"] == "awaiting_human_review"
         _start_budgeting(h)
-        pending = h.client.get("/api/multi-agent/pending").get_json()
-        assert pending["count"] == 1 and pending["workflows"][0]["feature"] == "budgeting"
-        assert h.server_client.get("/workflows/pending").get_json()["count"] == 2          # the server holds both
+        history = h.client.get("/api/multi-agent/workflows").get_json()
+        assert history["count"] == 1 and history["workflows"][0]["feature"] == "budgeting"
+        assert len(h.server_client.get("/workflows").get_json()) == 2                 # the server holds both
+        page = h.client.get("/ui/multi-agent/history").get_data(as_text=True)
+        assert loans_id not in page and "List my loans" not in page
     _run_contract(check)
 
 
@@ -180,10 +182,11 @@ def test_bad_ids_and_cross_site_posts_never_reach_the_server():
     def check(h):
         wid = _start_budgeting(h)
         before = len(h.server_calls)
-        assert h.client.get("/api/multi-agent/workflows/wf_x%3F/response").status_code == 400
         assert h.client.get("/api/multi-agent/workflows/wf_x%3F").status_code == 400
         r = h.client.post(f"/api/multi-agent/workflows/{wid}/decision", json={"decision": "accept"})   # no HX header
         assert r.status_code == 403
+        r = h.client.post(f"/ui/multi-agent/workflows/{wid}/decision", data={"decision": "accept"})     # no HX header either
+        assert r.status_code == 200 and "HX-Request" in r.get_data(as_text=True)
         assert len(h.server_calls) == before                                                            # nothing was sent
         assert h.server_client.get(f"/workflow/{wid}/status").get_json()["state"] == "awaiting_human_review"
     _run_contract(check)

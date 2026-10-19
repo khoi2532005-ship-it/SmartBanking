@@ -169,7 +169,7 @@ jobs:
           probe "htmx-rag-status"  "http://localhost:5004/ui/rag/status"
           # Release 2 panel fragment answers 200 with the Multi-Agent Server disabled
           probe "htmx-multi-agent-status" "http://localhost:5004/ui/multi-agent/status"
-          probe "htmx-multi-agent-pending" "http://localhost:5004/ui/multi-agent/pending"
+          probe "htmx-multi-agent-history" "http://localhost:5004/ui/multi-agent/history"
 
       - name: Verify seeded records and budget calculations
         run: |
@@ -216,7 +216,7 @@ jobs:
           curl -s http://localhost:3004/tabs/budgets.html | grep -qF 'href="/tabs/ai-mode.html"' \
             || { echo "FAIL budgets.html lacks the AI Mode tab link"; exit 1; }
           page=$(curl -s http://localhost:3004/tabs/ai-mode.html)
-          for needle in 'hx-post="/ui/mcp/tool"' 'hx-get="/ui/mcp/tools"' 'hx-post="/ui/rag/query"' 'hx-post="/ui/multi-agent/workflows"' 'id="ma-desk"'; do
+          for needle in 'hx-post="/ui/mcp/tool"' 'hx-get="/ui/mcp/tools"' 'hx-post="/ui/rag/query"' 'hx-post="/ui/multi-agent/workflows"' 'id="ma-history"'; do
             printf '%s' "$page" | grep -qF "$needle" \
               || { echo "FAIL frontend tab lacks $needle"; exit 1; }
           done
@@ -298,9 +298,9 @@ jobs:
 
           ## Release 2 surface (unit-tested, disabled in the smoke stack)
 
-          \`/api/multi-agent/workflows\` (start, poll), \`/review-panel\`, \`/decision\`, \`/pending\` (operator),
-          \`/response\` (customer view); settings MULTI_AGENT_ENABLED, MULTI_AGENT_SERVER_URL,
-          MULTI_AGENT_API_TOKEN, BUDGET_REVIEWER_TOKEN, BUDGET_FRONTEND_ORIGINS.
+          \`POST /api/multi-agent/workflows\` (start), \`GET /api/multi-agent/workflows\` (history),
+          \`GET /api/multi-agent/workflows/<id>\` (the whole workflow), \`POST .../decision\` (Accept / Partially accept / Reject);
+          settings MULTI_AGENT_ENABLED, MULTI_AGENT_SERVER_URL, MULTI_AGENT_API_TOKEN, BUDGET_FRONTEND_ORIGINS.
           | budgeting-frontend-service | \`GET http://localhost:3004/tabs/budgets.html\` |
           MD
 

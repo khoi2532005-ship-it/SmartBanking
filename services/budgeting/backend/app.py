@@ -20,7 +20,7 @@ from services import llm_client, mcp_client, multi_agent_client, rag_client
 # Browsers call this API from the budgeting tab (port 3004) and the shared home
 # page (port 3000), on whatever host serves them. Those origins may read
 # responses; no other website may, so a page elsewhere cannot drive the
-# review desk or read an unreleased answer. BUDGET_FRONTEND_ORIGINS adds more.
+# Multi-Agent panel or read its answers. BUDGET_FRONTEND_ORIGINS adds more.
 DEFAULT_ORIGINS = r"^https?://[^/]+:(3004|3000)$"
 
 
