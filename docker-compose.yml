@@ -276,6 +276,8 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       USE_MOCK_TRANSACTIONS: auto
+      # Release 2: extra browser origins for the budgeting API; empty by default (see .env.example).
+      BUDGET_FRONTEND_ORIGINS: ${BUDGET_FRONTEND_ORIGINS:-}
     extra_hosts: *host-gateway
     depends_on:
       budgeting-database-service:
