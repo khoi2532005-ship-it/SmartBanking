@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Multi-Agent Tab</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
+        .app-shell { max-width: none; padding: 1rem; }
+        .card { margin-bottom: 1.5rem; }
+        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
+        th { background: #f0f3f7; cursor: pointer; }
+        /* Long unbroken names and explanations wrap instead of widening the page. */
+        td { overflow-wrap: anywhere; }
+        .table-wrap { overflow-x: auto; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > div { display: flex; flex-direction: column; }
+        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
+        .is-hidden { display: none; }
+        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
+        .sev-high { background: #c0392b; }
+        .sev-medium { background: #d68910; }
+        .sev-low { background: #7f8c8d; }
+        button { cursor: pointer; }
+        /* Tab strip linking the Normal and AI Mode views. */
+        .tab-strip { margin: 0 0 1rem; }
+        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
+    </style>
+</head>
+<body>
+<main class="app-shell">
+    <section class="card">
+        <h2>Multi-Agent Mode</h2>
+        <p>Run planner, worker, and reviewer agents in a coordinated workflow.</p>
+
+        <div class="feature-toggle-row">
+            <label class="toggle-switch" for="multi-agent-toggle">
+                <input id="multi-agent-toggle" type="checkbox" checked>
+                <span class="toggle-label">Multi-Agent Enabled</span>
+            </label>
+            <span id="multi-agent-state" class="feature-state feature-on">ON</span>
+        </div>
+
+        <form id="workflow-form" class="stack-form">
+            <label for="workflow-request">User Request</label>
+            <input
+                id="workflow-request"
+                name="user_request"
+                list="workflow-request-samples"
+                required
+                placeholder="Example: Assess eligibility for a personal loan and explain the credit factors."
+            >
+            <datalist id="workflow-request-samples">
+                <option value="Assess my eligibility for a $15,000 personal loan with a 36-month term and $4,200 monthly income. Explain the key factors."></option>
+                <option value="Compare monthly repayments and total interest for a $20,000 loan over 36 versus 60 months at 8% annual interest."></option>
+                <option value="Explain how credit score, income, and existing debt can affect loan approval, and suggest ways to improve my creditworthiness."></option>
+            </datalist>
+            <div class="feature-actions" aria-label="Sample workflow requests">
+                <button type="button" class="rag-action" data-sample-request="Assess my eligibility for a $15,000 personal loan with a 36-month term and $4,200 monthly income. Explain the key factors.">Use Sample 1</button>
+                <button type="button" class="rag-action" data-sample-request="Compare monthly repayments and total interest for a $20,000 loan over 36 versus 60 months at 8% annual interest.">Use Sample 2</button>
+                <button type="button" class="rag-action" data-sample-request="Explain how credit score, income, and existing debt can affect loan approval, and suggest ways to improve my creditworthiness.">Use Sample 3</button>
+            </div>
+            <p class="rag-helper">Hint: use a full task request for planner-worker-reviewer flow.</p>
+            <button type="submit" class="rag-action">Run Workflow</button>
+        </form>
+
+        <form id="status-form" class="stack-form">
+            <button type="submit" class="rag-action">Get Workflow Status</button>
+        </form>
+
+        <div id="multi-agent-results" class="panel panel-mcp">Multi-agent responses will appear here.</div>
+    </section>
+</main>
+<script src="/loans-js/multi-agent.js"></script>
+
+</body>
+</html>

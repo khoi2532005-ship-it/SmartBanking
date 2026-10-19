@@ -5,6 +5,7 @@ const tabFrames = {
     "ai-mode": document.getElementById("tab-frame-ai-mode"),
     mcp: document.getElementById("tab-frame-mcp"),
     rag: document.getElementById("tab-frame-rag"),
+    "multi-agent": document.getElementById("tab-frame-multi-agent"),
 };
 
 function resizeFrame(frame) {
