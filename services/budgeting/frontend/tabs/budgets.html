@@ -335,7 +335,8 @@
               hx-target="#ma-panel"
               hx-swap="innerHTML"
               hx-include="#period-form"
-              hx-indicator="#ma-spinner">
+              hx-indicator="#ma-spinner"
+              hx-disabled-elt="find button[type=submit]">
             <div class="grow">
                 <label for="ma-request">Request</label>
                 <textarea id="ma-request" name="request" maxlength="1000" required
@@ -384,10 +385,11 @@
         <div id="ma-desk-body" class="is-hidden">
             <p class="status-line">
                 <span class="status-text">Pending workflows</span>
-                <button type="button" class="btn btn-secondary btn-small"
+                <button type="button" class="btn btn-secondary btn-small" id="ma-pending-refresh"
                         hx-get="/ui/multi-agent/pending"
                         hx-target="#ma-pending"
                         hx-swap="innerHTML"
+                        hx-trigger="click, ma-decided from:body"
                         hx-indicator="#ma-desk-spinner">Refresh</button>
                 <span id="ma-desk-spinner" class="htmx-indicator spinner">Loading...</span>
             </p>
@@ -406,13 +408,17 @@
 const BUDGETS_API = window.BUDGETS_API || `http://${window.location.hostname}:5004`;
 
 document.body.addEventListener("htmx:configRequest", (event) => {
-    if (event.detail.path.startsWith("/ui/multi-agent/")) {
-        // The review desk's token and the reviewer's name travel as headers; the
-        // backend checks the token on operator routes when one is configured.
+    // Only the review desk's requests carry the reviewer token and name: the
+    // pending list, the desk card and the decision. The customer's own
+    // requests (start, response) never do.
+    const path = event.detail.path;
+    const deskRequest = path === "/ui/multi-agent/pending"
+        || (path.startsWith("/ui/multi-agent/workflows/") && !path.endsWith("/response"));
+    if (deskRequest) {
         const token = document.getElementById("ma-token").value.trim();
         if (token) event.detail.headers["X-Reviewer-Token"] = token;
         const reviewer = document.getElementById("ma-reviewer-name").value.trim();
-        if (reviewer && event.detail.verb === "post") event.detail.parameters["reviewer"] = reviewer;
+        if (reviewer && path.endsWith("/decision")) event.detail.parameters["reviewer"] = reviewer;
     }
     if (event.detail.path.startsWith("/ui/")) {
         event.detail.path = BUDGETS_API + event.detail.path;

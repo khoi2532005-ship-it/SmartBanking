@@ -14,7 +14,7 @@ error rather than a stack trace.
 Release 2, the shared Multi-Agent Server (Planner -> Worker -> Reviewer -> human):
 
     POST /api/multi-agent/workflows                  {"request", "customer_id"?, "month"?, "year"?} -> 202 summary
-    GET  /api/multi-agent/workflows/<id>             summary, for polling (budgeting workflows only)
+    GET  /api/multi-agent/workflows/<id>             progress only, for polling (budgeting workflows only)
     GET  /api/multi-agent/workflows/<id>/review-panel plan, result and review: operator only
     POST /api/multi-agent/workflows/<id>/decision    {"decision": accept|partially_accept|reject, "note"?, "reviewer"?}: operator only
     GET  /api/multi-agent/workflows/<id>/response    the approved answer only; 409 until the decision is made
@@ -279,7 +279,7 @@ def multi_agent_workflow_status(workflow_id):
         summary = multi_agent_client.workflow_status(workflow_id)
     except _MA_ERRORS as exc:
         return _integration_error(exc)
-    return _budgeting_only(summary) or jsonify(summary)
+    return _budgeting_only(summary) or jsonify(multi_agent_client.customer_summary(summary))
 
 
 @agents_bp.get("/api/multi-agent/workflows/<workflow_id>/review-panel")

@@ -43,7 +43,7 @@ Copy the Release 2 block at the end of `services/budgeting/backend/routes/agents
 | Route | Who | Notes |
 |---|---|---|
 | `POST /api/multi-agent/workflows` | panel | needs the `HX-Request` or `X-Requested-With` header |
-| `GET /api/multi-agent/workflows/<id>` | panel | poll; your feature's workflows only |
+| `GET /api/multi-agent/workflows/<id>` | panel | poll: progress only (`customer_summary`), no reviewer name, note or error text |
 | `GET /api/multi-agent/workflows/<id>/review-panel` | operator | plan, result, review |
 | `POST /api/multi-agent/workflows/<id>/decision` | operator | `decision`, `note`, `reviewer`; recorded as `<feature>-ui:<reviewer>` |
 | `GET /api/multi-agent/workflows/<id>/response` | customer | the customer view; 409 until decided |
@@ -67,8 +67,11 @@ the token header and the reviewer name. The customer card polls
 Compose already passes `MULTI_AGENT_ENABLED`, `MULTI_AGENT_SERVER_URL` and
 `MULTI_AGENT_API_TOKEN` to every backend through the `x-llm-env` anchor. Add
 the two defaults to your Dockerfile (`MULTI_AGENT_ENABLED=true`,
-`MULTI_AGENT_SERVER_URL=http://host.docker.internal:8300`) and set
-`MULTI_AGENT_ENABLED: "false"` in your CI jobs so no test ever calls the server.
+`MULTI_AGENT_SERVER_URL=http://host.docker.internal:8300`), pass your own
+`<FEATURE>_REVIEWER_TOKEN` and `<FEATURE>_FRONTEND_ORIGINS` into your service's
+compose block the way budgeting-service and fraud-service do (otherwise the desk
+cannot be locked in Docker), and set `MULTI_AGENT_ENABLED: "false"` in your CI
+jobs so no test ever calls the server.
 
 ## 6. Tests
 

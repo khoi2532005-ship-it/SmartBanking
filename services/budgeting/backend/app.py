@@ -31,7 +31,7 @@ def allowed_origins():
 
 def create_app():
     app = Flask(__name__)
-    CORS(app, origins=allowed_origins())
+    CORS(app, origins=allowed_origins(), expose_headers=["HX-Trigger"])
 
     app.register_blueprint(budgets_bp)
     app.register_blueprint(insights_bp)

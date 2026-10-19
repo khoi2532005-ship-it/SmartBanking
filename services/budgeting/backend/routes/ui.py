@@ -10,7 +10,7 @@ import re
 from datetime import date
 from html import escape
 
-from flask import Blueprint, request
+from flask import Blueprint, make_response, request
 
 from routes.agents import decided_by, operator_check
 from services import database_api, insight_service, mcp_client, multi_agent_client, rag_client, transactions_client
@@ -748,8 +748,8 @@ def _decision_form(workflow_id):
       <section class="ma-section">
         <h4>Decision</h4>
         <form class="decision-form" hx-post="/ui/multi-agent/workflows/{workflow_id}/decision"
-              hx-target="closest article" hx-swap="outerHTML" hx-indicator="closest article">
-          <input type="text" name="reviewer" maxlength="60" placeholder="Reviewer name">
+              hx-target="closest article" hx-swap="outerHTML" hx-indicator="closest article"
+              hx-disabled-elt="find button">
           <textarea name="note" rows="2" maxlength="{multi_agent_client.MAX_NOTE_CHARS}" placeholder="Correction note (required for partially accept)"></textarea>
           <div class="form-actions">{buttons} <span class="htmx-indicator muted">Sending</span></div>
         </form>
@@ -805,11 +805,28 @@ def _workflow_card(full, message=""):
     </article>"""
 
 
+def _retry_card(workflow_id, path, exc):
+    """A temporary failure (server down or failing) keeps the card, its id and
+    its polling, so the workflow is not lost from the page."""
+    workflow_id = escape(str(workflow_id))
+    return f"""
+    <article class="insight-card ma-card" id="ma-{'customer-' if path.endswith('/response') else ''}{workflow_id}"
+             hx-get="/ui/multi-agent/workflows/{workflow_id}{path}" hx-trigger="every 5s" hx-swap="outerHTML">
+      <div class="history-head"><span class="chip">{workflow_id}</span><span class="badge badge-near">retrying</span></div>
+      <p class="alert alert-warn">{escape(str(exc).rstrip('.'))}. Checking again.</p>
+    </article>"""
+
+
+def _temporary(exc):
+    return isinstance(exc, multi_agent_client.MultiAgentUnreachable) or (
+        isinstance(exc, multi_agent_client.MultiAgentError) and exc.status >= 500)
+
+
 def _load_card(workflow_id, message=""):
     try:
         full = multi_agent_client.workflow(workflow_id)
     except _MA_ERRORS as exc:
-        return _ma_alert(exc)
+        return _retry_card(workflow_id, "", exc) if _temporary(exc) else _ma_alert(exc)
     if not multi_agent_client.is_budgeting(full):
         return _alert(f"Unknown budgeting workflow {workflow_id}.", "warn")
     return _workflow_card(full, message)
@@ -863,7 +880,7 @@ def _load_customer_card(workflow_id):
     try:
         summary = multi_agent_client.workflow_status(workflow_id)
     except _MA_ERRORS as exc:
-        return _ma_alert(exc)
+        return _retry_card(workflow_id, "/response", exc) if _temporary(exc) else _ma_alert(exc)
     if not multi_agent_client.is_budgeting(summary):
         return _alert(f"Unknown budgeting workflow {escape(str(workflow_id))}.", "warn")
     final = None
@@ -871,10 +888,14 @@ def _load_customer_card(workflow_id):
         try:
             final = multi_agent_client.customer_view(multi_agent_client.response(workflow_id))
         except multi_agent_client.MultiAgentError as exc:
-            if exc.status != 409:
+            if exc.status == 409:
+                pass
+            elif _temporary(exc):
+                return _retry_card(workflow_id, "/response", exc)
+            else:
                 return _ma_alert(exc)
         except _MA_ERRORS as exc:
-            return _ma_alert(exc)
+            return _retry_card(workflow_id, "/response", exc) if _temporary(exc) else _ma_alert(exc)
     return _customer_card(summary, final)
 
 
@@ -976,4 +997,6 @@ def multi_agent_decision_fragment(workflow_id):
         return _ma_alert(exc)
     except _MA_ERRORS as exc:
         return _ma_alert(exc)
-    return _load_card(workflow_id)
+    response = make_response(_load_card(workflow_id))
+    response.headers["HX-Trigger"] = "ma-decided"          # the desk's pending list refreshes itself
+    return response

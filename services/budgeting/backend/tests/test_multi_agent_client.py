@@ -114,7 +114,11 @@ class FakeServer:
         if (method, path) == ("POST", "/workflow"):
             return 202, {**SUMMARY_AWAITING, "state": "created", "stages": [], "links": {}}
         if path == f"/workflow/{WID}/status":
-            return 200, {**SUMMARY_AWAITING, "state": self.state}
+            summary = {**SUMMARY_AWAITING, "state": self.state, "decision": self.decision,
+                       "released": bool(self.decision and self.decision["decision"] != "reject")}
+            if self.state == "failed":
+                summary["error"] = "worker: no feature API answered: budgeting service unavailable: connection refused at http://localhost:5004/api/budgets/summary"
+            return 200, summary
         if path == f"/workflow/{WID}":
             full = {**FULL_AWAITING, "state": self.state}
             if self.state == "failed":
@@ -480,7 +484,53 @@ def test_start_fragment_returns_the_customer_card_which_polls_the_response():
         fake.state = "failed"
         fake.decision = None
         page = c.get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
-        assert "could not be completed" in page and "budgeting service unavailable" not in page
+        assert "could not be completed" in page and "budgeting service unavailable" not in page and "localhost:5004" not in page
+
+
+def test_poll_route_returns_progress_only():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
+        c = _client()
+        c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "reject", "note": "private reason", "reviewer": "Bao"})
+        body = c.get(f"/api/multi-agent/workflows/{WID}").get_json()
+        assert set(body) == {"workflow_id", "feature", "state", "created_at", "updated_at", "stages", "decision", "released", "failed"}
+        assert body["decision"] == "reject" and body["released"] is False and body["failed"] is False
+        assert body["stages"][0] == {"role": "planner", "status": "completed", "duration_seconds": 2.1}
+        text = str(body)
+        assert "private reason" not in text and "Bao" not in text and "budgeting-ui" not in text and "model" not in text
+        fake.state, fake.decision = "failed", None
+        body = c.get(f"/api/multi-agent/workflows/{WID}").get_json()
+        assert body["failed"] is True and "budgeting service unavailable" not in str(body) and "localhost" not in str(body)
+
+
+def test_temporary_failures_keep_the_card_polling():
+    def down(method, path, body=None):
+        raise ma.MultiAgentUnreachable("Multi-Agent Server at http://localhost:8300/x refused the connection - start it")
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(down):
+        c = _client()
+        page = c.get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
+        assert f'id="ma-customer-{WID}"' in page and "retrying" in page and 'hx-trigger="every 5s"' in page
+        assert f'hx-get="/ui/multi-agent/workflows/{WID}/response"' in page and "Checking again" in page
+        page = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
+        assert f'id="ma-{WID}"' in page and "retrying" in page and f'hx-get="/ui/multi-agent/workflows/{WID}"' in page
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(lambda m, p, b=None: (500, {"error": "boom"})):
+        page = _client().get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
+        assert "retrying" in page and "boom" not in page
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(lambda m, p, b=None: (404, {"error": f"unknown workflow '{WID}'"})):
+        page = _client().get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
+        assert "retrying" not in page and "unknown workflow" in page              # gone for good: no point polling
+
+
+def test_decision_fragment_refreshes_the_pending_list_and_has_no_name_box():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()):
+        c = _client()
+        card = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
+        assert 'name="reviewer"' not in card and 'hx-disabled-elt="find button"' in card
+        assert card.count('type="submit"') == 3 and "<input" not in card.split("decision-form")[1]   # only the textarea: Enter cannot submit
+        r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "accept", "reviewer": "Bao"})
+        assert r.status_code == 200 and r.headers.get("HX-Trigger") == "ma-decided"
+        assert "budgeting-ui:Bao" in r.get_data(as_text=True).lower().replace("bao", "Bao")
+        r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "reject"})
+        assert r.headers.get("HX-Trigger") is None                                   # a refused decision changes nothing
 
 
 def test_pending_fragment_lists_budgeting_workflows_for_the_desk():
@@ -504,6 +554,7 @@ def test_frontend_tab_wires_the_multi_agent_panel_and_desk():
         'hx-get="/ui/multi-agent/status"', 'hx-post="/ui/multi-agent/workflows"', 'hx-get="/ui/multi-agent/pending"',
         'id="ma-panel"', 'id="ma-desk"', 'id="ma-desk-card"', 'id="ma-pending"', 'name="request"', 'maxlength="1000"',
         'hx-include="#period-form"', 'id="ma-token"', 'X-Reviewer-Token', 'id="ma-reviewer-name"', "ma-chip",
+        'hx-disabled-elt="find button[type=submit]"', 'hx-trigger="click, ma-decided from:body"', 'id="ma-pending-refresh"',
     ):
         assert needle in html, needle
     assert 'hx-post="/ui/multi-agent/workflows"' in html.split('id="ma-desk"')[0]      # the start form is the customer part

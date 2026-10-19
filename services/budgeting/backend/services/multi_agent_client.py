@@ -216,6 +216,24 @@ def response(workflow_id: str) -> dict[str, Any]:
     return payload
 
 
+def customer_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    """The poll view for the person who asked: progress only. The reviewer's
+    name, a rejection note and internal error text stay on the operator side."""
+    decision = summary.get("decision") or {}
+    return {
+        "workflow_id": summary.get("workflow_id"),
+        "feature": summary.get("feature"),
+        "state": summary.get("state"),
+        "created_at": summary.get("created_at"),
+        "updated_at": summary.get("updated_at"),
+        "stages": [{"role": s.get("role"), "status": s.get("status"), "duration_seconds": s.get("duration_seconds")}
+                   for s in summary.get("stages") or []],
+        "decision": decision.get("decision"),
+        "released": bool(summary.get("released")),
+        "failed": summary.get("state") == "failed",
+    }
+
+
 def customer_view(final: dict[str, Any]) -> dict[str, Any]:
     """What a customer may receive: the approved answer, nothing about the review.
 
