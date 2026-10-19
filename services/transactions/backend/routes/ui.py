@@ -46,7 +46,14 @@ def _alert(message, kind="error"):
 
 
 def _integration_alert(exc):
-    if isinstance(exc, (mcp_client.MCPDisabled, rag_client.RAGDisabled, multi_agent_client.MultiAgentDisabled)):
+    if isinstance(
+        exc,
+        (
+            mcp_client.MCPDisabled,
+            rag_client.RAGDisabled,
+            multi_agent_client.MultiAgentDisabled,
+        ),
+    ):
         return _alert(f"{exc} - this control is retained but inactive here.", "warn")
     return _alert(str(exc))
 
@@ -54,13 +61,19 @@ def _integration_alert(exc):
 def _status_line(label, info, detail=""):
     url = f'<code>{escape(str(info.get("url", "")))}</code>'
     if not info.get("enabled"):
-        return (f'<span class="badge badge-near">Inactive</span> {label} integration is '
-                f'{escape(str(info.get("note", "disabled")))}: the controls below are retained '
-                f'but make no network call.')
+        return (
+            f'<span class="badge badge-near">Inactive</span> {label} integration is '
+            f'{escape(str(info.get("note", "disabled")))}: the controls below are retained '
+            f'but make no network call.'
+        )
     if info.get("reachable"):
-        return f'<span class="badge badge-ok">Reachable</span> {label} at {url}. {detail}'
-    return (f'<span class="badge badge-over">Unreachable</span> {label} at {url}: '
-            f'{escape(str(info.get("error", "no response")))}')
+        return (
+            f'<span class="badge badge-ok">Reachable</span> {label} at {url}. {detail}'
+        )
+    return (
+        f'<span class="badge badge-over">Unreachable</span> {label} at {url}: '
+        f'{escape(str(info.get("error", "no response")))}'
+    )
 
 
 @ui_bp.get("/mcp/status")
@@ -92,7 +105,11 @@ def rag_status_fragment():
 def mcp_tools_fragment():
     try:
         tools = mcp_client.list_tools()
-    except (mcp_client.MCPDisabled, mcp_client.MCPUnreachable, mcp_client.MCPProtocolError) as exc:
+    except (
+        mcp_client.MCPDisabled,
+        mcp_client.MCPUnreachable,
+        mcp_client.MCPProtocolError,
+    ) as exc:
         return _integration_alert(exc)
 
     items = "".join(
@@ -118,7 +135,11 @@ def mcp_tool_fragment():
     month, year = _period(request.form)
     try:
         result = mcp_client.transactions_spending(customer_id, month, year)
-    except (mcp_client.MCPDisabled, mcp_client.MCPUnreachable, mcp_client.MCPProtocolError) as exc:
+    except (
+        mcp_client.MCPDisabled,
+        mcp_client.MCPUnreachable,
+        mcp_client.MCPProtocolError,
+    ) as exc:
         return _integration_alert(exc)
 
     if result.is_error:
@@ -184,7 +205,9 @@ def rag_query_fragment():
     if not question:
         return _alert("Type a question about the SmartBank project first.", "warn")
     if len(question) > rag_client.MAX_QUERY_CHARS:
-        return _alert(f"Questions are limited to {rag_client.MAX_QUERY_CHARS} characters.", "warn")
+        return _alert(
+            f"Questions are limited to {rag_client.MAX_QUERY_CHARS} characters.", "warn"
+        )
 
     try:
         answer = rag_client.query(question)
@@ -192,7 +215,11 @@ def rag_query_fragment():
         return _integration_alert(exc)
     except rag_client.RAGError as exc:
         retrieved = (exc.payload.get("retrieval_summary") or {}).get("retrieved_count")
-        extra = f" {retrieved} chunks were retrieved before the failure." if retrieved is not None else ""
+        extra = (
+            f" {retrieved} chunks were retrieved before the failure."
+            if retrieved is not None
+            else ""
+        )
         message = str(exc).rstrip(".")
         return _alert(f"RAG server error (HTTP {exc.status}): {message}.{extra}")
 
@@ -241,16 +268,31 @@ def rag_query_fragment():
 # Multi-Agent UI fragments
 # ---------------------------------------------------------------------------
 
-_MA_ERRORS = (multi_agent_client.MultiAgentDisabled, multi_agent_client.MultiAgentUnreachable,
-              multi_agent_client.MultiAgentError)
-STAGE_BADGE = {"completed": "ok", "running": "near", "timed_out": "near", "failed": "over"}
+_MA_ERRORS = (
+    multi_agent_client.MultiAgentDisabled,
+    multi_agent_client.MultiAgentUnreachable,
+    multi_agent_client.MultiAgentError,
+)
+STAGE_BADGE = {
+    "completed": "ok",
+    "running": "near",
+    "timed_out": "near",
+    "failed": "over",
+}
 VERDICT_BADGE = {"accept": "ok", "revise": "near", "escalate": "over"}
-DECISION_LABEL = {"accept": "Accept", "partially_accept": "Partially accept", "reject": "Reject"}
+DECISION_LABEL = {
+    "accept": "Accept",
+    "partially_accept": "Partially accept",
+    "reject": "Reject",
+}
 
 
 def _ma_alert(exc):
     if isinstance(exc, multi_agent_client.MultiAgentError):
-        return _alert(f"Multi-Agent Server (HTTP {exc.status}): {str(exc).rstrip('.')}.", "warn" if exc.status < 500 else "error")
+        return _alert(
+            f"Multi-Agent Server (HTTP {exc.status}): {str(exc).rstrip('.')}.",
+            "warn" if exc.status < 500 else "error",
+        )
     return _alert(str(exc), "warn")
 
 
@@ -276,7 +318,11 @@ def _stage_badges(stages):
 def _list(items, cls="muted"):
     if not items:
         return ""
-    return "<ul>" + "".join(f'<li class="{cls}">{escape(str(i))}</li>' for i in items) + "</ul>"
+    return (
+        "<ul>"
+        + "".join(f'<li class="{cls}">{escape(str(i))}</li>' for i in items)
+        + "</ul>"
+    )
 
 
 def _plan_html(plan):
@@ -285,11 +331,15 @@ def _plan_html(plan):
     tasks = ""
     for t in plan.get("tasks") or []:
         if t.get("kind") == "api":
-            tasks += (f'<li><span class="chip">{escape(str(t.get("id")))}</span> <code>GET {escape(str(t.get("endpoint")))}</code> '
-                      f'<span class="muted">{escape(json.dumps(t.get("params") or {}, sort_keys=True))}</span></li>')
+            tasks += (
+                f'<li><span class="chip">{escape(str(t.get("id")))}</span> <code>GET {escape(str(t.get("endpoint")))}</code> '
+                f'<span class="muted">{escape(json.dumps(t.get("params") or {}, sort_keys=True))}</span></li>'
+            )
         else:
-            tasks += (f'<li><span class="chip">{escape(str(t.get("id")))}</span> analysis after {escape(", ".join(t.get("depends_on") or []))}: '
-                      f'{escape(str(t.get("instruction", "")))}</li>')
+            tasks += (
+                f'<li><span class="chip">{escape(str(t.get("id")))}</span> analysis after {escape(", ".join(t.get("depends_on") or []))}: '
+                f'{escape(str(t.get("instruction", "")))}</li>'
+            )
     meta = plan.get("meta") or {}
     return f"""
       <section class="ma-section">
@@ -307,15 +357,22 @@ def _result_html(result):
     rows = ""
     for e in result.get("evidence") or []:
         ok = e.get("status") == "ok"
-        detail = f"HTTP {e.get('http_status')} {e.get('duration_seconds')}s" if ok else str(e.get("error", ""))
-        rows += (f'<tr><td><span class="chip">{escape(str(e.get("task_id")))}</span></td>'
-                 f'<td><code>{escape(str(e.get("endpoint")))}</code></td>'
-                 f'<td><span class="badge badge-{"ok" if ok else "over"}">{escape(str(e.get("status")))}</span></td>'
-                 f'<td class="muted">{escape(detail)}</td></tr>')
+        detail = (
+            f"HTTP {e.get('http_status')} {e.get('duration_seconds')}s"
+            if ok
+            else str(e.get("error", ""))
+        )
+        rows += (
+            f'<tr><td><span class="chip">{escape(str(e.get("task_id")))}</span></td>'
+            f'<td><code>{escape(str(e.get("endpoint")))}</code></td>'
+            f'<td><span class="badge badge-{"ok" if ok else "over"}">{escape(str(e.get("status")))}</span></td>'
+            f'<td class="muted">{escape(detail)}</td></tr>'
+        )
     findings = "".join(
         f'<li><span class="chip">{escape(str(f.get("task_id")))}</span> {escape(str(f.get("statement")))} '
         f'<span class="muted">evidence {escape(", ".join(f.get("evidence") or []))}</span></li>'
-        for f in result.get("findings") or [])
+        for f in result.get("findings") or []
+    )
     meta = result.get("meta") or {}
     unproven = result.get("request_only_numbers") or []
     return f"""
@@ -341,10 +398,12 @@ def _review_html(review):
     criteria = "".join(
         f'<li><span class="badge badge-{"ok" if c.get("met") is True else "over"}">{escape(str(c.get("index")))} '
         f'{"met" if c.get("met") is True else ("not met" if c.get("met") is False else "not evaluated")}</span> {escape(str(c.get("note", "")))}</li>'
-        for c in review.get("criteria") or [])
+        for c in review.get("criteria") or []
+    )
     defects = "".join(
         f'<li><span class="badge badge-over">{escape(str(d.get("severity")))}</span> {escape(str(d.get("about", "")))}: {escape(str(d.get("note", "")))}</li>'
-        for d in review.get("defects") or [])
+        for d in review.get("defects") or []
+    )
     meta = review.get("meta") or {}
     escalated = ""
     if review.get("escalated"):
@@ -363,17 +422,28 @@ def _review_html(review):
 
 def _decision_form(workflow_id):
     workflow_id = escape(str(workflow_id))
-    buttons = "".join(
-        f'<button type="submit" name="decision" value="{value}" class="btn{" btn-primary" if value == "accept" else ""}">{label}</button>'
-        for value, label in DECISION_LABEL.items())
+    buttons = []
+    for value, label in DECISION_LABEL.items():
+        button_class = "btn btn-primary" if value == "accept" else "btn"
+        buttons.append(
+            '<button type="button" '
+            f'hx-post="/ui/multi-agent/workflows/{workflow_id}/decision" '
+            'hx-include="closest .decision-form" '
+            f'hx-target="#ma-{workflow_id}" '
+            'hx-swap="outerHTML" '
+            f'hx-indicator="#ma-{workflow_id} .htmx-indicator" '
+            'hx-disabled-elt="this" '
+            f'hx-vals=\'{{"decision": "{value}"}}\' '
+            f'class="{button_class}">{label}</button>'
+        )
+    buttons_html = "".join(buttons)
     return f"""
       <section class="ma-section">
         <h4>Decision</h4>
-        <form class="decision-form" hx-post="/ui/multi-agent/workflows/{workflow_id}/decision"
-              hx-target="#ma-{workflow_id}" hx-swap="outerHTML" hx-indicator="#ma-{workflow_id} .htmx-indicator">
+        <form class="decision-form">
           <input type="text" name="reviewer" maxlength="60" placeholder="Reviewer name">
           <textarea name="note" rows="2" maxlength="{multi_agent_client.MAX_NOTE_CHARS}" placeholder="Correction note (required for partially accept)"></textarea>
-          <div class="form-actions">{buttons} <span class="htmx-indicator muted">Sending</span></div>
+          <div class="form-actions">{buttons_html} <span class="htmx-indicator muted">Sending</span></div>
         </form>
       </section>"""
 
@@ -397,22 +467,62 @@ def _response_html(final):
       </section>"""
 
 
+def _retry_card(workflow_id, message=""):
+    workflow_id = escape(str(workflow_id))
+    return f"""
+    <article class="insight-card ma-card" id="ma-{workflow_id}"
+      hx-get="/ui/multi-agent/workflows/{workflow_id}" hx-trigger="every 2s" hx-swap="outerHTML">
+      <div class="history-head">
+        <span class="chip">{workflow_id}</span>
+        <span class="badge badge-near">Retrying</span>
+      </div>
+      <p class="muted">The workflow is temporarily unavailable; the card is retrying automatically.</p>
+      { _alert(message or "The server is still recovering.", "warn") }
+    </article>"""
+
+
 def _workflow_card(full, message=""):
     workflow_id = escape(str(full.get("workflow_id", "")))
     state = str(full.get("state", ""))
-    running = state not in (multi_agent_client.STATE_AWAITING, *multi_agent_client.TERMINAL_STATES)
-    poll = (f' hx-get="/ui/multi-agent/workflows/{workflow_id}" hx-trigger="every 2s" hx-swap="outerHTML"'
-            if running else "")
-    state_cls = {"awaiting_human_review": "near", "accepted": "ok", "partially_accepted": "ok", "rejected": "over", "failed": "over"}.get(state, "near")
+    running = state not in (
+        multi_agent_client.STATE_AWAITING,
+        *multi_agent_client.TERMINAL_STATES,
+    )
+    poll = (
+        f' hx-get="/ui/multi-agent/workflows/{workflow_id}" hx-trigger="every 2s" hx-swap="outerHTML"'
+        if running
+        else ""
+    )
+    state_cls = {
+        "awaiting_human_review": "near",
+        "accepted": "ok",
+        "partially_accepted": "ok",
+        "rejected": "over",
+        "failed": "over",
+    }.get(state, "near")
     context = full.get("context") or {}
-    head = (f'Customer {escape(str(context.get("customer_id", "")))}, '
-            f'{escape(str(context.get("month", "")))}/{escape(str(context.get("year", "")))}')
-    error = f'<p class="alert alert-error">{escape(str(full.get("error")))}</p>' if full.get("error") else ""
-    body = _plan_html(full.get("plan")) + _result_html(full.get("result")) + _review_html(full.get("review"))
+    head = (
+        f'Customer {escape(str(context.get("customer_id", "")))}, '
+        f'{escape(str(context.get("month", "")))}/{escape(str(context.get("year", "")))}'
+    )
+    error = (
+        f'<p class="alert alert-error">{escape(str(full.get("error")))}</p>'
+        if full.get("error")
+        else ""
+    )
+    body = (
+        _plan_html(full.get("plan"))
+        + _result_html(full.get("result"))
+        + _review_html(full.get("review"))
+    )
     if state == multi_agent_client.STATE_AWAITING:
         body += _decision_form(workflow_id)
     body += _response_html(full.get("final_response"))
-    revisions = f' <span class="muted">revisions {escape(str(full.get("revisions")))}</span>' if full.get("revisions") else ""
+    revisions = (
+        f' <span class="muted">revisions {escape(str(full.get("revisions")))}</span>'
+        if full.get("revisions")
+        else ""
+    )
     return f"""
     <article class="insight-card ma-card" id="ma-{workflow_id}"{poll}>
       <div class="history-head">
@@ -430,7 +540,7 @@ def _load_card(workflow_id, message=""):
     try:
         full = multi_agent_client.workflow(workflow_id)
     except _MA_ERRORS as exc:
-        return _ma_alert(exc)
+        return _retry_card(workflow_id, str(exc))
     if not multi_agent_client.is_transactions(full):
         return _alert(f"Unknown transactions workflow {workflow_id}.", "warn")
     return _workflow_card(full, message)
@@ -455,13 +565,19 @@ def multi_agent_status_fragment():
 
 @ui_bp.post("/multi-agent/workflows")
 def multi_agent_start_fragment():
-    if not (request.headers.get("HX-Request", "").lower() == "true" or request.headers.get("X-Requested-With")):
+    if not (
+        request.headers.get("HX-Request", "").lower() == "true"
+        or request.headers.get("X-Requested-With")
+    ):
         return _alert("Start workflows from the transactions panel.", "warn")
     text = (request.form.get("request") or "").strip()
     if not text:
         return _alert("Type the request first.", "warn")
     if len(text) > multi_agent_client.MAX_REQUEST_CHARS:
-        return _alert(f"Requests are limited to {multi_agent_client.MAX_REQUEST_CHARS} characters.", "warn")
+        return _alert(
+            f"Requests are limited to {multi_agent_client.MAX_REQUEST_CHARS} characters.",
+            "warn",
+        )
     customer_id = _customer(request.form)
     month, year = _period(request.form)
     try:
@@ -487,7 +603,9 @@ def multi_agent_decision_fragment(workflow_id):
     try:
         summary = multi_agent_client.workflow_status(workflow_id)
         if not multi_agent_client.is_transactions(summary):
-            return _alert(f"Unknown transactions workflow {escape(str(workflow_id))}.", "warn")
+            return _alert(
+                f"Unknown transactions workflow {escape(str(workflow_id))}.", "warn"
+            )
         multi_agent_client.decide(workflow_id, decision, note, by=decided_by(reviewer))
     except multi_agent_client.MultiAgentError as exc:
         if exc.status in (400, 409):

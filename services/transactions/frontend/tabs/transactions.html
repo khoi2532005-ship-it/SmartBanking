@@ -158,6 +158,35 @@
     <div id="rag-panel" class="panel"><p class="muted">No question asked yet.</p></div>
   </div>
 
+  <div class="section">
+    <h2>AI Mode <span class="muted">multi-agent workflow</span></h2>
+    <p class="muted">Starts the shared planner/worker/reviewer workflow for this feature and renders the full decision card in place.</p>
+    <p class="status-line">
+      <span id="ma-status" class="status-text" hx-get="/ui/multi-agent/status" hx-trigger="load" hx-swap="innerHTML">
+        <span class="spinner">Checking the Multi-Agent server...</span>
+      </span>
+      <button type="button" class="btn-secondary" hx-get="/ui/multi-agent/status" hx-target="#ma-status" hx-swap="innerHTML">Re-check</button>
+    </p>
+    <form class="row rag-form" id="ma-form" hx-post="/ui/multi-agent/workflows" hx-target="#ma-panel" hx-swap="innerHTML" hx-indicator="#ma-spinner">
+      <div class="grow">
+        <label for="ma-request">Request</label>
+        <input id="ma-request" name="request" type="text" maxlength="1000" required placeholder="e.g. Which spending category is driving the rise this month?">
+      </div>
+      <div>
+        <label for="ma-month">Month</label>
+        <input id="ma-month" name="month" type="number" min="1" max="12" value="9" />
+      </div>
+      <div>
+        <label for="ma-year">Year</label>
+        <input id="ma-year" name="year" type="number" min="2000" max="2100" value="2026" />
+      </div>
+      <input type="hidden" name="customer_id" value="1" />
+      <button type="submit" class="btn-ai">Start workflow</button>
+      <span id="ma-spinner" class="spinner" style="display:none;">Starting the workflow...</span>
+    </form>
+    <div id="ma-panel" class="panel"><p class="muted">No Multi-Agent workflow started yet.</p></div>
+  </div>
+
   <script src="/js/htmx.min.js"></script>
   <script>
     const API = `http://${window.location.hostname}:5005`;
