@@ -195,10 +195,15 @@ the operator's name and a rejection note never leave the operator routes.
 | `BUDGET_REVIEWER_TOKEN` | empty | When set, the operator routes and the review-desk fragments require `X-Reviewer-Token` |
 | `BUDGET_FRONTEND_ORIGINS` | empty | Extra browser origins allowed by CORS, comma-separated |
 
-Fragments: `GET /ui/multi-agent/status` (status line), `POST /ui/multi-agent/workflows`
-(start, returns the workflow card), `GET /ui/multi-agent/workflows/<id>` (the
-card polls itself every 2 s until the gate, operator only) and
-`POST /ui/multi-agent/workflows/<id>/decision` (operator only). Checks:
+Fragments: `GET /ui/multi-agent/status` (status line); `POST /ui/multi-agent/workflows`
+(start) and `GET /ui/multi-agent/workflows/<id>/response` return the customer
+card, which polls itself every 2 s and ends with only the approved answer;
+`GET /ui/multi-agent/pending`, `GET /ui/multi-agent/workflows/<id>` (the review
+desk card with plan, evidence, findings, review and the decision form) and
+`POST /ui/multi-agent/workflows/<id>/decision` are operator only. The Budgets
+tab carries the panel (status line, request form, customer card) and a Review
+desk section that stays closed until opened, with the reviewer token and name
+fields whose values travel as `X-Reviewer-Token` and `reviewer`. Checks:
 `python -m tests.test_multi_agent_client` (stubbed transport) and
 `python -m tests.test_multi_agent_contract` (the real server app, in process)
 from `backend/`.

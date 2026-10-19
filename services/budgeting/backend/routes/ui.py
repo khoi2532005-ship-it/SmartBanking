@@ -748,7 +748,7 @@ def _decision_form(workflow_id):
       <section class="ma-section">
         <h4>Decision</h4>
         <form class="decision-form" hx-post="/ui/multi-agent/workflows/{workflow_id}/decision"
-              hx-target="#ma-{workflow_id}" hx-swap="outerHTML" hx-indicator="#ma-{workflow_id} .htmx-indicator">
+              hx-target="closest article" hx-swap="outerHTML" hx-indicator="closest article">
           <input type="text" name="reviewer" maxlength="60" placeholder="Reviewer name">
           <textarea name="note" rows="2" maxlength="{multi_agent_client.MAX_NOTE_CHARS}" placeholder="Correction note (required for partially accept)"></textarea>
           <div class="form-actions">{buttons} <span class="htmx-indicator muted">Sending</span></div>
@@ -815,6 +815,69 @@ def _load_card(workflow_id, message=""):
     return _workflow_card(full, message)
 
 
+def _customer_card(summary, final=None):
+    """What the person who asked sees: progress, then the approved answer.
+
+    Only the stage badges and the customer view of the final response appear
+    here. The plan, the Worker's unreleased answer and the review belong to
+    the review desk card.
+    """
+    workflow_id = escape(str(summary.get("workflow_id", "")))
+    state = str(summary.get("state", ""))
+    decided = state in multi_agent_client.TERMINAL_STATES
+    poll = (f' hx-get="/ui/multi-agent/workflows/{workflow_id}/response" hx-trigger="every 2s" hx-swap="outerHTML"'
+            if not decided else "")
+    state_cls = {"awaiting_human_review": "near", "accepted": "ok", "partially_accepted": "ok",
+                 "rejected": "over", "failed": "over"}.get(state, "near")
+    body = ""
+    if state == multi_agent_client.STATE_AWAITING:
+        body = '<p class="muted">Awaiting human review</p>'
+    elif state == "failed":
+        body = '<p class="alert alert-warn">The request could not be completed.</p>'
+    elif final is not None and final.get("released"):
+        findings = _list([f.get("statement", "") for f in final.get("findings") or []], cls="")
+        body = f"""
+      <section class="ma-section ma-final">
+        <h4>Final response <span class="badge badge-ok">released</span> <span class="muted">{escape(str(final.get("released_at", "")))}</span></h4>
+        <p>{escape(str(final.get("answer") or ""))}</p>
+        {('<p class="muted">Correction: ' + escape(str(final.get("correction_note"))) + '</p>') if final.get("correction_note") else ""}
+        {findings}
+        {('<p class="muted">Gaps</p>' + _list(final.get("gaps"))) if final.get("gaps") else ""}
+        <p class="muted">Sources: {_chips(final.get("evidence_endpoints") or [])}</p>
+      </section>"""
+    elif final is not None:
+        body = '<section class="ma-section"><h4>Final response <span class="badge badge-over">withheld</span></h4></section>'
+    return f"""
+    <article class="insight-card ma-card ma-customer" id="ma-customer-{workflow_id}"{poll}>
+      <div class="history-head">
+        <span class="chip">{workflow_id}</span>
+        <span class="badge badge-{state_cls}">{escape(state)}</span>
+        <span class="htmx-indicator muted">{"Running" if not decided and state != multi_agent_client.STATE_AWAITING else ""}</span>
+      </div>
+      <p class="muted">{_stage_badges(summary.get("stages") or [])}</p>
+      {body}
+    </article>"""
+
+
+def _load_customer_card(workflow_id):
+    try:
+        summary = multi_agent_client.workflow_status(workflow_id)
+    except _MA_ERRORS as exc:
+        return _ma_alert(exc)
+    if not multi_agent_client.is_budgeting(summary):
+        return _alert(f"Unknown budgeting workflow {escape(str(workflow_id))}.", "warn")
+    final = None
+    if summary.get("state") in ("accepted", "partially_accepted", "rejected"):
+        try:
+            final = multi_agent_client.customer_view(multi_agent_client.response(workflow_id))
+        except multi_agent_client.MultiAgentError as exc:
+            if exc.status != 409:
+                return _ma_alert(exc)
+        except _MA_ERRORS as exc:
+            return _ma_alert(exc)
+    return _customer_card(summary, final)
+
+
 def _operator_alert(*, state_changing):
     """The review desk is for the operator: same-origin marker on POSTs, reviewer token when configured."""
     refused = operator_check(request.headers, state_changing=state_changing)
@@ -848,7 +911,44 @@ def multi_agent_start_fragment():
         summary = multi_agent_client.start(text, customer_id, month, year)
     except _MA_ERRORS as exc:
         return _ma_alert(exc)
-    return _load_card(summary["workflow_id"])
+    return _load_customer_card(summary["workflow_id"])
+
+
+@ui_bp.get("/multi-agent/workflows/<workflow_id>/response")
+def multi_agent_response_fragment(workflow_id):
+    """The customer card: progress, then only the approved answer."""
+    return _load_customer_card(workflow_id)
+
+
+@ui_bp.get("/multi-agent/pending")
+def multi_agent_pending_fragment():
+    """The review desk's list: budgeting workflows waiting for a decision."""
+    refused = _operator_alert(state_changing=False)
+    if refused:
+        return refused
+    try:
+        listing = multi_agent_client.pending()
+    except _MA_ERRORS as exc:
+        return _ma_alert(exc)
+    mine = [w for w in listing.get("workflows") or [] if multi_agent_client.is_budgeting(w)]
+    if not mine:
+        return '<p class="empty">No workflows awaiting a decision.</p>'
+    items = "".join(
+        f"""
+        <li>
+          <div class="history-head">
+            <span class="chip">{escape(str(w.get("workflow_id")))}</span>
+            <span class="badge badge-{VERDICT_BADGE.get(str(w.get("review_verdict")), "near")}">{escape(str(w.get("review_verdict") or ""))}</span>
+            {'<span class="badge badge-over">escalated</span>' if w.get("escalated") else ""}
+            <span class="muted">{escape(str(w.get("created_at", "")))}</span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/multi-agent/workflows/{escape(str(w.get("workflow_id")))}"
+                    hx-target="#ma-desk-card" hx-swap="innerHTML">Open</button>
+          </div>
+          <p class="muted">{escape(str(w.get("request", "")))}</p>
+        </li>"""
+        for w in mine)
+    return f'<ul class="insight-history">{items}</ul>'
 
 
 @ui_bp.get("/multi-agent/workflows/<workflow_id>")

@@ -452,20 +452,80 @@ def test_status_fragment_shows_pipeline_and_pending_when_reachable():
         assert "planner" in page and "human" in page and "1 pending" in page
 
 
-def test_workflow_card_polls_while_running_and_stops_at_the_gate():
+def test_start_fragment_returns_the_customer_card_which_polls_the_response():
     with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer(state="working")) as fake:
         c = _client()
         r = c.post("/ui/multi-agent/workflows", headers=HX, data={"request": "Which categories went over?", "customer_id": "1", "month": "9", "year": "2026"})
         page = r.get_data(as_text=True)
-        assert r.status_code == 200 and f'id="ma-{WID}"' in page
-        assert f'hx-get="/ui/multi-agent/workflows/{WID}"' in page and 'hx-trigger="every 2s"' in page
+        assert r.status_code == 200 and f'id="ma-customer-{WID}"' in page and f'id="ma-{WID}"' not in page
+        assert f'hx-get="/ui/multi-agent/workflows/{WID}/response"' in page and 'hx-trigger="every 2s"' in page
         assert "htmx-indicator" in page and "working" in page
+        for secret in ("Dining Out", "Plan", "Findings", "Review", 'name="decision"', "Internal", "match the evidence"):
+            assert secret not in page, secret                                   # nothing unreleased on the customer side
+        fake.state = "awaiting_human_review"
+        page = c.get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
+        assert "Awaiting human review" in page and 'hx-trigger="every 2s"' in page   # keeps polling until decided
+        assert "Dining Out" not in page
+        fake.decision = {"decision": "partially_accept", "note": "Say the period", "by": "budgeting-ui:Bao", "decided_at": "2026-10-18T01:01:00+00:00"}
+        fake.state = "partially_accepted"
+        page = c.get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
+        assert 'hx-trigger="every 2s"' not in page and "released" in page
+        assert "Two categories are over budget" in page and "Correction: Say the period" in page and "/api/budgets/summary" in page
+        for secret in ("Spending source is", "budgeting-ui", "findings match", "Review", 'name="decision"'):
+            assert secret not in page, secret
+        fake.decision = {"decision": "reject", "note": "private reason", "by": "budgeting-ui", "decided_at": "2026-10-18T01:01:00+00:00"}
+        fake.state = "rejected"
+        page = c.get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
+        assert "withheld" in page and "private reason" not in page and "Two categories" not in page
+        fake.state = "failed"
+        fake.decision = None
+        page = c.get(f"/ui/multi-agent/workflows/{WID}/response").get_data(as_text=True)
+        assert "could not be completed" in page and "budgeting service unavailable" not in page
+
+
+def test_pending_fragment_lists_budgeting_workflows_for_the_desk():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()):
+        page = _client().get("/ui/multi-agent/pending").get_data(as_text=True)
+        assert WID in page and f'hx-get="/ui/multi-agent/workflows/{WID}"' in page and 'hx-target="#ma-desk-card"' in page
+    with _env(MULTI_AGENT_ENABLED="true", BUDGET_REVIEWER_TOKEN="rev-123"), _stub(FakeServer()):
+        c = _client()
+        page = c.get("/ui/multi-agent/pending").get_data(as_text=True)
+        assert "X-Reviewer-Token" in page and WID not in page
+        page = c.get("/ui/multi-agent/pending", headers={"X-Reviewer-Token": "rev-123"}).get_data(as_text=True)
+        assert WID in page
+    with _env(MULTI_AGENT_ENABLED="false"):
+        r = _client().get("/ui/multi-agent/pending")
+        assert r.status_code == 200 and b"disabled" in r.data
+
+
+def test_frontend_tab_wires_the_multi_agent_panel_and_desk():
+    html = (BASE_DIR.parent / "frontend" / "tabs" / "budgets.html").read_text(encoding="utf-8")
+    for needle in (
+        'hx-get="/ui/multi-agent/status"', 'hx-post="/ui/multi-agent/workflows"', 'hx-get="/ui/multi-agent/pending"',
+        'id="ma-panel"', 'id="ma-desk"', 'id="ma-desk-card"', 'id="ma-pending"', 'name="request"', 'maxlength="1000"',
+        'hx-include="#period-form"', 'id="ma-token"', 'X-Reviewer-Token', 'id="ma-reviewer-name"', "ma-chip",
+    ):
+        assert needle in html, needle
+    assert 'hx-post="/ui/multi-agent/workflows"' in html.split('id="ma-desk"')[0]      # the start form is the customer part
+    from app import app
+    ui_rules = {r.rule for r in app.url_map.iter_rules() if r.rule.startswith("/ui/multi-agent")}
+    for path in ("/ui/multi-agent/status", "/ui/multi-agent/workflows", "/ui/multi-agent/workflows/<workflow_id>",
+                 "/ui/multi-agent/workflows/<workflow_id>/response", "/ui/multi-agent/workflows/<workflow_id>/decision",
+                 "/ui/multi-agent/pending"):
+        assert path in ui_rules, path
+
+
+def test_operator_card_polls_while_running_and_stops_at_the_gate():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer(state="working")) as fake:
+        c = _client()
+        page = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
+        assert f'id="ma-{WID}"' in page and f'hx-get="/ui/multi-agent/workflows/{WID}"' in page and 'hx-trigger="every 2s"' in page
         fake.state = "awaiting_human_review"
         page = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
         assert 'hx-trigger="every 2s"' not in page                       # polling stops
         for needle in ("Plan", "/api/budgets/summary", "Evidence", "Findings", "Dining Out is over by 25.2",
                        "Answer", "Review", "accept", "both named", 'name="decision"', 'value="partially_accept"',
-                       'name="note"', f'hx-post="/ui/multi-agent/workflows/{WID}/decision"'):
+                       'name="note"', f'hx-post="/ui/multi-agent/workflows/{WID}/decision"', 'hx-target="closest article"'):
             assert needle in page, needle
         assert "&lt;mock&gt;" in page and "<mock>" not in page             # server text is escaped
 

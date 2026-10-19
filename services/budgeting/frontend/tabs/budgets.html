@@ -68,6 +68,17 @@
         .rag-insufficient { border-left: 4px solid var(--warn); padding-left: 0.75rem; }
         .insight-card h4 { margin: 0.7rem 0 0.2rem; font-size: 0.78rem;
                            text-transform: uppercase; letter-spacing: 0.04em; }
+        /* Release 2: shared Multi-Agent Server panel and review desk */
+        .ma-form .grow { flex: 1 1 320px; }
+        .ma-form .grow textarea { width: 100%; min-height: 3.2rem; resize: vertical; }
+        .ma-card .history-head .badge { margin-left: 0; }
+        .ma-section { border-top: 1px solid var(--line-soft); padding-top: 0.5rem; margin-top: 0.6rem; }
+        .ma-section ul { margin: 0.2rem 0 0.4rem; padding-left: 1.2rem; }
+        .ma-final { border-left: 4px solid var(--ok); padding-left: 0.75rem; }
+        .decision-form textarea, .decision-form input { width: 100%; margin-bottom: 0.4rem; }
+        .decision-form .form-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .desk-row { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 0.6rem; }
+        .desk-row input { width: 220px; }
     </style>
 </head>
 <body>
@@ -304,6 +315,89 @@
         </div>
     </section>
 
+    <section class="card">
+        <h2>Budget question <span class="muted">via the Multi-Agent server</span></h2>
+        <p class="status-line">
+            <span id="ma-status" class="status-text"
+                  hx-get="/ui/multi-agent/status"
+                  hx-trigger="load"
+                  hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/multi-agent/status"
+                    hx-target="#ma-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
+
+        <form class="row ma-form" id="ma-form"
+              hx-post="/ui/multi-agent/workflows"
+              hx-target="#ma-panel"
+              hx-swap="innerHTML"
+              hx-include="#period-form"
+              hx-indicator="#ma-spinner">
+            <div class="grow">
+                <label for="ma-request">Request</label>
+                <textarea id="ma-request" name="request" maxlength="1000" required
+                          placeholder="e.g. Which budget categories went over the limit this period, and by how much?"></textarea>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-ai">Start</button>
+            </div>
+            <div>
+                <span id="ma-spinner" class="htmx-indicator spinner">
+                    Starting...
+                </span>
+            </div>
+        </form>
+
+        <div class="chips">
+            Try:
+            <button type="button" class="chip ma-chip"
+                    data-request="Which budget categories went over the limit this period, and by how much each?">Over budget</button>
+            <button type="button" class="chip ma-chip"
+                    data-request="What did I spend most on this period, and how does it compare with that category's budget?">Top spending</button>
+            <button type="button" class="chip ma-chip"
+                    data-request="Which budgets are close to their limit, and how much is left in each?">Near limit</button>
+        </div>
+
+        <div id="ma-panel" class="panel">
+            <p class="empty">No request started yet.</p>
+        </div>
+    </section>
+
+    <section class="card" id="ma-desk">
+        <h2>Review desk <span class="muted">human review</span></h2>
+        <form class="desk-row" id="ma-desk-form" onsubmit="return false">
+            <div>
+                <label for="ma-token">Reviewer token</label>
+                <input id="ma-token" type="password" autocomplete="off" placeholder="only if the backend requires one">
+            </div>
+            <div>
+                <label for="ma-reviewer-name">Reviewer</label>
+                <input id="ma-reviewer-name" type="text" maxlength="60" placeholder="your name">
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary" id="ma-desk-toggle">Open review desk</button>
+            </div>
+        </form>
+        <div id="ma-desk-body" class="is-hidden">
+            <p class="status-line">
+                <span class="status-text">Pending workflows</span>
+                <button type="button" class="btn btn-secondary btn-small"
+                        hx-get="/ui/multi-agent/pending"
+                        hx-target="#ma-pending"
+                        hx-swap="innerHTML"
+                        hx-indicator="#ma-desk-spinner">Refresh</button>
+                <span id="ma-desk-spinner" class="htmx-indicator spinner">Loading...</span>
+            </p>
+            <div id="ma-pending" class="panel">
+                <p class="empty">Press Refresh.</p>
+            </div>
+            <div id="ma-desk-card" class="panel"></div>
+        </div>
+    </section>
+
 </main>
 
 <script>
@@ -312,9 +406,44 @@
 const BUDGETS_API = window.BUDGETS_API || `http://${window.location.hostname}:5004`;
 
 document.body.addEventListener("htmx:configRequest", (event) => {
+    if (event.detail.path.startsWith("/ui/multi-agent/")) {
+        // The review desk's token and the reviewer's name travel as headers; the
+        // backend checks the token on operator routes when one is configured.
+        const token = document.getElementById("ma-token").value.trim();
+        if (token) event.detail.headers["X-Reviewer-Token"] = token;
+        const reviewer = document.getElementById("ma-reviewer-name").value.trim();
+        if (reviewer && event.detail.verb === "post") event.detail.parameters["reviewer"] = reviewer;
+    }
     if (event.detail.path.startsWith("/ui/")) {
         event.detail.path = BUDGETS_API + event.detail.path;
     }
+});
+
+// Release 2: the review desk stays closed until opened; the token and name are
+// kept for this browser tab only.
+(function () {
+    const token = document.getElementById("ma-token");
+    const reviewer = document.getElementById("ma-reviewer-name");
+    try {
+        token.value = sessionStorage.getItem("ma-token") || "";
+        reviewer.value = sessionStorage.getItem("ma-reviewer") || "";
+    } catch (e) { /* storage unavailable: the fields still work for this page */ }
+    token.addEventListener("input", () => { try { sessionStorage.setItem("ma-token", token.value); } catch (e) {} });
+    reviewer.addEventListener("input", () => { try { sessionStorage.setItem("ma-reviewer", reviewer.value); } catch (e) {} });
+    const toggle = document.getElementById("ma-desk-toggle");
+    const body = document.getElementById("ma-desk-body");
+    toggle.addEventListener("click", () => {
+        const open = body.classList.toggle("is-hidden") === false;
+        toggle.textContent = open ? "Close review desk" : "Open review desk";
+        if (open) htmx.trigger(body.querySelector("[hx-get]"), "click");
+    });
+})();
+
+// Example requests for the Multi-Agent panel: fill the box, the person presses Start.
+document.body.addEventListener("click", (event) => {
+    const chip = event.target.closest(".ma-chip");
+    if (!chip) return;
+    document.getElementById("ma-request").value = chip.dataset.request;
 });
 
 // Reveal hidden panels the first time they are populated.
