@@ -1092,6 +1092,26 @@ def test_second_server_start_leaves_a_running_servers_data_alone(tmp_path, monke
     assert server_module.port_in_use(port) is False
 
 
+def test_port_check_falls_back_to_a_bind_probe_when_the_connect_probe_times_out(monkeypatch):
+    # Some hosts drop loopback connections to closed ports instead of refusing
+    # them, so the connect probe times out for a free port. The bind probe must
+    # then decide: a port nothing holds is free, a port with a listener is not.
+    def always_times_out(*args, **kwargs):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(server_module.socket, "create_connection", always_times_out)
+
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind(("0.0.0.0", 0))
+    listener.listen(5)
+    port = listener.getsockname()[1]
+    try:
+        assert server_module.port_in_use(port) is True
+    finally:
+        listener.close()
+    assert server_module.port_in_use(port) is False
+
+
 def test_store_skips_files_that_are_not_workflows(tmp_path, api):
     (tmp_path / "data").mkdir()
     (tmp_path / "data" / "wf_list.json").write_text("[]", encoding="utf-8")

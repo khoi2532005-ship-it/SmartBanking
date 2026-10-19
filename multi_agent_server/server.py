@@ -293,20 +293,37 @@ def _banner(app: Flask) -> None:
 
 
 def port_in_use(port: int, host: str = "127.0.0.1") -> bool:
-    """True when something already listens on the port (a connect probe works on every OS).
+    """True when something already listens on the port.
 
-    On localhost a refused connection is the only sign that nothing is there; a
-    timeout means a listener with a full backlog, so it counts as in use. Any
-    other error also counts as in use: refusing to start is safer than
-    touching another server's data.
+    A connect probe answers on every OS: refused means nothing is there and a
+    connection means a server is. A timeout is ambiguous. It can be a listener
+    with a full backlog, or a host whose firewall drops loopback connections to
+    closed ports instead of refusing them (the Hyper-V firewall that Docker
+    Desktop's WSL2 VM brings up on Windows does this), so a bind probe settles
+    it: a port that can be bound is free. Any other error counts as in use:
+    refusing to start is safer than touching another server's data.
     """
     try:
         with socket.create_connection((host, port), timeout=0.5):
             return True
     except ConnectionRefusedError:
         return False
+    except TimeoutError:
+        return not _can_bind(port)
     except OSError:
         return True
+
+
+def _can_bind(port: int) -> bool:
+    """True when the port can be bound on all interfaces, the way the server binds it."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # Windows: do not share a port another socket holds
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        try:
+            probe.bind(("0.0.0.0", port))
+        except OSError:
+            return False
+    return True
 
 
 def main() -> int:
