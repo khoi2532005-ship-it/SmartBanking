@@ -90,7 +90,12 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-rag.txt -r requirements-multi-agent.txt
+          pip install \
+            -r requirements-agentic.txt \
+            -r requirements-mcp.txt \
+            -r requirements-rag.txt \
+            -r requirements-multi-agent.txt \
+            -r services/transactions/backend/requirements.txt
 
       - name: Run relevant unit tests
         run: python -m pytest -q tests/test_agentic_validation_modes.py tests/test_mcp_server.py tests/test_rag_server.py tests/test_multi_agent_server.py services/transactions/backend/tests/test_multi_agent_client.py

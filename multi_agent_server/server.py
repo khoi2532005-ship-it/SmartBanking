@@ -293,20 +293,22 @@ def _banner(app: Flask) -> None:
 
 
 def port_in_use(port: int, host: str = "127.0.0.1") -> bool:
-    """True when something already listens on the port (a connect probe works on every OS).
+    """True when something is already listening on the port.
 
-    On localhost a refused connection is the only sign that nothing is there; a
-    timeout means a listener with a full backlog, so it counts as in use. Any
-    other error also counts as in use: refusing to start is safer than
-    touching another server's data.
+    A connect probe is not reliable on some platforms (notably Windows) after a
+    listener has been closed: the port may briefly look unavailable even though it
+    is free. A bind probe is the direct check for "is anything already using this
+    socket address and port?" and is the safer choice here.
     """
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        with socket.create_connection((host, port), timeout=0.5):
-            return True
-    except ConnectionRefusedError:
-        return False
+        probe.bind((host, port))
     except OSError:
         return True
+    else:
+        return False
+    finally:
+        probe.close()
 
 
 def main() -> int:
