@@ -8,7 +8,9 @@ is mainly for accounts, loans and transactions.
 
 Everything below lives in the budgeting feature and can be copied with the
 feature name changed. Nothing in `multi_agent_server/` needs to change except
-the catalogue entry for your feature.
+the catalogue entry for your feature: the server's `GET /workflows` already
+takes `?feature=`, `?customer_id=` and `?limit=`, which is what a panel's
+history list calls.
 
 ## 1. Your endpoints in the catalogue
 
@@ -39,13 +41,15 @@ Copy the Release 2 block at the end of `services/budgeting/backend/routes/agents
 | Route | Notes |
 |---|---|
 | `POST /api/multi-agent/workflows` | start; needs the `HX-Request` or `X-Requested-With` header |
-| `GET /api/multi-agent/workflows` | your feature's most recent workflows, newest first |
+| `GET /api/multi-agent/workflows[?customer_id=]` | your feature's latest workflows, newest first, one customer's when asked |
 | `GET /api/multi-agent/workflows/<id>` | the whole workflow: stages, plan, result, review, decision, final response |
 | `POST /api/multi-agent/workflows/<id>/decision` | `decision`, `note`, `reviewer`; recorded as `<feature>-ui:<reviewer>` |
 
 Keep the two boundaries: every POST needs the same-origin header, and another
-feature's workflow id is a 404. Restrict CORS to your frontend origins the way
-`app.py` does. Add `multi_agent` to `/api/health` and to `/api/agents/status`.
+feature's workflow id is a 404. Answer browsers only from your own tab and the
+home page on the same host as the API, the way `app.py` does (the same rule
+fraud-service uses); `<FEATURE>_FRONTEND_ORIGINS` adds exact origins. Add
+`multi_agent` to `/api/health` and to `/api/agents/status`.
 
 ## 4. The fragments and the panel
 
@@ -56,8 +60,11 @@ polls itself every 2 s, then the plan, the evidence and findings, the review
 with its risks, then the decision block (reviewer name, note, Accept /
 Partially accept / Reject) inside the same card once the workflow is
 awaiting human review, then the final response, released or withheld. A
-History list under the card reopens earlier workflows. Budgeting keeps its AI
-panels on an AI Mode tab next to the Normal tab, as fraud and accounts do.
+refused or failed decision shows its reason inside the block and keeps the
+typed note; a decision that went through replaces the card (HX-Retarget, so
+expose it through CORS). A History list under the card shows the selected
+customer's workflows and reopens them. Budgeting keeps its AI panels on an AI
+Mode tab next to the Normal tab, as fraud and accounts do.
 
 ## 5. Configuration
 

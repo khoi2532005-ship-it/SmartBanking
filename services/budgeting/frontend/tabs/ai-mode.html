@@ -8,12 +8,6 @@
     <!-- Vendored locally so the demo does not depend on network access. -->
     <script src="/js/htmx.min.js"></script>
     <style>
-        .inline-edit { display: flex; gap: 0.3rem; align-items: center; }
-        .inline-edit input { width: 92px; }
-        td.actions { white-space: nowrap; }
-        td.actions .btn { margin-left: 0.25rem; }
-        .category { font-weight: 600; }
-        .over-by { color: var(--over); font-weight: 600; }
         .summary-strip {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -49,7 +43,6 @@
                         margin-bottom: 0.3rem; flex-wrap: wrap; }
         .insight-history p { margin: 0; font-size: 0.9rem; }
         .source-note { margin-bottom: 0; }
-        .unbudgeted { margin: 0.5rem 0 0; }
         /* Release 1: shared MCP and RAG server panels */
         .status-line { display: flex; gap: 0.5rem; align-items: center;
                        flex-wrap: wrap; margin: 0.25rem 0 0.9rem;
@@ -79,10 +72,9 @@
         .ma-decision .grow { flex: 1 1 320px; }
         .ma-decision input, .ma-decision textarea { width: 100%; }
         .ma-decision .form-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem; }
+        .ma-message:empty { display: none; }
+        .ma-message .alert { margin: 0.4rem 0 0; }
         .ma-history-title { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
-        /* Tab strip linking the Normal and AI Mode views, as the fraud tabs do. */
-        .tab-strip { margin: 0 0 1rem; }
-        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
     </style>
 </head>
 <body>
@@ -319,7 +311,8 @@
         <h3 class="ma-history-title">History</h3>
         <div id="ma-history" class="panel"
              hx-get="/ui/multi-agent/history"
-             hx-trigger="load, ma-started from:body, ma-decided from:body"
+             hx-include="#period-form"
+             hx-trigger="load, change from:#period-form, ma-started from:body, ma-updated from:body, ma-decided from:body"
              hx-swap="innerHTML">
             <p class="empty">Loading...</p>
         </div>
@@ -360,14 +353,6 @@ document.body.addEventListener("click", (event) => {
     document.getElementById("rag-query").value = chip.dataset.question;
     const form = document.getElementById("rag-form");
     form.requestSubmit ? form.requestSubmit() : htmx.trigger(form, "submit");
-});
-
-// Clear the create form once a budget has been created successfully.
-document.body.addEventListener("htmx:afterRequest", (event) => {
-    const form = document.getElementById("create-form");
-    if (event.detail.elt === form && event.detail.successful) {
-        form.reset();
-    }
 });
 
 // Surface network/server failures instead of leaving the panel blank.

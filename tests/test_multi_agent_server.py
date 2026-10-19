@@ -1952,6 +1952,26 @@ def test_unknown_route_is_json_not_html(client):
     assert response.is_json and response.get_json()["status"] == 404
 
 
+def test_list_filters_by_feature_customer_and_limit(client):
+    # three workflows: budgeting for customers 1 and 2, loans for customer 1; newest first throughout
+    first = client.post("/workflow", json=VALID).get_json()["workflow_id"]
+    loans = client.post("/workflow", json={**VALID, "feature": "loans"}).get_json()["workflow_id"]
+    second = client.post("/workflow", json={**VALID, "context": {**VALID["context"], "customer_id": 2}}).get_json()["workflow_id"]
+    # created within the same second, so only membership is asserted, not the order among them
+    budgeting = client.get("/workflows?feature=budgeting").get_json()
+    assert {w["workflow_id"] for w in budgeting} == {first, second}
+    assert all(w["request"] == VALID["request"] and "customer_id" in w["context"] for w in budgeting)
+    assert [w["workflow_id"] for w in client.get("/workflows?feature=budgeting&customer_id=2").get_json()] == [second]
+    assert {w["workflow_id"] for w in client.get("/workflows?customer_id=1").get_json()} == {loans, first}
+    assert len(client.get("/workflows?limit=1").get_json()) == 1
+    assert [w["workflow_id"] for w in client.get("/workflows?feature=loans&limit=5").get_json()] == [loans]
+    assert client.get("/workflows?feature=budgeting&customer_id=9").get_json() == []
+    response = client.get("/workflows?feature=bogus")
+    assert response.status_code == 400 and "budgeting" in response.get_json()["features"]
+    for bad in ("/workflows?limit=0", "/workflows?limit=101", "/workflows?limit=ten", "/workflows?customer_id=x"):
+        assert client.get(bad).status_code == 400, bad
+
+
 def test_list_filters_by_state_and_rejects_unknown_states(client):
     first = client.post("/workflow", json=VALID).get_json()["workflow_id"]
     second = client.post("/workflow", json={**VALID, "feature": "loans"}).get_json()["workflow_id"]

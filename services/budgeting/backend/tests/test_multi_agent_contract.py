@@ -149,7 +149,7 @@ def test_accept_releases_the_final_response_in_the_card():
         wid = _start_budgeting(h)
         r = h.client.post(f"/ui/multi-agent/workflows/{wid}/decision", headers=HX, data={"decision": "accept", "reviewer": "Bao"})
         page = r.get_data(as_text=True)
-        assert r.status_code == 200 and r.headers.get("HX-Trigger") == "ma-decided"
+        assert r.status_code == 200 and r.headers.get("HX-Trigger") == "ma-decided" and r.headers.get("HX-Retarget") == f"#ma-{wid}"
         assert "accepted" in page and "released" in page and BUDGET_RESULT["answer"] in page and "budgeting-ui:Bao" in page
         full = h.client.get(f"/api/multi-agent/workflows/{wid}").get_json()
         assert full["final_response"]["released"] is True and full["final_response"]["answer"] == BUDGET_RESULT["answer"]
@@ -157,6 +157,9 @@ def test_accept_releases_the_final_response_in_the_card():
         history = h.client.get("/api/multi-agent/workflows").get_json()
         assert history["count"] == 1 and history["workflows"][0]["state"] == "accepted"
         assert history["workflows"][0]["request"].startswith("Which categories") and history["workflows"][0]["context"] == CONTEXT
+        assert h.client.get("/api/multi-agent/workflows?customer_id=2").get_json()["count"] == 0
+        page = h.client.get("/ui/multi-agent/history?customer_id=1").get_data(as_text=True)
+        assert wid in page and "accepted" in page
     _run_contract(check)
 
 

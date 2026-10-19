@@ -12,7 +12,7 @@ from html import escape
 
 from flask import Blueprint, make_response, request
 
-from routes.agents import HISTORY_LIMIT, MAX_REVIEWER_CHARS, decided_by, same_origin_marker
+from routes.agents import MAX_REVIEWER_CHARS, decided_by, same_origin_marker
 from services import database_api, insight_service, mcp_client, multi_agent_client, rag_client, transactions_client
 from services.budget_logic import build_summary
 
@@ -749,14 +749,17 @@ def _decision_block(workflow_id):
     """The human decision inside the card: reviewer name, note, three buttons.
 
     There is no <form>: each button posts the block's two fields itself, so
-    Enter in the name box submits nothing, a second click while one decision
-    is in flight is dropped, and the whole card is replaced by the answer.
+    Enter in the name box submits nothing and a second click while one
+    decision is in flight is dropped. The buttons target the block's message
+    slot, so a refused or failed decision shows its reason there and the name
+    and note stay typed; a decision that went through comes back as the whole
+    card with HX-Retarget, which replaces the article.
     """
     workflow_id = escape(str(workflow_id))
     buttons = "".join(
         f'<button type="button" class="btn{" btn-primary" if value == "accept" else ""}" '
         f'hx-post="/ui/multi-agent/workflows/{workflow_id}/decision" hx-vals=\'{{"decision": "{value}"}}\' '
-        f'hx-include="closest .ma-decision" hx-target="closest article" hx-swap="outerHTML" '
+        f'hx-include="closest .ma-decision" hx-target="#ma-msg-{workflow_id}" hx-swap="innerHTML" '
         f'hx-sync="closest .ma-decision:drop" hx-disabled-elt="this" hx-indicator="closest .ma-decision">{label}</button>'
         for value, label in DECISION_LABEL.items())
     return f"""
@@ -774,6 +777,7 @@ def _decision_block(workflow_id):
                       placeholder="Correction note (required for Partially accept)"></textarea>
           </div>
         </div>
+        <div id="ma-msg-{workflow_id}" class="ma-message"></div>
         <div class="form-actions">{buttons} <span class="htmx-indicator muted">Sending</span></div>
       </section>"""
 
@@ -839,8 +843,10 @@ def _retry_card(workflow_id, exc):
 
 
 def _temporary(exc):
+    """A server that is down or failing may answer later; a reply that broke the
+    contract (missing fields, a non-object body) will not, so it is shown instead."""
     return isinstance(exc, multi_agent_client.MultiAgentUnreachable) or (
-        isinstance(exc, multi_agent_client.MultiAgentError) and exc.status >= 500)
+        isinstance(exc, multi_agent_client.MultiAgentError) and exc.temporary)
 
 
 def _load_card(workflow_id, message=""):
@@ -849,7 +855,7 @@ def _load_card(workflow_id, message=""):
     except _MA_ERRORS as exc:
         return _retry_card(workflow_id, exc) if _temporary(exc) else _ma_alert(exc)
     if not multi_agent_client.is_budgeting(full):
-        return _alert(f"Unknown budgeting workflow {escape(str(workflow_id))}.", "warn")
+        return _alert(f"Unknown budgeting workflow {workflow_id}.", "warn")
     return _workflow_card(full, message)
 
 
@@ -893,16 +899,16 @@ def multi_agent_start_fragment():
 
 @ui_bp.get("/multi-agent/history")
 def multi_agent_history_fragment():
-    """The most recent budgeting workflows, newest first; Open loads one into the panel."""
+    """The selected customer's latest workflows, newest first; Open loads one into the panel."""
+    customer_id = _customer(request.args)
     try:
-        listing = multi_agent_client.history()
+        listing = multi_agent_client.history(customer_id)
     except _MA_ERRORS as exc:
         return f'<p class="empty">{escape(str(exc).rstrip("."))}.</p>'
-    mine = [w for w in listing if multi_agent_client.is_budgeting(w)][:HISTORY_LIMIT]
-    if not mine:
-        return '<p class="empty">No budgeting workflows yet.</p>'
+    if not listing:
+        return f'<p class="empty">No workflows for customer {customer_id} yet.</p>'
     items = ""
-    for w in mine:
+    for w in listing:
         workflow_id = escape(str(w.get("workflow_id")))
         context = w.get("context") or {}
         items += f"""
@@ -922,8 +928,13 @@ def multi_agent_history_fragment():
 
 @ui_bp.get("/multi-agent/workflows/<workflow_id>")
 def multi_agent_workflow_fragment(workflow_id):
-    """The card: polled every 2 s while the stages run, then the gate, then the answer."""
-    return _load_card(workflow_id)
+    """The card: polled every 2 s while the stages run, then the gate, then the answer.
+    When the card has stopped running, the history list is told to refresh, so
+    a workflow that reached the gate or failed while polling shows up right."""
+    response = make_response(_load_card(workflow_id))
+    if 'hx-trigger="every' not in response.get_data(as_text=True) and f'id="ma-{escape(str(workflow_id))}"' in response.get_data(as_text=True):
+        response.headers["HX-Trigger"] = "ma-updated"
+    return response
 
 
 @ui_bp.post("/multi-agent/workflows/<workflow_id>/decision")
@@ -937,14 +948,23 @@ def multi_agent_decision_fragment(workflow_id):
     try:
         summary = multi_agent_client.workflow_status(workflow_id)
         if not multi_agent_client.is_budgeting(summary):
-            return _alert(f"Unknown budgeting workflow {escape(str(workflow_id))}.", "warn")
+            return _alert(f"Unknown budgeting workflow {workflow_id}.", "warn")
         multi_agent_client.decide(workflow_id, decision, note, by=decided_by(reviewer))
     except multi_agent_client.MultiAgentError as exc:
-        if exc.status in (400, 409):
-            return _load_card(workflow_id, _alert(f"{str(exc).rstrip('.')}.", "warn"))
-        return _ma_alert(exc)
+        if exc.status == 409:                                   # decided elsewhere: show the card as it is now
+            return _replace_card(workflow_id, _alert(f"{str(exc).rstrip('.')}.", "warn"), "ma-updated")
+        if exc.temporary:                                       # the server failed just now: the note stays typed
+            return _alert(f"{str(exc).rstrip('.')}. Try again.", "warn")
+        return _ma_alert(exc)                                   # 400 bad note, 404: the reason, in the slot
     except _MA_ERRORS as exc:
-        return _ma_alert(exc)
-    response = make_response(_load_card(workflow_id))
-    response.headers["HX-Trigger"] = "ma-decided"           # the history list refreshes itself
+        return _alert(f"{str(exc).rstrip('.')}. Try again.", "warn")
+    return _replace_card(workflow_id, "", "ma-decided")
+
+
+def _replace_card(workflow_id, message, trigger):
+    """The whole card instead of the message slot the button targeted."""
+    response = make_response(_load_card(workflow_id, message))
+    response.headers["HX-Retarget"] = f"#ma-{escape(str(workflow_id))}"
+    response.headers["HX-Reswap"] = "outerHTML"
+    response.headers["HX-Trigger"] = trigger                   # the history list refreshes itself
     return response

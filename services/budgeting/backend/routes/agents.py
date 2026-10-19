@@ -14,7 +14,7 @@ error rather than a stack trace.
 Release 2, the shared Multi-Agent Server (Planner -> Worker -> Reviewer -> human):
 
     POST /api/multi-agent/workflows                  {"request", "customer_id"?, "month"?, "year"?} -> 202 summary
-    GET  /api/multi-agent/workflows                  the most recent budgeting workflows (history)
+    GET  /api/multi-agent/workflows[?customer_id=]   the latest budgeting workflows (history), newest first
     GET  /api/multi-agent/workflows/<id>             the whole workflow: stages, plan, result, review, decision, final response
     POST /api/multi-agent/workflows/<id>/decision    {"decision": accept|partially_accept|reject, "note"?, "reviewer"?}
 
@@ -187,7 +187,6 @@ def rag_query():
 _MA_ERRORS = (multi_agent_client.MultiAgentDisabled, multi_agent_client.MultiAgentUnreachable,
               multi_agent_client.MultiAgentError)
 MAX_REVIEWER_CHARS = 60
-HISTORY_LIMIT = 10
 WORKFLOW_KEYS = ("workflow_id", "feature", "state", "request", "context", "created_at", "updated_at", "stages",
                  "revisions", "plan", "result", "review", "decision", "final_response", "error")
 
@@ -252,13 +251,19 @@ def multi_agent_start():
 
 @agents_bp.get("/api/multi-agent/workflows")
 def multi_agent_history():
-    """The most recent budgeting workflows, newest first, for the panel's history list."""
+    """The latest budgeting workflows, newest first; ?customer_id= keeps one customer's."""
+    raw = request.args.get("customer_id")
+    customer_id = None
+    if raw:
+        try:
+            customer_id = int(raw)
+        except ValueError:
+            return jsonify({"error": "customer_id must be an integer"}), 400
     try:
-        listing = multi_agent_client.history()
+        listing = multi_agent_client.history(customer_id)
     except _MA_ERRORS as exc:
         return _integration_error(exc)
-    mine = [w for w in listing if multi_agent_client.is_budgeting(w)][:HISTORY_LIMIT]
-    return jsonify({"count": len(mine), "workflows": mine})
+    return jsonify({"count": len(listing), "customer_id": customer_id, "workflows": listing})
 
 
 @agents_bp.get("/api/multi-agent/workflows/<workflow_id>")

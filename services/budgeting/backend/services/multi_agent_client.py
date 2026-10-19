@@ -9,7 +9,7 @@ waits for a person; the final response exists only after that decision.
     workflow_status()  GET  /workflow/<id>/status     -> summary: state, stages, decision, released
     workflow()         GET  /workflow/<id>            -> the whole record: plan, result, review, decision, final_response
     decide()           POST /workflow/<id>/decision   -> accept | partially_accept | reject (+ note, by)
-    history()          GET  /workflows                -> every workflow the server holds, newest first
+    history()          GET  /workflows?feature=budgeting&limit=10[&customer_id=] -> this feature's latest workflows, newest first
 
 Every call that names a workflow checks the id's shape first, so nothing but
 a workflow id is ever placed in a server URL. The routes keep this feature to
@@ -22,6 +22,8 @@ its own workflows with is_budgeting().
   (MULTI_AGENT_CLIENT_TIMEOUT, default 10 s).
 - A non-2xx reply raises MultiAgentError carrying the status and the server's
   own error message; a 409 from decide() means the workflow is not waiting.
+  A 5xx from the server is marked temporary (the UI keeps polling); a reply
+  that breaks the contract is not, because it will not fix itself.
 - MULTI_AGENT_API_TOKEN, when set, is sent as a bearer token on every call.
 """
 
@@ -43,6 +45,7 @@ MAX_NOTE_CHARS = 1000
 DECISIONS = ("accept", "partially_accept", "reject")
 STATE_AWAITING = "awaiting_human_review"
 TERMINAL_STATES = ("accepted", "partially_accepted", "rejected", "failed")
+HISTORY_LIMIT = 10                      # workflows the panel's history shows
 _SUMMARY_KEYS = ("workflow_id", "state", "stages")
 WORKFLOW_ID = re.compile(r"^wf_[0-9a-f]{8}$")
 
@@ -58,10 +61,11 @@ class MultiAgentUnreachable(RuntimeError):
 class MultiAgentError(RuntimeError):
     """The server answered with an error status (or an unusable body)."""
 
-    def __init__(self, status: int, message: str, payload: dict[str, Any] | None = None) -> None:
+    def __init__(self, status: int, message: str, payload: dict[str, Any] | None = None, *, temporary: bool = False) -> None:
         super().__init__(message)
         self.status = status
         self.payload = payload or {}
+        self.temporary = temporary          # the server failed just now; a later call may succeed
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +132,7 @@ def _expect(status_code: int, payload: Any, ok: tuple[int, ...] = (200,)) -> dic
                                    "to the same value the server uses", payload if isinstance(payload, dict) else {})
     if status_code >= 500:
         # The server's own failure text stays in its logs; the caller learns only that it failed.
-        raise MultiAgentError(502, f"the Multi-Agent Server failed (HTTP {status_code})")
+        raise MultiAgentError(502, f"the Multi-Agent Server failed (HTTP {status_code})", temporary=True)
     if status_code not in ok:
         message = payload.get("error") if isinstance(payload, dict) else None
         raise MultiAgentError(status_code, message or f"Multi-Agent Server returned HTTP {status_code}",
@@ -197,14 +201,18 @@ def decide(workflow_id: str, decision: str, note: str = "", by: str = "budgeting
     return _validate_summary(_expect(status_code, payload))
 
 
-def history() -> list[dict[str, Any]]:
-    """Every workflow the server holds, all features, newest first."""
-    status_code, payload = _request("GET", "/workflows")
+def history(customer_id: int | None = None, limit: int = HISTORY_LIMIT) -> list[dict[str, Any]]:
+    """This feature's latest workflows, newest first (the server sorts and caps
+    them); with a customer id, only that customer's."""
+    query = f"/workflows?feature={FEATURE}&limit={int(limit)}"
+    if customer_id is not None:
+        query += f"&customer_id={int(customer_id)}"
+    status_code, payload = _request("GET", query)
     if status_code != 200:
         _expect(status_code, payload)                      # raises with the server's reason
     if not isinstance(payload, list) or not all(isinstance(w, dict) for w in payload):
         raise MultiAgentError(502, "Multi-Agent Server returned a non-list workflow listing")
-    return sorted(payload, key=lambda w: str(w.get("created_at") or ""), reverse=True)
+    return [w for w in payload if is_budgeting(w)][:int(limit)]      # the server already filtered; this is the boundary
 
 
 def health() -> dict[str, Any]:

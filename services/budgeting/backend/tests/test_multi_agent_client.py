@@ -137,15 +137,24 @@ class FakeServer:
             self.decision = {"decision": body["decision"], "note": body["note"], "by": body["by"], "decided_at": "2026-10-18T01:01:00+00:00"}
             return 200, {**SUMMARY_AWAITING, "state": self.state, "decision": self.decision,
                          "released": body["decision"] != "reject", "final_response": self._final()}
-        if path == "/workflows":
-            # the server's listing holds every feature's workflows; the budgeting routes filter and sort
-            return 200, [
-                {**SUMMARY_AWAITING, "workflow_id": OLDER_WID, "state": "rejected", "created_at": "2026-10-17T09:00:00+00:00",
-                 "request": "Older question", "context": CONTEXT},
+        if path.startswith("/workflows"):
+            # the server's listing: every feature's workflows, newest first, narrowed by the query it is sent
+            from urllib.parse import parse_qs, urlsplit
+            query = parse_qs(urlsplit(path).query)
+            rows = [
                 {**SUMMARY_AWAITING, "workflow_id": LOANS_WID, "feature": "loans", "state": "accepted",
                  "created_at": "2026-10-18T02:00:00+00:00", "request": "List my loans", "context": {"customer_id": 1}},
                 {**SUMMARY_AWAITING, "state": self.state, "decision": self.decision, "request": REQUEST, "context": CONTEXT},
+                {**SUMMARY_AWAITING, "workflow_id": OLDER_WID, "state": "rejected", "created_at": "2026-10-17T09:00:00+00:00",
+                 "request": "Older question", "context": CONTEXT},
             ]
+            if query.get("feature"):
+                rows = [w for w in rows if w["feature"] == query["feature"][0]]
+            if query.get("customer_id"):
+                rows = [w for w in rows if w["context"].get("customer_id") == int(query["customer_id"][0])]
+            if query.get("limit"):
+                rows = rows[:int(query["limit"][0])]
+            return 200, rows
         return 404, {"error": f"unknown workflow {path!r}"}
 
 
@@ -236,11 +245,16 @@ def test_decide_validates_before_calling_and_relays_the_server_answer():
         assert exc.status == 409 and exc.payload["state"] == "partially_accepted"
 
 
-def test_history_lists_every_workflow_newest_first_and_rejects_bad_bodies():
-    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()):
+def test_history_asks_for_this_features_workflows_and_rejects_bad_bodies():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
         listing = ma.history()
-        assert [w["workflow_id"] for w in listing] == [LOANS_WID, WID, OLDER_WID]        # every feature, newest first
-        assert listing[1]["request"] == REQUEST and listing[1]["context"] == CONTEXT
+        assert fake.calls[-1][1] == f"/workflows?feature=budgeting&limit={ma.HISTORY_LIMIT}"   # the server filters and caps
+        assert [w["workflow_id"] for w in listing] == [WID, OLDER_WID]                  # budgeting only, newest first
+        assert listing[0]["request"] == REQUEST and listing[0]["context"] == CONTEXT
+        assert ma.history(customer_id=2) == [] and fake.calls[-1][1].endswith("&customer_id=2")
+        assert [w["workflow_id"] for w in ma.history(limit=1)] == [WID]
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(lambda m, p, b=None: (200, [{**SUMMARY_AWAITING, "feature": "loans"}])):
+        assert ma.history() == []                                                       # a stray other-feature row is dropped here too
     with _env(MULTI_AGENT_ENABLED="true"), _stub(lambda m, p, b=None: (200, {"workflows": []})):
         assert _raises(ma.history, ma.MultiAgentError).status == 502
     with _env(MULTI_AGENT_ENABLED="true"), _stub(lambda m, p, b=None: (200, [1, 2])):
@@ -288,8 +302,13 @@ def test_server_failures_become_502_without_the_servers_text():
         with _stub(lambda m, p, b=None: (500, {"error": "Traceback (most recent call last): secret path"})):
             exc = _raises(lambda: ma.workflow_status(WID), ma.MultiAgentError)
             assert exc.status == 502 and "Traceback" not in str(exc) and "HTTP 500" in str(exc)
+            assert exc.temporary is True                                                # the server may answer later
             r = _client().get(f"/api/multi-agent/workflows/{WID}")
             assert r.status_code == 502 and "Traceback" not in r.get_data(as_text=True)
+        with _stub(lambda m, p, b=None: (200, {"workflow_id": WID})):
+            assert _raises(lambda: ma.workflow_status(WID), ma.MultiAgentError).temporary is False   # a broken contract will not
+        with _stub(lambda m, p, b=None: (404, {"error": "unknown workflow"})):
+            assert _raises(lambda: ma.workflow_status(WID), ma.MultiAgentError).temporary is False
 
 
 # ---------------------------------------------------------------- routes
@@ -356,6 +375,9 @@ def test_routes_relay_the_workflow_lifecycle():
         assert full["result"]["answer"].startswith("Two categories")                    # the panel shows the whole workflow
         history = c.get("/api/multi-agent/workflows").get_json()
         assert history["count"] == 2 and [w["workflow_id"] for w in history["workflows"]] == [WID, OLDER_WID]   # budgeting only, newest first
+        history = c.get("/api/multi-agent/workflows?customer_id=2").get_json()
+        assert history == {"count": 0, "customer_id": 2, "workflows": []}
+        assert c.get("/api/multi-agent/workflows?customer_id=two").status_code == 400
         r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "accept"})
         assert r.status_code == 200 and r.get_json()["state"] == "accepted" and r.get_json()["final_response"]["released"] is True
         assert fake.calls[-1][2]["by"] == "budgeting-ui"
@@ -375,7 +397,7 @@ def test_other_features_workflows_do_not_exist_here():
         status, payload = loans(method, path, body)
         if isinstance(payload, dict) and payload.get("feature") == "budgeting":
             payload = {**payload, "feature": "loans"}
-        if path == "/workflows":
+        if path.startswith("/workflows"):
             payload = [{**w, "feature": "loans"} for w in payload]
         return status, payload
 
@@ -384,11 +406,11 @@ def test_other_features_workflows_do_not_exist_here():
         assert c.get(f"/api/multi-agent/workflows/{WID}").status_code == 404
         r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers=HX, json={"decision": "accept"})
         assert r.status_code == 404 and loans.decision is None                # never decided
-        assert c.get("/api/multi-agent/workflows").get_json() == {"count": 0, "workflows": []}
+        assert c.get("/api/multi-agent/workflows").get_json() == {"count": 0, "customer_id": None, "workflows": []}
         page = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
         assert "Unknown budgeting workflow" in page and "Dining Out" not in page
         page = c.get("/ui/multi-agent/history").get_data(as_text=True)
-        assert "No budgeting workflows yet" in page and WID not in page
+        assert "No workflows for customer 1 yet" in page and WID not in page
         r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "accept"})
         assert "Unknown budgeting workflow" in r.get_data(as_text=True) and loans.decision is None
 
@@ -410,19 +432,26 @@ def test_posts_need_the_same_origin_marker():
         assert r.status_code == 200 and fake.decision["by"] == "budgeting-ui:Bao"
 
 
-def test_cors_allows_the_frontend_origins_only():
-    with _env(MULTI_AGENT_ENABLED="false"):
-        c = _client()
-        for origin in ("http://localhost:3004", "http://127.0.0.1:3004", "http://20.1.2.3:3004", "http://localhost:3000"):
+def test_browsers_are_answered_only_from_the_tabs_on_the_apis_own_host():
+    with _env(MULTI_AGENT_ENABLED="false"), _stub(FakeServer()) as fake:
+        c = _client()                                                               # the test client's host is localhost
+        for origin in ("http://localhost:3004", "http://localhost:3000"):
             r = c.get("/api/health", headers={"Origin": origin})
-            assert r.headers.get("Access-Control-Allow-Origin") == origin, origin
-        for origin in ("http://evil.example", "http://localhost:5004", "http://localhost:30040"):
+            assert r.status_code == 200 and r.headers.get("Access-Control-Allow-Origin") == origin, origin
+        exposed = r.headers.get("Access-Control-Expose-Headers", "")
+        assert all(h in exposed for h in ("HX-Trigger", "HX-Retarget", "HX-Reswap"))   # the panel reads these cross-origin
+        for origin in ("http://127.0.0.1:3004", "http://20.1.2.3:3004", "http://attacker.example:3000",
+                       "http://evil.example", "http://localhost:5004", "http://localhost:30040", "not a url"):
             r = c.get("/api/health", headers={"Origin": origin})
-            assert r.headers.get("Access-Control-Allow-Origin") is None, origin
+            assert r.status_code == 403 and "own tab" in r.get_json()["error"], origin
+            r = c.post(f"/api/multi-agent/workflows/{WID}/decision", headers={"Origin": origin, **HX}, json={"decision": "accept"})
+            assert r.status_code == 403, origin                                     # refused before the route runs
+        assert fake.decision is None and fake.calls == []
+        assert c.get("/api/health").status_code == 200                              # server-side callers send no Origin
     with _env(MULTI_AGENT_ENABLED="false", BUDGET_FRONTEND_ORIGINS="https://demo.example.edu"):
         from app import create_app
         r = create_app().test_client().get("/api/health", headers={"Origin": "https://demo.example.edu"})
-        assert r.headers.get("Access-Control-Allow-Origin") == "https://demo.example.edu"
+        assert r.status_code == 200 and r.headers.get("Access-Control-Allow-Origin") == "https://demo.example.edu"
 
 
 # ---------------------------------------------------------------- fragments
@@ -443,9 +472,12 @@ def test_start_fragment_returns_the_card_which_polls_itself_until_the_gate():
         assert r.status_code == 200 and r.headers.get("HX-Trigger") == "ma-started"        # the history list refreshes
         assert f'id="ma-{WID}"' in page and f'hx-get="/ui/multi-agent/workflows/{WID}"' in page and 'hx-trigger="every 2s"' in page
         assert "htmx-indicator" in page and "working" in page and "ma-decision" not in page    # no decision before the gate
+        assert c.get(f"/ui/multi-agent/workflows/{WID}").headers.get("HX-Trigger") is None   # still running: history unchanged
         fake.state = "awaiting_human_review"
-        page = c.get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
+        r = c.get(f"/ui/multi-agent/workflows/{WID}")
+        page = r.get_data(as_text=True)
         assert 'hx-trigger="every 2s"' not in page                                   # polling stops at the gate
+        assert r.headers.get("HX-Trigger") == "ma-updated"                           # and the history list refreshes
         for needle in ("Plan", "/api/budgets/summary", "Evidence", "Findings", "Dining Out is over by 25.2", "Answer",
                        "Review", "both named", "Decision", 'name="reviewer"', 'name="note"', "Partially accept (correct)",
                        f'hx-post="/ui/multi-agent/workflows/{WID}/decision"'):
@@ -462,25 +494,59 @@ def test_decision_block_posts_without_a_form_and_refreshes_history():
         assert block.count(f'hx-post="/ui/multi-agent/workflows/{WID}/decision"') == 3 and 'type="button"' in block
         for value in ma.DECISIONS:
             assert f'hx-vals=\'{{"decision": "{value}"}}\'' in block, value
-        for needle in ('hx-include="closest .ma-decision"', 'hx-sync="closest .ma-decision:drop"', 'hx-target="closest article"',
-                       'hx-swap="outerHTML"', 'hx-disabled-elt="this"', 'name="reviewer"', 'name="note"', 'maxlength="60"'):
+        for needle in ('hx-include="closest .ma-decision"', 'hx-sync="closest .ma-decision:drop"', f'hx-target="#ma-msg-{WID}"',
+                       'hx-swap="innerHTML"', 'hx-disabled-elt="this"', 'name="reviewer"', 'name="note"', 'maxlength="60"',
+                       f'id="ma-msg-{WID}"'):
             assert needle in block, needle
         r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "accept", "reviewer": "Bao"})
         page = r.get_data(as_text=True)
         assert r.status_code == 200 and r.headers.get("HX-Trigger") == "ma-decided"
-        assert "accepted" in page and "budgeting-ui:Bao" in page and "ma-decision" not in page   # no second decision offered
+        assert r.headers.get("HX-Retarget") == f"#ma-{WID}" and r.headers.get("HX-Reswap") == "outerHTML"   # the whole card replaces the article
+        assert f'id="ma-{WID}"' in page and "accepted" in page and "budgeting-ui:Bao" in page and "ma-decision" not in page
         assert fake.decision["by"] == "budgeting-ui:Bao"
         r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "reject"})
-        assert r.headers.get("HX-Trigger") is None and b"not awaiting_human_review" in r.data   # a refused decision changes nothing
+        assert r.headers.get("HX-Trigger") == "ma-updated" and r.headers.get("HX-Retarget") == f"#ma-{WID}"
+        assert b"not awaiting_human_review" in r.data and f'id="ma-{WID}"'.encode() in r.data   # decided already: the card as it is now
+        assert fake.decision["decision"] == "accept"
 
 
-def test_history_fragment_lists_budgeting_workflows_newest_first():
-    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()):
-        page = _client().get("/ui/multi-agent/history").get_data(as_text=True)
+def test_refused_or_failed_decisions_keep_the_block_and_its_note():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
+        c = _client()
+        r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "partially_accept", "note": ""})
+        page = r.get_data(as_text=True)
+        assert r.status_code == 200 and "needs a note" in page and "HX-Retarget" not in r.headers and "HX-Trigger" not in r.headers
+        assert "<article" not in page and 'id="ma-' not in page                       # only the reason, into the slot
+        assert fake.decision is None
+
+    def down(method, path, body=None):
+        if method == "POST":
+            raise ma.MultiAgentUnreachable("Multi-Agent Server at http://localhost:8300/x refused the connection - start it")
+        return FakeServer()(method, path, body)
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(down):
+        r = _client().post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "accept"})
+        page = r.get_data(as_text=True)
+        assert "Try again" in page and "<article" not in page and "HX-Retarget" not in r.headers   # the typed note stays on the page
+
+    def failing(method, path, body=None):
+        if method == "POST":
+            return 503, {"error": "model unavailable"}
+        return FakeServer()(method, path, body)
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(failing):
+        page = _client().post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "accept"}).get_data(as_text=True)
+        assert "Try again" in page and "HTTP 503" in page and "<article" not in page
+
+
+def test_history_fragment_lists_the_selected_customers_workflows_newest_first():
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
+        page = _client().get("/ui/multi-agent/history?customer_id=1&month=9&year=2026").get_data(as_text=True)
+        assert fake.calls[-1][1] == f"/workflows?feature=budgeting&limit={ma.HISTORY_LIMIT}&customer_id=1"
         assert WID in page and OLDER_WID in page and page.index(WID) < page.index(OLDER_WID)
         assert LOANS_WID not in page and "List my loans" not in page
         assert f'hx-get="/ui/multi-agent/workflows/{WID}"' in page and 'hx-target="#ma-panel"' in page
         assert "awaiting_human_review" in page and REQUEST in page and "Customer 1, 9/2026" in page
+        page = _client().get("/ui/multi-agent/history?customer_id=2").get_data(as_text=True)
+        assert "No workflows for customer 2 yet" in page and WID not in page            # another customer's questions stay out
     with _env(MULTI_AGENT_ENABLED="false"):
         r = _client().get("/ui/multi-agent/history")
         assert r.status_code == 200 and b"MULTI_AGENT_ENABLED=false" in r.data and b"<ul" not in r.data
@@ -502,6 +568,10 @@ def test_temporary_failures_keep_the_card_polling():
     with _env(MULTI_AGENT_ENABLED="true"), _stub(lambda m, p, b=None: (404, {"error": f"unknown workflow '{WID}'"})):
         page = _client().get(f"/ui/multi-agent/workflows/{WID}").get_data(as_text=True)
         assert "retrying" not in page and "unknown workflow" in page              # gone for good: no point polling
+    with _env(MULTI_AGENT_ENABLED="true"), _stub(lambda m, p, b=None: (200, {"workflow_id": WID, "feature": "budgeting"})):
+        r = _client().get(f"/ui/multi-agent/workflows/{WID}")
+        page = r.get_data(as_text=True)
+        assert "retrying" not in page and "missing required fields" in page and r.headers.get("HX-Trigger") is None   # a broken record will not fix itself
 
 
 def test_frontend_tabs_wire_the_panel_and_carry_no_inner_header():
@@ -520,11 +590,17 @@ def test_frontend_tabs_wire_the_panel_and_carry_no_inner_header():
     for needle in (
         'hx-get="/ui/multi-agent/status"', 'hx-post="/ui/multi-agent/workflows"', 'hx-get="/ui/multi-agent/history"',
         'id="ma-panel"', 'id="ma-history"', 'name="request"', 'maxlength="1000"', 'hx-include="#period-form"', "ma-chip",
-        'hx-disabled-elt="find button[type=submit]"', 'hx-trigger="load, ma-started from:body, ma-decided from:body"',
+        'hx-disabled-elt="find button[type=submit]"',
+        'hx-trigger="load, change from:#period-form, ma-started from:body, ma-updated from:body, ma-decided from:body"',
     ):
         assert needle in html, needle
-    for gone in ("ma-desk", "ma-token", "X-Reviewer-Token", "ma-pending", "sessionStorage", "/response"):
+    assert 'hx-include="#period-form"' in html.split('id="ma-history"')[1].split(">")[0]   # the history follows the selected customer
+    for gone in ("ma-desk", "ma-token", "X-Reviewer-Token", "ma-pending", "sessionStorage", "/response",
+                 "create-form", ".inline-edit", "td.actions", ".tab-strip {"):
         assert gone not in html, gone
+    shared_css = (BASE_DIR.parents[2] / "shared" / "frontend" / "css" / "styles.css").read_text(encoding="utf-8")
+    assert ".tab-strip {" in shared_css and ".tab-strip {" not in normal                  # the strip rules live once, in the shared stylesheet
+    assert ".summary-strip" in html and ".stat " in html                                 # the MCP summary still needs these here
     from app import app
     ui_rules = {r.rule for r in app.url_map.iter_rules() if r.rule.startswith("/ui/multi-agent")}
     assert ui_rules == {"/ui/multi-agent/status", "/ui/multi-agent/workflows", "/ui/multi-agent/workflows/<workflow_id>",
@@ -538,10 +614,11 @@ def test_decision_fragment_renders_the_released_or_withheld_response():
     with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()) as fake:
         c = _client()
         r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "partially_accept", "note": ""})
-        assert r.status_code == 200 and b"needs a note" in r.data and b"ma-decision" in r.data   # the card comes back with the reason
+        assert r.status_code == 200 and b"needs a note" in r.data and b"<article" not in r.data    # the reason, into the slot
         assert fake.decision is None
-        page = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX,
-                      data={"decision": "partially_accept", "note": "Say the period"}).get_data(as_text=True)
+        r = c.post(f"/ui/multi-agent/workflows/{WID}/decision", headers=HX, data={"decision": "partially_accept", "note": "Say the period"})
+        page = r.get_data(as_text=True)
+        assert r.headers.get("HX-Retarget") == f"#ma-{WID}"
         assert "partially_accepted" in page and "Final response" in page and "Two categories" in page and "Say the period" in page
         assert "ma-decision" not in page                                                           # no second decision offered
     with _env(MULTI_AGENT_ENABLED="true"), _stub(FakeServer()):

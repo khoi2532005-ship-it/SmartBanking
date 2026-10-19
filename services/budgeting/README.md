@@ -171,15 +171,17 @@ start command when the server is down, bearer token when one is configured).
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `POST` | `/api/multi-agent/workflows` | `{"request", "customer_id"?, "month"?, "year"?}` -> 202 summary. Needs the `HX-Request` or `X-Requested-With` header |
-| `GET` | `/api/multi-agent/workflows` | The most recent budgeting workflows, newest first (history) |
+| `GET` | `/api/multi-agent/workflows` | The latest budgeting workflows, newest first (history); `?customer_id=` keeps one customer's |
 | `GET` | `/api/multi-agent/workflows/<id>` | The whole workflow: stages, plan, Worker result, review, decision and final response (budgeting workflows only) |
 | `POST` | `/api/multi-agent/workflows/<id>/decision` | `{"decision": accept \| partially_accept \| reject, "note"?, "reviewer"?}`. Recorded in the audit as `budgeting-ui:<reviewer>` |
 
 Two boundaries: this feature acts only on its own workflows (another
 feature's id is a 404 here), and every POST needs the same-origin marker
 (`HX-Request`, which HTMX sends, or `X-Requested-With`), which a cross-site
-form cannot set. CORS allows only the frontend origins (ports 3004 and 3000
-on any host, plus `BUDGET_FRONTEND_ORIGINS`).
+form cannot set. A browser is answered only from the budgeting tab (port 3004)
+or the home page (port 3000) on the same host as the API, plus the exact
+origins in `BUDGET_FRONTEND_ORIGINS`; any other page gets a 403 before a
+route runs, the rule fraud-service uses.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -196,9 +198,12 @@ shows the plan, the evidence and findings, and the review with its risks, and
 once the state is `awaiting_human_review` the decision block (reviewer name,
 note, Accept / Partially accept / Reject) appears inside the same card.
 `POST /ui/multi-agent/workflows/<id>/decision` returns the card with the
-final response, released or withheld; `GET /ui/multi-agent/history` lists the
-most recent budgeting workflows with an Open button each. The panel sits on
-the AI Mode tab under the MCP and RAG panels. Checks:
+final response, released or withheld (through `HX-Retarget`); a refused or
+failed decision returns only its reason, into the block, so the typed note
+stays. `GET /ui/multi-agent/history` lists the selected customer's latest
+workflows with an Open button each and refreshes itself when a workflow
+starts, stops running or is decided. The panel sits on the AI Mode tab under
+the MCP and RAG panels. Checks:
 `python -m tests.test_multi_agent_client` (stubbed transport) and
 `python -m tests.test_multi_agent_contract` (the real server app, in process)
 from `backend/`.
