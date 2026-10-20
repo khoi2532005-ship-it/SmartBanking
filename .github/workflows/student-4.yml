@@ -235,12 +235,75 @@ jobs:
         run: docker compose -f "$COMPOSE_FILE" down -v
 
   # =====================================================================
+  # 3b. Post-commit endpoint tests - two endpoint functions of the budgeting
+  #     API, run against the containerised stack after every push
+  # =====================================================================
+  endpoint-tests:
+    name: Post-commit endpoint tests
+    runs-on: ubuntu-latest
+    needs: [build-images, unit-checks]
+    timeout-minutes: 15
+    env:
+      MCP_ENABLED: "false"
+      RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the test runner
+        run: pip install pytest requests
+
+      # Only the database and API containers: the tests are black-box HTTP
+      # calls against the seeded stack, the way a deployed service is tested.
+      - name: Start the budgets database and API
+        run: docker compose -f "$COMPOSE_FILE" up -d --no-deps budgeting-database-service budgeting-service
+
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 20); do
+            curl -fsS http://localhost:5004/api/health && exit 0
+            sleep 3
+          done
+          echo "FAIL the budgets API did not come up"; exit 1
+
+      - name: Run the two endpoint tests
+        env:
+          BUDGET_API_URL: http://localhost:5004
+          ENDPOINT_REPORT_DIR: reports
+        run: |
+          python -m pytest services/budgeting/backend/tests/test_endpoints_post_commit.py \
+            -q -p no:cacheprovider --junitxml=reports/endpoint-tests-junit.xml
+
+      - name: Report to the job summary
+        if: always()
+        run: cat reports/post-commit-endpoint-report-student-4.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: student-4-endpoint-tests
+          path: reports/
+          retention-days: 30
+
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose -f "$COMPOSE_FILE" logs --tail 100
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" down -v
+
+  # =====================================================================
   # 4. Evidence gate - run-linked report for the technical report
   # =====================================================================
   evidence-pack:
     name: Evidence pack
     runs-on: ubuntu-latest
-    needs: smoke-check
+    needs: [smoke-check, endpoint-tests]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -262,8 +325,10 @@ jobs:
             "gates": {
               "build": "passed",
               "unit": "passed",
-              "smoke": "passed"
-            }
+              "smoke": "passed",
+              "endpoint_tests": "passed"
+            },
+            "endpoint_tests_artifact": "student-4-endpoint-tests"
           }
           JSON
 
@@ -283,6 +348,9 @@ jobs:
           - Build: three service images built successfully
           - Unit: budget-versus-actual calculations verified
           - Smoke: ports 5014, 5004 and 3004 returned HTTP 200
+          - Endpoint tests: \`GET /api/budgets/summary\` and \`POST /api/budgets\` passed against the
+            containerised stack after this push (artifact \`student-4-endpoint-tests\`, report
+            \`post-commit-endpoint-report-student-4.{json,md}\`)
           - Teardown: \`docker compose down -v\` ran
 
           ## Validated endpoints
