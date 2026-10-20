@@ -49,4 +49,4 @@ if __name__ == "__main__":
     print(f"Serving shared frontend from {SHARED_DIR}")
     print(f"Serving feature tabs   from {TABS_DIR}")
     print(f"Open http://localhost:{PORT}/tabs/budgets.html")
-    app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True)
+    app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True)  # noqa: S104  # frontend must bind on all interfaces for container reachability

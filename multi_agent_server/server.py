@@ -345,7 +345,7 @@ def _can_bind(port: int) -> bool:
         if not hasattr(socket, "SO_EXCLUSIVEADDRUSE"):            # every platform but Windows
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            probe.bind(("0.0.0.0", port))
+            probe.bind(("0.0.0.0", port))  # noqa: S104  # local availability probe intentionally attempts a wildcard bind
         except OSError:
             return False
     return True

@@ -1013,7 +1013,7 @@ def test_partial_audit_failure_leaves_a_marker_and_metrics_stay_sane(client, tmp
 
 
 def test_non_ascii_token_or_header_is_401_not_500(tmp_path, api):
-    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True), api_token="s3crét").test_client()
+    client = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True), api_token="s3crét").test_client()  # noqa: S106  # fake token in test fixture only
     assert client.post("/workflow", json=VALID, headers={"Authorization": "Bearer s3cret"}).status_code == 401
     assert client.post("/workflow", json=VALID, headers={"Authorization": "Bearer s3crét"}).status_code == 202
     assert client.get("/workflows/pending", headers={"Authorization": "Bearer ✗"}).status_code == 401
@@ -1102,7 +1102,7 @@ def test_port_check_falls_back_to_a_bind_probe_when_the_connect_probe_times_out(
     monkeypatch.setattr(server_module.socket, "create_connection", always_times_out)
 
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listener.bind(("0.0.0.0", 0))
+    listener.bind(("0.0.0.0", 0))  # noqa: S104  # local loopback probe in test setup only
     listener.listen(5)
     port = listener.getsockname()[1]
     try:
@@ -1151,7 +1151,7 @@ def test_interrupted_workflows_are_closed_on_restart(tmp_path, api):
 
 
 def test_bearer_token_guards_every_workflow_route_but_not_health(tmp_path, api):
-    app = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True), api_token="s3cret")
+    app = make_app(tmp_path, ScriptedAsk(GOOD_PLAN, GOOD_RESULT, GOOD_REVIEW, cycle=True), api_token="s3cret")  # noqa: S106  # fake token in test fixture only
     client = app.test_client()
     assert client.get("/health").get_json()["auth"] == "token"
     refused = client.post("/workflow", json=VALID)
@@ -1160,7 +1160,7 @@ def test_bearer_token_guards_every_workflow_route_but_not_health(tmp_path, api):
     assert client.get("/metrics", headers={"Authorization": "Bearer wrong"}).status_code == 401
     ok = client.post("/workflow", json=VALID, headers={"Authorization": "Bearer s3cret"})
     assert ok.status_code == 202
-    adapter = terminal.FlaskClientAdapter(client, token="s3cret")
+    adapter = terminal.FlaskClientAdapter(client, token="s3cret")  # noqa: S106  # fake token in test fixture only
     status, pending = adapter.get("/workflows/pending")
     assert status == 200 and pending["count"] == 1
     lines = []
@@ -1181,7 +1181,7 @@ def test_http_client_sends_the_token_and_explains_a_401(monkeypatch):
         return Response()
 
     monkeypatch.setattr(terminal.requests, "request", fake_request)
-    client = terminal.HttpClient("http://localhost:8300", token="abc")
+    client = terminal.HttpClient("http://localhost:8300", token="abc")  # noqa: S106  # fake token in test fixture only
     with pytest.raises(terminal.ServerUnavailable) as info:
         client.get("/workflows/pending")
     assert seen["headers"] == {"Authorization": "Bearer abc"} and "MULTI_AGENT_API_TOKEN" in str(info.value)

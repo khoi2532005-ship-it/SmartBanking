@@ -59,9 +59,8 @@ def account_summary(customer_id):
                 "summary_text": explanation,
             }
         )
-    except Exception:
-        pass  # AI-Mode should still respond even if saving the history fails
-
+    except Exception:  # noqa: S110  # best-effort history persistence should not block the response
+        pass
     return jsonify({"customer_id": customer_id, "summary": explanation, "totals": totals})
 
 
@@ -87,7 +86,7 @@ def risk_profile(customer_id):
                 "risk_level": assessment["risk_level"],
             }
         )
-    except Exception:
+    except Exception:  # noqa: S110  # fallback to response generation even if audit history fails to persist
         pass
 
     return jsonify(

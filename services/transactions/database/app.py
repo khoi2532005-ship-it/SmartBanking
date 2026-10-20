@@ -287,4 +287,4 @@ def delete_transaction(transaction_id):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5015, debug=False, threaded=True)
+    app.run(host="0.0.0.0", port=5015, debug=False, threaded=True)  # noqa: S104  # local database service bind required for Docker host access

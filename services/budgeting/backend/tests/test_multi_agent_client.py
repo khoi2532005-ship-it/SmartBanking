@@ -207,7 +207,7 @@ def test_bearer_token_is_sent_when_configured():
     saved = requests.request
     requests.request = fake_request
     try:
-        with _env(MULTI_AGENT_ENABLED="true", MULTI_AGENT_SERVER_URL="http://host.docker.internal:8300/", MULTI_AGENT_API_TOKEN="s3cret"):
+        with _env(MULTI_AGENT_ENABLED="true", MULTI_AGENT_SERVER_URL="http://host.docker.internal:8300/", MULTI_AGENT_API_TOKEN="s3cret"):  # noqa: S106  # fake token in test fixture only
             ma.health()
             assert seen["url"] == "http://host.docker.internal:8300/health"
             assert seen["headers"] == {"Authorization": "Bearer s3cret"} and seen["timeout"][0] == 2

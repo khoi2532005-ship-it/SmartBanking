@@ -19,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(REPO_ROOT / ".env")
 
 # ---- where this server listens -------------------------------------------
-MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
+MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")  # noqa: S104  # local Docker host bind required for container access
 MCP_PORT = int(os.getenv("MCP_PORT", "8100"))
 MCP_PATH = "/mcp"
 MCP_LOG_LEVEL = os.getenv("MCP_LOG_LEVEL", "WARNING").upper()
@@ -40,5 +40,5 @@ READ_TIMEOUT = 5
 
 def local_url() -> str:
     """The URL a client on this machine uses."""
-    host = "localhost" if MCP_HOST in ("0.0.0.0", "") else MCP_HOST
+    host = "localhost" if MCP_HOST in ("0.0.0.0", "") else MCP_HOST  # noqa: S104  # default bind is intentional for containerized local clients
     return f"http://{host}:{MCP_PORT}{MCP_PATH}"

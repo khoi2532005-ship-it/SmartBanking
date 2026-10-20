@@ -54,8 +54,8 @@ class ChromaIndex:
         """Delete and recreate the collection from the current corpus."""
         try:
             self._client.delete_collection(self._name)
-        except Exception:
-            pass                                  # first build: nothing to delete
+        except Exception:  # noqa: S110  # first build: nothing to delete, so the rebuild is best-effort
+            pass
         self._collection = self._client.create_collection(
             self._name, metadata={"hnsw:space": "cosine"}
         )

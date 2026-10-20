@@ -77,8 +77,7 @@ def create_transaction():
             # take first line and normalise
             category = ai_text.splitlines()[0].strip()
             payload["category"] = category
-    except Exception:
-        # don't block transaction creation on LLM errors
+    except Exception:  # noqa: S110  # fallback category inference should never block transaction creation
         pass
 
     try:

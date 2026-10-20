@@ -43,7 +43,7 @@ def tokenize(text: str) -> list[str]:
 
 
 def _slot(token: str) -> tuple[int, float]:
-    digest = hashlib.sha1(token.encode("utf-8")).digest()
+    digest = hashlib.sha1(token.encode("utf-8")).digest()  # noqa: S324  # deterministic embedding hash; not for password hashing or security signing
     index = int.from_bytes(digest[:4], "big") % DIM
     sign = 1.0 if digest[4] & 1 else -1.0
     return index, sign

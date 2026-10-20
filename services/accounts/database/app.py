@@ -122,7 +122,7 @@ def get_customers():
         conditions.append("LOWER(email) = LOWER(?)")
         params.append(email)
 
-    query = f"SELECT {CUSTOMER_COLUMNS} FROM customers"
+    query = f"SELECT {CUSTOMER_COLUMNS} FROM customers"  # noqa: S608  # fixed schema columns; all user input is bound as query parameters
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY customer_id"
@@ -138,7 +138,7 @@ def get_customer(customer_id):
     conn = get_db_connection()
 
     customer = conn.execute(
-        f"SELECT {CUSTOMER_COLUMNS} FROM customers WHERE customer_id = ?",
+        f"SELECT {CUSTOMER_COLUMNS} FROM customers WHERE customer_id = ?",  # noqa: S608  # fixed schema columns; id is bound as a parameter
         (customer_id,),
     ).fetchone()
 
@@ -323,7 +323,7 @@ def get_accounts():
         conditions.append("(account_number LIKE ? OR account_type LIKE ?)")
         params.extend([f"%{q}%", f"%{q}%"])
 
-    query = f"SELECT {ACCOUNT_COLUMNS} FROM accounts"
+    query = f"SELECT {ACCOUNT_COLUMNS} FROM accounts"  # noqa: S608  # fixed schema columns; filter values are all parameterized
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY account_id"
@@ -339,7 +339,7 @@ def get_account(account_id):
     conn = get_db_connection()
 
     account = conn.execute(
-        f"SELECT {ACCOUNT_COLUMNS} FROM accounts WHERE account_id = ?",
+        f"SELECT {ACCOUNT_COLUMNS} FROM accounts WHERE account_id = ?",  # noqa: S608  # fixed schema columns; id is bound as a parameter
         (account_id,),
     ).fetchone()
 
@@ -477,7 +477,7 @@ def get_ai_summaries():
         conditions.append("LOWER(summary_type) = LOWER(?)")
         params.append(summary_type)
 
-    query = f"SELECT {SUMMARY_COLUMNS} FROM ai_summaries"
+    query = f"SELECT {SUMMARY_COLUMNS} FROM ai_summaries"  # noqa: S608  # fixed schema columns; all user input is bound as query parameters
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY summary_id DESC"
@@ -493,7 +493,7 @@ def get_ai_summary(summary_id):
     conn = get_db_connection()
 
     summary = conn.execute(
-        f"SELECT {SUMMARY_COLUMNS} FROM ai_summaries WHERE summary_id = ?",
+        f"SELECT {SUMMARY_COLUMNS} FROM ai_summaries WHERE summary_id = ?",  # noqa: S608  # fixed schema columns; summary_id is passed as a bound parameter
         (summary_id,),
     ).fetchone()
 
@@ -506,4 +506,4 @@ def get_ai_summary(summary_id):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5011, debug=False, threaded=True)
+    app.run(host="0.0.0.0", port=5011, debug=False, threaded=True)  # noqa: S104  # local database service bind required for Docker host access
