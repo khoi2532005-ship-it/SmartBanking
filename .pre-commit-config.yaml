@@ -1,0 +1,33 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff security checks
+        args:
+          - --select
+          - S
+          - --extend-ignore
+          - S101,S104,S105,S106,S110,S324,S603,S607,S608
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect secrets
+        args: [--baseline, .secrets.baseline]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit requirements scan
+        args:
+          - --requirement=requirements-agentic.txt
+          - --requirement=requirements-mcp.txt
+          - --requirement=requirements-multi-agent.txt
+          - --requirement=requirements-rag.txt
+          - --ignore-vuln=PYSEC-2026-311
+          - --ignore-vuln=PYSEC-2026-3813
+          - --ignore-vuln=PYSEC-2026-3814
+          - --ignore-vuln=PYSEC-2026-3815
