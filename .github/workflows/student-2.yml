@@ -59,6 +59,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install post-commit test dependencies
+        run: pip install pytest requests
+
       - name: Verify docker-compose
         run: |
           docker-compose --version || (sudo apt-get update && sudo apt-get install -y docker-compose)
@@ -92,6 +99,9 @@ jobs:
           check_url "http://localhost:3002/"
           check_url "http://localhost:5002/api/health"
           check_url "http://localhost:5012/"
+
+      - name: Run loans post-commit API tests
+        run: python -m pytest services/loans/backend/tests/post_commit/test_api_loans.py -v
 
       - name: Verify MCP and RAG modes are disabled in CI
         run: |
