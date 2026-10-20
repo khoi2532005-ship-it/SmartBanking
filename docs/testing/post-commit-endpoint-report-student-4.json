@@ -3,12 +3,12 @@
   "name": "Cong Bao Nguyen",
   "feature": "budgeting",
   "workflow": "student-4-budgets-ci",
-  "job": "endpoint-tests",
-  "commit": "32546bf",
+  "job": "local",
+  "commit": "2ea47fb",
   "branch": "local",
   "run_id": "local",
   "run_url": "",
-  "ran_at": "2026-10-20T12:20:05Z",
+  "ran_at": "2026-10-20T14:56:10Z",
   "api_url": "http://localhost:5004",
   "spending_source": "mock",
   "ai_services": {
@@ -16,23 +16,24 @@
     "rag": "disabled",
     "multi_agent": "disabled"
   },
+  "pytest_exit_status": 0,
   "tests": [
     {
       "test": "test_budget_summary_reports_the_seeded_period",
       "method": "GET",
       "endpoint": "/api/budgets/summary",
       "outcome": "passed",
-      "duration_s": 0.01,
+      "duration_s": 0.012,
       "checks": [
         {
           "check": "answers 200 for the seeded period",
           "ok": true,
-          "detail": "HTTP 200"
+          "detail": "HTTP 200 '{\"budgets\":[{\"budget_id\":2,\"category\":\"Dining Out\",\"customer_id\":1,\"month\":9,\"monthly_limit\":300.0,\"over_budget\":true,\"o'"
         },
         {
           "check": "echoes customer_id, month and year",
           "ok": true,
-          "detail": ""
+          "detail": "{'budgets': [{'budget_id': 2, 'category': 'Dining Out', 'customer_id': 1, 'month': 9, 'monthly_limit': 300.0, 'over_budg"
         },
         {
           "check": "the seven seeded budgets are present with their limits",
@@ -75,29 +76,34 @@
           "detail": "limit 250.0 spent 240.0 -> NEAR_LIMIT remaining 10.0 96.0%"
         },
         {
-          "check": "totals add up across the seven lines",
+          "check": "totals add up across the lines",
           "ok": true,
           "detail": "{'budget_count': 7, 'over_budget_count': 3, 'percent_used': 100.5, 'total_limit': 2160.0, 'total_remaining': -9.97, 'total_spent': 2169.97}"
         },
         {
-          "check": "mock spending source: the exact seeded figures and statuses",
+          "check": "mock spending source: the seeded categories carry the exact figures and statuses",
           "ok": true,
-          "detail": "spent/status per category [('Dining Out', 412.0, 'OVER_BUDGET'), ('Entertainment', 90.0, 'ON_TRACK'), ('Groceries', 645.0, 'NEAR_LIMIT'), ('Shopping', 505.0, 'OVER_BUDGET'), ('Subscriptions', 59.97, 'NEAR_LIMIT'), ('Transport', 218.0, 'OVER_BUDGET'), ('Utilities', 240.0, 'NEAR_LIMIT')]"
+          "detail": "[('Groceries', 645.0, 'NEAR_LIMIT'), ('Dining Out', 412.0, 'OVER_BUDGET'), ('Transport', 218.0, 'OVER_BUDGET'), ('Entertainment', 90.0, 'ON_TRACK'), ('Utilities', 240.0, 'NEAR_LIMIT'), ('Shopping', 505.0, 'OVER_BUDGET'), ('Subscriptions', 59.97, 'NEAR_LIMIT')]"
+        },
+        {
+          "check": "mock spending source: the exact seeded totals and over-budget categories",
+          "ok": true,
+          "detail": "{'budget_count': 7, 'over_budget_count': 3, 'percent_used': 100.5, 'total_limit': 2160.0, 'total_remaining': -9.97, 'total_spent': 2169.97}"
         },
         {
           "check": "400 for {'customer_id': 1, 'month': 13, 'year': 2026}",
           "ok": true,
-          "detail": "HTTP 400 {\"error\":\"month must be between 1 and 12\"}\n"
+          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'"
         },
         {
           "check": "400 for {'customer_id': 'abc'}",
           "ok": true,
-          "detail": "HTTP 400 {\"error\":\"customer_id must be an integer\"}\n"
+          "detail": "HTTP 400 '{\"error\":\"customer_id must be an integer\"}\\n'"
         },
         {
           "check": "400 for {'customer_id': 1, 'year': 1999}",
           "ok": true,
-          "detail": "HTTP 400 {\"error\":\"year must be between 2000 and 2100\"}\n"
+          "detail": "HTTP 400 '{\"error\":\"year must be between 2000 and 2100\"}\\n'"
         }
       ],
       "error": ""
@@ -107,57 +113,62 @@
       "method": "POST",
       "endpoint": "/api/budgets",
       "outcome": "passed",
-      "duration_s": 0.02,
+      "duration_s": 0.024,
       "checks": [
+        {
+          "check": "the period's budget count is known before the create",
+          "ok": true,
+          "detail": "7"
+        },
         {
           "check": "creating a new budget answers 201 with its id",
           "ok": true,
-          "detail": "HTTP 201 {\"budget_id\":18,\"message\":\"Budget created\"}\n"
+          "detail": "HTTP 201 '{\"budget_id\":18,\"message\":\"Budget created\"}\\n'"
         },
         {
           "check": "the new budget appears in the period summary with no spend, on track",
           "ok": true,
-          "detail": "{'budget_id': 18, 'category': 'CI check 6cf7a4b5', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}"
+          "detail": "{'budget_id': 18, 'category': 'CI check c3788aa3', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}"
         },
         {
           "check": "the same customer, category and period again answers 409",
           "ok": true,
-          "detail": "HTTP 409 {\"error\":\"A budget for that customer, category, month and year already exists\"}\n"
+          "detail": "HTTP 409 '{\"error\":\"A budget for that customer, category, month and year already exists\"}\\n'"
         },
         {
           "check": "400 for greater than zero",
           "ok": true,
-          "detail": "HTTP 400 {\"error\":\"monthly_limit must be greater than zero\"}\n"
+          "detail": "HTTP 400 '{\"error\":\"monthly_limit must be greater than zero\"}\\n'"
         },
         {
           "check": "400 for Invalid input",
           "ok": true,
-          "detail": "HTTP 400 {\"error\":\"Invalid input: could not convert string to float: 'lots'\"}\n"
+          "detail": "HTTP 400 '{\"error\":\"Invalid input: could not convert string to float: \\'lots\\'\"}\\n'"
         },
         {
           "check": "400 for category required",
           "ok": true,
-          "detail": "HTTP 400 {\"error\":\"category required\"}\n"
+          "detail": "HTTP 400 '{\"error\":\"category required\"}\\n'"
         },
         {
           "check": "400 for month must be between 1 and 12",
           "ok": true,
-          "detail": "HTTP 400 {\"error\":\"month must be between 1 and 12\"}\n"
+          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'"
         },
         {
           "check": "400 for a JSON body that is not an object",
           "ok": true,
-          "detail": "HTTP 400"
+          "detail": "HTTP 400 '{\"error\":\"JSON object body required\"}\\n'"
         },
         {
           "check": "cleanup: the test budget is deleted again",
           "ok": true,
-          "detail": "HTTP 200"
+          "detail": "(200, '{\"message\":\"Budget deleted\"}\\n')"
         },
         {
-          "check": "the period is back to the seven seeded budgets",
+          "check": "the period is back to its previous budget count",
           "ok": true,
-          "detail": ""
+          "detail": "7 vs 7"
         }
       ],
       "error": ""
@@ -167,7 +178,8 @@
     "endpoints": 2,
     "passed": 2,
     "failed": 0,
-    "checks": 25,
+    "skipped": 0,
+    "checks": 27,
     "result": "passed"
   }
 }
