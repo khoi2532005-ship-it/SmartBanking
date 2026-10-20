@@ -83,16 +83,20 @@ def _rel(path: Path) -> str:
 def _git_sha() -> str:
     """The commit, marked -dirty when tracked files differ from it."""
     try:
-        return subprocess.check_output(["git", "describe", "--always", "--dirty", "--abbrev=7"],
-                                       cwd=REPO_ROOT, text=True).strip()
+        return subprocess.check_output(  # noqa: S603  # local git metadata only; constant executable and repo path
+            ["git", "describe", "--always", "--dirty", "--abbrev=7"],  # noqa: S607  # local git metadata only; constant executable and repo path
+            cwd=REPO_ROOT, text=True,
+        ).strip()
     except Exception:
         return "unknown"
 
 
 def _tree_is_dirty() -> bool:
     try:
-        out = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"],
-                                      cwd=REPO_ROOT, text=True)
+        out = subprocess.check_output(  # noqa: S603  # repo-local git status check on a trusted working tree
+            ["git", "status", "--porcelain", "--untracked-files=no"],  # noqa: S607  # repo-local git status check on a trusted working tree
+            cwd=REPO_ROOT, text=True,
+        )
     except Exception:
         return False
     return bool(out.strip())

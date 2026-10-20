@@ -67,8 +67,9 @@ def _service_up(url: str) -> bool:
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, text=True
+        return subprocess.check_output(  # noqa: S603  # local git metadata only; constant executable and repo path
+            ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607  # local git metadata only; constant executable and repo path
+            cwd=REPO_ROOT, text=True,
         ).strip()
     except Exception:
         return "unknown"

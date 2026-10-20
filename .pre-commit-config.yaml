@@ -1,0 +1,100 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff security checks
+        args:
+          - --select
+          - S
+          - --extend-per-file-ignores
+          - '**/tests/**/*.py:S101'
+          - --extend-per-file-ignores
+          - '**/test_*.py:S101'
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect secrets
+        args: [--baseline, .secrets.baseline]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit root requirements
+        args:
+          - --requirement=requirements-agentic.txt
+          - --requirement=requirements-mcp.txt
+          - --requirement=requirements-multi-agent.txt
+          - --requirement=requirements-rag.txt
+          # ChromaDB 1.5.9 is the current release and still has these PYSEC advisories.
+          # There is no fixed upstream version yet, so the team tracks the issue explicitly.
+          - --ignore-vuln=PYSEC-2026-311
+          - --ignore-vuln=PYSEC-2026-3813
+          - --ignore-vuln=PYSEC-2026-3814
+          - --ignore-vuln=PYSEC-2026-3815
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit accounts database requirements
+        args: [--requirement=services/accounts/database/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit budgeting backend requirements
+        args: [--requirement=services/budgeting/backend/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit budgeting database requirements
+        args: [--requirement=services/budgeting/database/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit fraud backend requirements
+        args: [--requirement=services/fraud-alerts/backend/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit fraud database requirements
+        args: [--requirement=services/fraud-alerts/database/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit loans backend requirements
+        args: [--requirement=services/loans/backend/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit loans database requirements
+        args: [--requirement=services/loans/database/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit transactions backend requirements
+        args: [--requirement=services/transactions/backend/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        name: pip-audit transactions database requirements
+        args: [--requirement=services/transactions/database/requirements.txt]

@@ -403,7 +403,7 @@ class Orchestrator:
                 restore()
                 try:
                     self.store.save(workflow)
-                except Exception:
+                except Exception:  # noqa: S110  # disk write failure is explicitly handled by rollback state and audit marker
                     pass                           # the disk is failing; memory is at least consistent
                 marker = {"decision": decision, "reason": f"audit write failed: {type(exc).__name__}: {exc}",
                           "effect": "the decision was not applied; lines above for it are void"}
@@ -411,7 +411,7 @@ class Orchestrator:
                     self.audit.append_batch(
                         [self.audit.history_record(workflow, "decision_rolled_back", role=HUMAN, detail=marker)],
                         [self.audit.coordination_record(workflow, "decision_rolled_back", actor=HUMAN, detail=marker)])
-                except Exception:
+                except Exception:  # noqa: S110  # audit rollback itself is best-effort; the workflow state is already restored
                     pass
                 raise
         return workflow

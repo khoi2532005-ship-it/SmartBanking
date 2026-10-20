@@ -43,7 +43,7 @@ signal.signal(signal.SIGINT, shutdown)
 def main():
     for name, path in SERVICES:
         print(f"Starting {name} ({path})")
-        processes.append((name, subprocess.Popen([sys.executable, path])))
+        processes.append((name, subprocess.Popen([sys.executable, path])))  # noqa: S603  # trusted local service launcher started from repo-managed paths
         time.sleep(0.5)  # let the database service create its SQLite file first
 
     while True:

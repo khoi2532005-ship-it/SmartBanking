@@ -221,11 +221,11 @@ def decide_loan(loan_id):
                     "approved_amount": approved_amount,
                 },
             )
-        except Exception:
+        except Exception:  # noqa: S110  # rollback should keep the database consistent even when update fails
             for repayment in created_repayments:
                 try:
                     database_api.delete_repayment(repayment["repayment_id"])
-                except Exception:
+                except Exception:  # noqa: S110  # cleanup is best-effort while rolling back a failed loan approval
                     pass
             raise
     except Exception as exc:

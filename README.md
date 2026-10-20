@@ -40,6 +40,18 @@ Fallback local LLM: `docker compose --profile local-llm up -d` and set
 
 Stop everything: `docker compose down -v`
 
+## Security hooks
+
+From the repo root, install the commit hooks once and run them locally before every commit:
+
+```bash
+python -m pip install pre-commit
+pre-commit install --install-hooks
+pre-commit run --all-files
+```
+
+The hooks enforce Ruff security checks, detect-secrets scans, and pip-audit over the root and service requirement files.
+
 ## Release 1 demo run sheet
 
 Four terminals, in this order. The commands are the same on Windows

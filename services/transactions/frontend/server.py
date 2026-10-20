@@ -38,4 +38,4 @@ def css_file(filename):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3005, debug=False)
+    app.run(host="0.0.0.0", port=3005, debug=False)  # noqa: S104  # frontend must bind on all interfaces for container reachability
