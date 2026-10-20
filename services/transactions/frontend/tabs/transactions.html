@@ -167,7 +167,7 @@
       </span>
       <button type="button" class="btn-secondary" hx-get="/ui/multi-agent/status" hx-target="#ma-status" hx-swap="innerHTML">Re-check</button>
     </p>
-    <form class="row rag-form" id="ma-form" hx-post="/ui/multi-agent/workflows" hx-target="#ma-panel" hx-swap="innerHTML" hx-indicator="#ma-spinner">
+    <form class="row rag-form" id="ma-form" hx-post="/ui/multi-agent/workflows" hx-target="#ma-panel" hx-swap="innerHTML" hx-include="#customer" hx-indicator="#ma-spinner">
       <div class="grow">
         <label for="ma-request">Request</label>
         <input id="ma-request" name="request" type="text" maxlength="1000" required placeholder="e.g. Which spending category is driving the rise this month?">
@@ -180,7 +180,6 @@
         <label for="ma-year">Year</label>
         <input id="ma-year" name="year" type="number" min="2000" max="2100" value="2026" />
       </div>
-      <input type="hidden" name="customer_id" value="1" />
       <button type="submit" class="btn-ai">Start workflow</button>
       <span id="ma-spinner" class="spinner" style="display:none;">Starting the workflow...</span>
     </form>

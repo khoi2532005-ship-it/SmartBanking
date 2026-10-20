@@ -539,8 +539,14 @@ def _workflow_card(full, message=""):
 def _load_card(workflow_id, message=""):
     try:
         full = multi_agent_client.workflow(workflow_id)
-    except _MA_ERRORS as exc:
+    except multi_agent_client.MultiAgentUnreachable as exc:
         return _retry_card(workflow_id, str(exc))
+    except multi_agent_client.MultiAgentError as exc:
+        if exc.status >= 500:
+            return _retry_card(workflow_id, str(exc))
+        return _ma_alert(exc)
+    except multi_agent_client.MultiAgentDisabled as exc:
+        return _alert(str(exc), "warn")
     if not multi_agent_client.is_transactions(full):
         return _alert(f"Unknown transactions workflow {workflow_id}.", "warn")
     return _workflow_card(full, message)

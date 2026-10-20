@@ -320,7 +320,6 @@ def port_in_use(port: int, host: str = "127.0.0.1") -> bool:
     it: a port that can be bound is free. Any other error counts as in use:
     refusing to start is safer than touching another server's data.
     """
-    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         with socket.create_connection((host, port), timeout=0.5):
             return True
