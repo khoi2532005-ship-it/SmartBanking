@@ -249,11 +249,14 @@ Release 2 post-commit endpoint tests: `tests/test_endpoints_post_commit.py`
 tests two endpoint functions, `GET /api/budgets/summary` (the seeded period,
 its totals and statuses, its 400s) and `POST /api/budgets` (create, the new
 line in the summary, then 409 and 400), as black-box HTTP calls against a
-running API with the seeded database and no AI service. The `endpoint-tests`
-job of student-4.yml runs them against the containerised stack after every
-push and uploads the artifact `student-4-endpoint-tests` with
+running API with the seeded database and no AI service. The smoke job of
+student-4.yml runs them against the containerised stack it has just started,
+after every push, and uploads the artifact `student-4-endpoint-tests` with
 `post-commit-endpoint-report-student-4.{json,md}`; the last run's report is
-kept under `docs/testing/`. Locally, with the database and API running:
+kept under `docs/testing/`. The report is written whatever happened, so a
+failed run leaves evidence too. Budgets added beyond the seed are tolerated:
+the totals are then checked arithmetically rather than against the seed
+figures. Locally, with the database and API running:
 
 ```bash
 BUDGET_API_URL=http://localhost:5004 ENDPOINT_REPORT_DIR=reports \

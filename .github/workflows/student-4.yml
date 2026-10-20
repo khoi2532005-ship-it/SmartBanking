@@ -119,7 +119,7 @@ jobs:
   # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200
   # =====================================================================
   smoke-check:
-    name: Smoke check
+    name: Smoke check and endpoint tests
     runs-on: ubuntu-latest
     needs: [build-images, unit-checks]
     timeout-minutes: 15
@@ -222,65 +222,31 @@ jobs:
           done
           echo "panels present in the frontend; status fragments report the inactive state"
 
-      - name: Container status
-        if: always()
-        run: docker compose -f "$COMPOSE_FILE" ps
-
-      - name: Service logs on failure
-        if: failure()
-        run: docker compose -f "$COMPOSE_FILE" logs --tail 100
-
-      - name: Stop services
-        if: always()
-        run: docker compose -f "$COMPOSE_FILE" down -v
-
-  # =====================================================================
-  # 3b. Post-commit endpoint tests - two endpoint functions of the budgeting
-  #     API, run against the containerised stack after every push
-  # =====================================================================
-  endpoint-tests:
-    name: Post-commit endpoint tests
-    runs-on: ubuntu-latest
-    needs: [build-images, unit-checks]
-    timeout-minutes: 15
-    env:
-      MCP_ENABLED: "false"
-      RAG_ENABLED: "false"
-      MULTI_AGENT_ENABLED: "false"
-    steps:
-      - uses: actions/checkout@v4
-
+      # Post-commit endpoint tests (Release 2): two endpoint functions of this
+      # backend, as black-box HTTP calls against the stack started above, the
+      # way a deployed service is tested. The report goes to the job summary
+      # and to the student-4-endpoint-tests artifact.
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install the test runner
+      - name: Install the endpoint test runner
         run: pip install pytest requests
 
-      # Only the database and API containers: the tests are black-box HTTP
-      # calls against the seeded stack, the way a deployed service is tested.
-      - name: Start the budgets database and API
-        run: docker compose -f "$COMPOSE_FILE" up -d --no-deps budgeting-database-service budgeting-service
-
-      - name: Wait for the API
-        run: |
-          for i in $(seq 1 20); do
-            curl -fsS http://localhost:5004/api/health && exit 0
-            sleep 3
-          done
-          echo "FAIL the budgets API did not come up"; exit 1
-
-      - name: Run the two endpoint tests
+      - name: Post-commit endpoint tests (GET /api/budgets/summary, POST /api/budgets)
         env:
           BUDGET_API_URL: http://localhost:5004
           ENDPOINT_REPORT_DIR: reports
+          # On a pull request GITHUB_SHA is the merge commit; record the pushed head instead.
+          ENDPOINT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ENDPOINT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           python -m pytest services/budgeting/backend/tests/test_endpoints_post_commit.py \
             -q -p no:cacheprovider --junitxml=reports/endpoint-tests-junit.xml
 
-      - name: Report to the job summary
+      - name: Endpoint test report to the job summary
         if: always()
-        run: cat reports/post-commit-endpoint-report-student-4.md >> "$GITHUB_STEP_SUMMARY" || true
+        run: cat reports/post-commit-endpoint-report-student-4.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no endpoint report was written" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -288,6 +254,11 @@ jobs:
           name: student-4-endpoint-tests
           path: reports/
           retention-days: 30
+          if-no-files-found: warn
+
+      - name: Container status
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" ps
 
       - name: Service logs on failure
         if: failure()
@@ -303,7 +274,7 @@ jobs:
   evidence-pack:
     name: Evidence pack
     runs-on: ubuntu-latest
-    needs: [smoke-check, endpoint-tests]
+    needs: smoke-check
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -349,8 +320,8 @@ jobs:
           - Unit: budget-versus-actual calculations verified
           - Smoke: ports 5014, 5004 and 3004 returned HTTP 200
           - Endpoint tests: \`GET /api/budgets/summary\` and \`POST /api/budgets\` passed against the
-            containerised stack after this push (artifact \`student-4-endpoint-tests\`, report
-            \`post-commit-endpoint-report-student-4.{json,md}\`)
+            containerised stack after this push, in the smoke job (artifact \`student-4-endpoint-tests\`,
+            report \`post-commit-endpoint-report-student-4.{json,md}\`)
           - Teardown: \`docker compose down -v\` ran
 
           ## Validated endpoints
