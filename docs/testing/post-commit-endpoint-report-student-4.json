@@ -4,17 +4,23 @@
   "feature": "budgeting",
   "workflow": "student-4-budgets-ci",
   "job": "local",
-  "commit": "70196de",
+  "commit": "c47d729",
   "branch": "local",
   "run_id": "local",
   "run_url": "",
-  "ran_at": "2026-10-21T02:35:31Z",
+  "ran_at": "2026-10-21T02:47:20Z",
   "api_url": "http://localhost:5004",
   "spending_source": "mock",
   "ai_services": {
     "mcp": "disabled",
     "rag": "disabled",
     "multi_agent": "disabled"
+  },
+  "leftovers": {
+    "found": [],
+    "removed": [],
+    "failed": {},
+    "error": ""
   },
   "pytest_exit_status": 0,
   "tests": [
@@ -23,8 +29,14 @@
       "method": "GET",
       "endpoint": "/api/budgets/summary",
       "outcome": "passed",
-      "duration_s": 0.012,
+      "duration_s": 0.014,
       "checks": [
+        {
+          "check": "budgets left by an interrupted run were removed before the period was read",
+          "ok": true,
+          "detail": "found [], removed [], failed {}",
+          "info": false
+        },
         {
           "check": "answers 200 for the seeded period",
           "ok": true,
@@ -65,6 +77,12 @@
           "check": "the summary and the spending endpoint name the same spending source",
           "ok": true,
           "detail": "mock vs mock",
+          "info": false
+        },
+        {
+          "check": "the period's stored budgets are exactly the seeded ones (init_db.py)",
+          "ok": true,
+          "detail": "stored [(2, 'Dining Out', 300.0), (4, 'Entertainment', 150.0), (1, 'Groceries', 800.0), (6, 'Shopping', 400.0), (7, 'Subscriptions', 60.0), (3, 'Transport', 200.0), (5, 'Utilities', 250.0)], seeded [(1, 'Groceries', 800.0), (2, 'Dining Out', 300.0), (3, 'Transport', 200.0), (4, 'Entertainment', 150.0), (5, 'Utilities', 250.0), (6, 'Shopping', 400.0), (7, 'Subscriptions', 60.0)]",
           "info": false
         },
         {
@@ -147,18 +165,18 @@
       "method": "POST",
       "endpoint": "/api/budgets",
       "outcome": "passed",
-      "duration_s": 0.028,
+      "duration_s": 0.026,
       "checks": [
         {
           "check": "creating a new budget answers 201 with its id",
           "ok": true,
-          "detail": "HTTP 201 '{\"budget_id\":50,\"message\":\"Budget created\"}\\n'",
+          "detail": "HTTP 201 '{\"budget_id\":22,\"message\":\"Budget created\"}\\n'",
           "info": false
         },
         {
           "check": "the new budget appears in the period summary with no spend, on track",
           "ok": true,
-          "detail": "{'budget_id': 50, 'category': 'CI check d4bf0dc8', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
+          "detail": "{'budget_id': 22, 'category': 'CI check 71f11d9c', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
           "info": false
         },
         {
@@ -200,7 +218,7 @@
         {
           "check": "cleanup: every budget the test created is deleted",
           "ok": true,
-          "detail": "deleted {50: 200}",
+          "detail": "deleted {22: 200}",
           "info": false
         },
         {
@@ -218,7 +236,7 @@
     "passed": 2,
     "failed": 0,
     "skipped": 0,
-    "checks": 29,
+    "checks": 31,
     "result": "passed"
   }
 }
