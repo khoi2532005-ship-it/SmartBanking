@@ -23,6 +23,33 @@
         .sev-high { background: #c0392b; }
         .sev-medium { background: #d68910; }
         .sev-low { background: #7f8c8d; }
+        .ma-workflow { display: grid; gap: 0.85rem; }
+        .ma-workflow-header, .ma-stage-list, .ma-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .ma-workflow-header { justify-content: space-between; }
+        .ma-workflow-header h3, .ma-section h4 { margin: 0; }
+        .ma-section { border-top: 1px solid var(--line-soft); padding-top: 0.75rem; }
+        .ma-section p { margin: 0.35rem 0; }
+        .ma-section ul { margin: 0.35rem 0; padding-left: 1.25rem; }
+        .ma-stage { display: inline-flex; gap: 0.35rem; align-items: center; border-radius: 999px; padding: 0.18rem 0.55rem; background: var(--line-soft); color: var(--ink-soft); font-size: 0.78rem; font-weight: 650; }
+        .ma-stage.is-complete { background: var(--ok-tint); color: var(--ok); }
+        .ma-stage.is-current { background: var(--warn-tint); color: var(--warn); }
+        .ma-stage.is-failed { background: var(--over-tint); color: var(--over); }
+        .ma-state { margin-left: 0; }
+        .ma-workflow .badge-ok { background: var(--ok-tint); color: var(--ok); }
+        .ma-workflow .badge-near { background: var(--warn-tint); color: var(--warn); }
+        .ma-workflow .badge-over { background: var(--over-tint); color: var(--over); }
+        .ma-answer { white-space: pre-wrap; overflow-wrap: anywhere; }
+        .ma-workflow table { margin-top: 0.65rem; }
+        .ma-workflow th { cursor: default; }
+        .ma-workflow td { overflow-wrap: anywhere; }
+        .ma-decision-fields { display: grid; gap: 0.6rem; grid-template-columns: minmax(180px, 1fr) minmax(220px, 2fr); }
+        .ma-decision-fields > div { display: flex; flex-direction: column; }
+        .ma-decision-fields textarea { resize: vertical; }
+        .ma-decision-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.65rem; }
+        .ma-decision-message { margin: 0.6rem 0 0; }
+        @media (max-width: 560px) { .ma-decision-fields { grid-template-columns: 1fr; } }
+        .workflow-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.6rem 0; }
+        .workflow-actions form { margin: 0; }
         button { cursor: pointer; }
         /* Tab strip linking the Normal and AI Mode views. */
         .tab-strip { margin: 0 0 1rem; }
@@ -63,14 +90,18 @@
                 <button type="button" class="rag-action" data-sample-request="Explain how credit score, income, and existing debt can affect loan approval, and suggest ways to improve my creditworthiness.">Use Sample 3</button>
             </div>
             <p class="rag-helper">Hint: use a full task request for planner-worker-reviewer flow.</p>
-            <button type="submit" class="rag-action">Run Workflow</button>
         </form>
 
-        <form id="status-form" class="stack-form">
-            <button type="submit" class="rag-action">Get Workflow Status</button>
-        </form>
+        <div class="workflow-actions">
+            <button type="submit" form="workflow-form" class="rag-action">Run Workflow</button>
+            <form id="status-form">
+                <button type="submit" class="rag-action">Get Workflow Status</button>
+            </form>
+        </div>
 
-        <div id="multi-agent-results" class="panel panel-mcp">Multi-agent responses will appear here.</div>
+        <div id="multi-agent-results" class="panel panel-mcp" aria-live="polite">
+            <p class="empty">Multi-agent workflow results will appear here.</p>
+        </div>
     </section>
 </main>
 <script src="/loans-js/multi-agent.js"></script>

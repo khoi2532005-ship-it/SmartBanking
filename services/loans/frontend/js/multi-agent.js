@@ -5,6 +5,10 @@ const modeState = document.getElementById("multi-agent-state");
 const workflowRequestInput = document.getElementById("workflow-request");
 const STORAGE_KEY = "multi_agent_mode_enabled";
 const ACTIVE_STATES = ["created", "planning", "planned", "working", "executed", "reviewing", "revising", "reviewed"];
+const STATE_LABELS = {
+    awaiting_human_review: "Awaiting review",
+    partially_accepted: "Partially accepted",
+};
 
 function isEnabled() {
     return modeToggle.checked;
@@ -23,7 +27,10 @@ function renderState() {
 }
 
 function renderDisabledMessage() {
-    output.textContent = "Multi-Agent Mode is OFF. Enable Multi-Agent Mode to run workflows.";
+    const message = document.createElement("p");
+    message.className = "alert alert-warn";
+    message.textContent = "Multi-Agent Mode is OFF. Enable Multi-Agent Mode to run workflows.";
+    output.replaceChildren(message);
 }
 
 function saveMode() {
@@ -40,21 +47,41 @@ function loadMode() {
     renderState();
 }
 
-function renderJson(title, payload) {
-    const heading = document.createElement("h3");
-    heading.textContent = title;
-    const body = document.createElement("pre");
-    body.textContent = JSON.stringify(payload, null, 2);
-    output.replaceChildren(heading, body);
-}
-
 function renderError(title, error) {
     const message = error && error.message ? error.message : String(error);
     const heading = document.createElement("h3");
     heading.textContent = title;
-    const body = document.createElement("pre");
+    const body = document.createElement("p");
+    body.className = "alert alert-error";
     body.textContent = message;
     output.replaceChildren(heading, body);
+}
+
+function textElement(tag, text, className = "") {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = text == null ? "" : String(text);
+    return element;
+}
+
+function addSection(parent, title, content) {
+    if (!content) return;
+    const section = document.createElement("section");
+    section.className = "ma-section";
+    section.append(textElement("h4", title), content);
+    parent.append(section);
+}
+
+function addList(values, renderItem = (value) => String(value)) {
+    if (!Array.isArray(values) || !values.length) return null;
+    const list = document.createElement("ul");
+    values.forEach((value) => list.append(textElement("li", renderItem(value))));
+    return list;
+}
+
+function addTextSection(parent, title, value, emptyMessage = "") {
+    const text = value == null || value === "" ? emptyMessage : String(value);
+    if (text) addSection(parent, title, textElement("p", text, value ? "" : "muted"));
 }
 
 function stageFor(record, role) {
@@ -62,136 +89,249 @@ function stageFor(record, role) {
     return [...stages].reverse().find((stage) => stage.role === role) || null;
 }
 
-function stageStatus(stage) {
-    if (!stage) {
-        return "pending";
-    }
-    if (stage.status === "completed") {
-        return "success";
-    }
-    if (stage.status === "failed" || stage.status === "timed_out") {
-        return "error";
-    }
-    return "running";
+function stageClass(record, role) {
+    const stage = stageFor(record, role);
+    if (stage && stage.status === "completed") return "is-complete";
+    if (stage && ["failed", "timed_out"].includes(stage.status)) return "is-failed";
+    if (stage) return "is-current";
+    if (role === "human" && record.state === "awaiting_human_review") return "is-current";
+    if (role === "human" && record.decision) return "is-complete";
+    return "";
 }
 
-function plannerResult(record) {
-    const stage = stageFor(record, "planner");
+function stageLabel(record, role, label) {
+    const stage = stageFor(record, role);
+    let status = stage ? stage.status.replaceAll("_", " ") : "pending";
+    if (role === "human" && record.state === "awaiting_human_review") status = "awaiting decision";
+    if (role === "human" && record.decision) status = record.decision.decision || record.decision.value || "decided";
+    return textElement("span", `${label}: ${status}`, `ma-stage ${stageClass(record, role)}`);
+}
+
+function renderEvidence(parent, evidence) {
+    if (!Array.isArray(evidence) || !evidence.length) return;
+    const table = document.createElement("table");
+    const header = document.createElement("tr");
+    ["Task", "Source", "Status", "Details"].forEach((label) => header.append(textElement("th", label)));
+    table.append(header);
+
+    evidence.forEach((item) => {
+        const row = document.createElement("tr");
+        const detail = item.status === "ok"
+            ? [item.http_status ? `HTTP ${item.http_status}` : "", item.duration_seconds != null ? `${item.duration_seconds}s` : ""].filter(Boolean).join(" · ")
+            : (item.error || "Evidence unavailable");
+        [item.task_id || "—", item.endpoint || "—", item.status || "unknown", detail || "—"]
+            .forEach((value) => row.append(textElement("td", value)));
+        table.append(row);
+    });
+    addSection(parent, "Evidence", table);
+}
+
+function renderDecisionControls(record) {
+    const section = document.createElement("section");
+    section.className = "ma-section";
+    section.append(
+        textElement("h4", "Human workflow decision"),
+        textElement("p", "Review the agent result and choose whether to accept, partially accept, or reject it.")
+    );
+
+    const fields = document.createElement("div");
+    fields.className = "ma-decision-fields";
+
+    const reviewerField = document.createElement("div");
+    const reviewerLabel = textElement("label", "Reviewer");
+    reviewerLabel.htmlFor = "ma-reviewer";
+    const reviewer = document.createElement("input");
+    reviewer.id = "ma-reviewer";
+    reviewer.name = "reviewer";
+    reviewer.type = "text";
+    reviewer.maxLength = 60;
+    reviewer.autocomplete = "name";
+    reviewer.placeholder = "Your name (optional)";
+    reviewerField.append(reviewerLabel, reviewer);
+
+    const noteField = document.createElement("div");
+    const noteLabel = textElement("label", "Decision note");
+    noteLabel.htmlFor = "ma-decision-note";
+    const note = document.createElement("textarea");
+    note.id = "ma-decision-note";
+    note.name = "note";
+    note.rows = 2;
+    note.maxLength = 1000;
+    note.placeholder = "Required for Partially accept";
+    noteField.append(noteLabel, note);
+    fields.append(reviewerField, noteField);
+    section.append(fields);
+
+    const message = document.createElement("p");
+    message.className = "ma-decision-message";
+    message.setAttribute("role", "status");
+    message.setAttribute("aria-live", "polite");
+    section.append(message);
+
+    const actions = document.createElement("div");
+    actions.className = "ma-decision-actions";
+    [
+        ["accept", "Accept", "btn"],
+        ["partially_accept", "Partially accept", "btn btn-secondary"],
+        ["reject", "Reject", "btn btn-danger"],
+    ].forEach(([decision, label, className]) => {
+        const button = textElement("button", label, className);
+        button.type = "button";
+        button.addEventListener("click", async () => {
+            if (decision === "partially_accept" && !note.value.trim()) {
+                message.className = "ma-decision-message alert alert-error";
+                message.textContent = "Add a note explaining the correction before partially accepting.";
+                note.focus();
+                return;
+            }
+
+            const decisionButtons = [...actions.querySelectorAll("button")];
+            decisionButtons.forEach((item) => { item.disabled = true; });
+            message.className = "ma-decision-message spinner";
+            message.textContent = "Submitting your decision…";
+            try {
+                await postJson(
+                    `/api/multi-agent/workflow/${encodeURIComponent(record.workflow_id)}/review`,
+                    { decision, note: note.value.trim(), reviewer: reviewer.value.trim() }
+                );
+                const updatedRecord = await getJson(
+                    `/api/multi-agent/workflow/${encodeURIComponent(record.workflow_id)}`
+                );
+                renderWorkflow(updatedRecord);
+            } catch (error) {
+                message.className = "ma-decision-message alert alert-error";
+                message.textContent = error && error.message ? error.message : String(error);
+                decisionButtons.forEach((item) => { item.disabled = false; });
+            }
+        });
+        actions.append(button);
+    });
+    section.append(actions);
+    return section;
+}
+
+function renderWorkflow(record, metrics = null) {
+    const card = document.createElement("article");
+    card.className = "ma-workflow";
+
+    const header = document.createElement("div");
+    header.className = "ma-workflow-header";
+    header.append(textElement("h3", "Loan workflow"));
+    const state = String(record.state || "unknown");
+    const stateClass = state === "failed" || state === "rejected" ? "badge-over"
+        : state === "accepted" || state === "partially_accepted" ? "badge-ok" : "badge-near";
+    header.append(textElement("span", STATE_LABELS[state] || state.replaceAll("_", " "), `badge ${stateClass} ma-state`));
+    card.append(header);
+
+    const meta = document.createElement("div");
+    meta.className = "ma-meta muted";
+    if (record.workflow_id) meta.append(textElement("span", `Workflow ${record.workflow_id}`, "chip"));
+    if (record.context && record.context.customer_id != null) {
+        meta.append(textElement("span", `Customer ${record.context.customer_id}`));
+    }
+    if (record.updated_at || record.created_at) meta.append(textElement("span", record.updated_at || record.created_at));
+    card.append(meta);
+    if (record.request) card.append(textElement("p", record.request));
+
+    const stages = document.createElement("div");
+    stages.className = "ma-stage-list";
+    stages.setAttribute("aria-label", "Workflow progress");
+    stages.append(
+        stageLabel(record, "planner", "Planner"),
+        stageLabel(record, "worker", "Worker"),
+        stageLabel(record, "reviewer", "Reviewer"),
+        stageLabel(record, "human", "Human review"),
+    );
+    card.append(stages);
+
+    if (record.error) card.append(textElement("p", record.error, "alert alert-error"));
+    const stageMessages = ["planner", "worker", "reviewer"].flatMap((role) => {
+        const stage = stageFor(record, role);
+        if (!stage) return [];
+        return [stage.error, stage.fallback_reason]
+            .filter(Boolean)
+            .map((message) => `${role[0].toUpperCase()}${role.slice(1)}: ${message}`);
+    });
+    stageMessages.forEach((message) => card.append(textElement("p", message, "alert alert-warn")));
+
     const plan = record.plan || {};
-    const tasks = Array.isArray(plan.tasks) ? plan.tasks : [];
-    const objective = plan.objective || (stage && stage.output && stage.output.objective) || "";
-    const steps = tasks.map((task, index) => `${index + 1}. ${task.title || task.instruction || task.endpoint || task.id}`);
-    const parts = [
-        `Objective: ${objective || "Plan the requested workflow."}`,
-        `Steps: ${steps.length ? steps.join("\n") : "Plan, work, review, human decision."}`,
-        `Evidence Required: ${tasks.filter((task) => task.kind === "api").map((task) => task.evidence || task.endpoint).join("; ") || "Evidence defined by the workflow plan."}`,
-        "Human Approval: Required.",
-    ];
-    const fallbackReason = (plan.meta && plan.meta.fallback_reason) || (stage && stage.fallback_reason);
-    if (fallbackReason) {
-        parts.push(`Fallback Reason: ${fallbackReason}`);
+    if (plan.objective || (Array.isArray(plan.tasks) && plan.tasks.length)) {
+        const section = document.createElement("section");
+        section.className = "ma-section";
+        section.append(textElement("h4", "Plan"));
+        if (plan.objective) section.append(textElement("p", plan.objective));
+        const tasks = addList(plan.tasks, (task) =>
+            [task.title || task.instruction || task.endpoint || task.id, task.kind === "api" ? task.endpoint : ""]
+                .filter(Boolean).join(" · "));
+        if (tasks) section.append(tasks);
+        card.append(section);
     }
-    if (stage && stage.error) {
-        parts.push(`Error: ${stage.error}`);
-    }
-    return {
-        agent: "planner_agent",
-        human_approval_required: true,
-        model: (plan.meta && plan.meta.model) || (stage && stage.model) || "",
-        objective,
-        plan: parts.join("\n"),
-        status: stageStatus(stage),
-        steps: [
-            { action: "Create workflow plan", agent: "planner_agent", step: 1 },
-            { action: "Retrieve feature evidence and generate output", agent: "worker_agent", step: 2 },
-            { action: "Review output for risk, correction, retest, and recommendation", agent: "reviewer_agent", step: 3 },
-            { action: "Accept, partially accept, or reject", agent: "human_reviewer", step: 4 },
-        ],
-    };
-}
 
-function workerResult(record) {
-    const stage = stageFor(record, "worker");
     const result = record.result || {};
-    const evidence = Array.isArray(result.evidence) ? result.evidence : [];
-    const errors = evidence
-        .filter((item) => item.status !== "ok")
-        .map((item) => item.error)
-        .filter(Boolean);
-    const error = (stage && stage.error) || errors.join("; ") || "";
-    const status = stageStatus(stage) === "error" || (evidence.length > 0 && errors.length === evidence.length)
-        ? "error"
-        : stageStatus(stage);
-    return {
-        agent: "worker_agent",
-        error,
-        evidence,
-        evidence_count: evidence.length,
-        human_approval_required: true,
-        output: result.answer || "",
-        status,
-    };
-}
+    renderEvidence(card, result.evidence);
+    const findings = addList(result.findings, (finding) => {
+        const refs = Array.isArray(finding.evidence) && finding.evidence.length
+            ? ` (evidence: ${finding.evidence.join(", ")})` : "";
+        return `${finding.statement || ""}${refs}`;
+    });
+    if (findings) addSection(card, "Findings", findings);
+    addTextSection(card, "Worker answer", result.answer, "The worker has not produced an answer yet.");
+    const gaps = addList(result.gaps);
+    if (gaps) addSection(card, "Gaps", gaps);
 
-function reviewerResult(record) {
-    const stage = stageFor(record, "reviewer");
     const review = record.review || {};
-    const details = [
-        review.summary,
-        ...(Array.isArray(review.defects) ? review.defects.map((defect) => `Defect (${defect.severity || "unspecified"}): ${defect.note || defect.about || ""}`) : []),
-        ...(Array.isArray(review.risks) ? review.risks.map((risk) => `Risk: ${risk}`) : []),
-        ...(Array.isArray(review.revision_notes) ? review.revision_notes.map((note) => `Correction: ${note}`) : []),
-        stage && stage.fallback_reason ? `Fallback Reason: ${stage.fallback_reason}` : "",
-        stage && stage.error ? `Error: ${stage.error}` : "",
-    ].filter(Boolean);
-    return {
-        agent: "reviewer_agent",
-        human_approval_required: true,
-        model: (review.meta && review.meta.model) || (stage && stage.model) || "",
-        review: details.join("\n"),
-        status: stageStatus(stage),
-    };
-}
-
-function displayWorkflow(record) {
-    const stages = Array.isArray(record.stages) ? record.stages : [];
-    const durationMs = stages.reduce((total, stage) =>
-        total + (typeof stage.duration_seconds === "number" ? stage.duration_seconds * 1000 : 0), 0);
-    const decision = record.decision && (record.decision.decision || record.decision.value);
-    const humanStage = stageFor(record, "human");
-    return {
-        duration_ms: Math.round(durationMs),
-        human_decision: {
-            allowed_values: ["Accept", "Partially Accept", "Reject"],
-            required: true,
-            status: decision || (humanStage && humanStage.status === "completed" ? "completed" : "pending"),
-        },
-        participating_agents: ["planner_agent", "worker_agent", "reviewer_agent"],
-        planner_result: plannerResult(record),
-        reviewer_result: reviewerResult(record),
-        status: record.state === "failed" ? "error" : ACTIVE_STATES.includes(record.state) ? "running" : "success",
-        timestamp: record.updated_at || record.created_at || "",
-        user_request: record.request || "",
-        worker_result: workerResult(record),
-        workflow_id: record.workflow_id || "",
-    };
-}
-
-function displayWorkflowStatus(record, metrics) {
-    const counts = metrics.counts;
-    const workflowHistoryCount = metrics.workflows.total;
-    if (!Number.isInteger(counts.history_records)
-        || !Number.isInteger(counts.coordination_records)
-        || !Number.isInteger(workflowHistoryCount)) {
-        throw new Error("Multi-Agent API returned incomplete workflow and audit counts");
+    if (review.summary || review.verdict
+        || (Array.isArray(review.risks) && review.risks.length)
+        || (Array.isArray(review.defects) && review.defects.length)
+        || (Array.isArray(review.revision_notes) && review.revision_notes.length)) {
+        const section = document.createElement("section");
+        section.className = "ma-section";
+        const heading = document.createElement("h4");
+        heading.append(document.createTextNode("Review"));
+        if (review.verdict) {
+            const verdictClass = ["accept", "pass"].includes(String(review.verdict).toLowerCase()) ? "badge-ok" : "badge-near";
+            heading.append(textElement("span", review.verdict, `badge ${verdictClass}`));
+        }
+        section.append(heading);
+        if (review.summary) section.append(textElement("p", review.summary));
+        const risks = addList(review.risks);
+        if (risks) {
+            section.append(textElement("p", "Risks", "muted"), risks);
+        }
+        const revisions = addList(review.revision_notes);
+        if (revisions) {
+            section.append(textElement("p", "Revision notes", "muted"), revisions);
+        }
+        const defects = addList(review.defects, (defect) =>
+            `${defect.severity || "Issue"}: ${defect.note || defect.about || ""}`);
+        if (defects) {
+            section.append(textElement("p", "Defects", "muted"), defects);
+        }
+        card.append(section);
     }
-    const latestWorkflow = displayWorkflow(record);
-    return {
-        audit_record_count: counts.history_records + counts.coordination_records,
-        latest_workflow: latestWorkflow,
-        status: latestWorkflow.status,
-        workflow_history_count: workflowHistoryCount,
-    };
+
+    if (record.decision) {
+        const decision = record.decision.decision || record.decision.value || "completed";
+        addTextSection(card, "Human decision",
+            `${String(decision).replaceAll("_", " ")}${record.decision.by ? ` · ${record.decision.by}` : ""}`);
+        addTextSection(card, "Reviewer note", record.decision.note);
+    } else if (record.state === "awaiting_human_review") {
+        card.append(renderDecisionControls(record));
+    }
+    if (record.final_response) {
+        addTextSection(card, record.final_response.released ? "Final response" : "Final response withheld",
+            record.final_response.answer || record.final_response.correction_note
+                || (record.final_response.released ? "No response text was returned." : "The response was withheld."));
+    }
+
+    if (metrics && metrics.counts && metrics.workflows) {
+        const counts = metrics.counts;
+        const total = metrics.workflows.total;
+        if (Number.isInteger(counts.history_records) && Number.isInteger(counts.coordination_records) && Number.isInteger(total)) {
+            card.append(textElement("p", `${total} workflows · ${counts.history_records + counts.coordination_records} audit records`, "muted"));
+        }
+    }
+    output.replaceChildren(card);
 }
 
 function isWorkflowRunning(record) {
@@ -268,15 +408,14 @@ document.getElementById("workflow-form").addEventListener("submit", async (e) =>
         const user_request = document.getElementById("workflow-request").value.trim();
         const started = await postJson("/api/multi-agent/workflow", { user_request });
         if (!started.workflow_id) {
-            renderJson("Multi-Agent API: /multi-agent/workflow", started);
-            return;
+            throw new Error("Multi-Agent API did not return a workflow ID.");
         }
         let record = await getJson(`/api/multi-agent/workflow/${encodeURIComponent(started.workflow_id)}`);
-        renderJson("Multi-Agent Workflow", displayWorkflow(record));
+        renderWorkflow(record);
         for (let attempt = 0; attempt < 240 && isWorkflowRunning(record); attempt += 1) {
             await sleep(1000);
             record = await getJson(`/api/multi-agent/workflow/${encodeURIComponent(started.workflow_id)}`);
-            renderJson("Multi-Agent Workflow", displayWorkflow(record));
+            renderWorkflow(record);
         }
     } catch (error) {
         renderError("Multi-Agent API Error: /multi-agent/workflow", error);
@@ -294,14 +433,13 @@ document.getElementById("status-form").addEventListener("submit", async (e) => {
     try {
         const summary = await getJson("/api/multi-agent/workflow/status");
         if (!summary.workflow_id) {
-            renderJson("Multi-Agent API: /multi-agent/workflow/status", summary);
-            return;
+            throw new Error("Multi-Agent API did not return a workflow ID.");
         }
         const [record, metrics] = await Promise.all([
             getJson(`/api/multi-agent/workflow/${encodeURIComponent(summary.workflow_id)}`),
             getJson("/api/multi-agent/metrics"),
         ]);
-        renderJson("Multi-Agent Workflow Status", displayWorkflowStatus(record, metrics));
+        renderWorkflow(record, metrics);
     } catch (error) {
         renderError("Multi-Agent API Error: /multi-agent/workflow/status", error);
     }
