@@ -4,7 +4,7 @@ Reviews the cloud deployment report the cloud owner produces and has the model
 write the Cloud Deployment Review entry that supports the final human release
 decision.
 
-ACT reads one JSON report (schema in docs/deployment/README.md): provider and
+ACT reads one JSON report (schema in docs/deployment/cloud-deployment-report-format.md): provider and
 region, the commit and workflow run, the resources, the endpoint and CRUD
 checks with their status codes, the state of the four AI services (disabled by
 default in the required cloud deployment), open issues, and the human release
@@ -100,10 +100,10 @@ class CloudDeploymentReviewMode(Mode):
         if not path.is_file():
             return Evidence(ok=False, summary=(
                 f"cloud deployment report not found at {rel(path)}; the cloud owner's cloud-deployment.yml run "
-                f"writes it (schema: docs/deployment/README.md), or set CLOUD_DEPLOYMENT_REPORT"))
+                f"writes it (schema: docs/deployment/cloud-deployment-report-format.md), or set CLOUD_DEPLOYMENT_REPORT"))
         report = read_json(path)
         if not report:
-            return Evidence(ok=False, summary=f"{rel(path)} is not a JSON object; see docs/deployment/README.md for the schema")
+            return Evidence(ok=False, summary=f"{rel(path)} is not a JSON object; see docs/deployment/cloud-deployment-report-format.md for the schema")
         workflow = report.get("workflow") or {}
         resources = [r for r in (report.get("resources") or []) if isinstance(r, dict)]
         endpoints = _checks(report.get("endpoints"))

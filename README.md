@@ -16,11 +16,12 @@ prompts/          Prompt files per feature (prompts/<feature>/) and agentic-loop
 agentic/          Shared agentic-loop engine; one mode per feature in agentic/modes/
 mcp_server/       Shared local MCP server (Release 1); one read-only tool per feature in mcp_server/tools/
 rag_server/       Shared local RAG server (Release 1); approved corpus in rag_server/corpus/, prompts in prompts/_rag/
+multi_agent_server/  Shared local Multi-Agent server (Release 2); prompts in prompts/_multi_agent/
 tests/            Engine tests (no services or API key needed)
 docs/             Feature registrations (features.md), loop guide (agentic-loop.md),
-                  run evidence (evidence/)
+                  run evidence (evidence/, testing/, release-2/)
 agentic_loop.py   Plan -> Act -> Observe -> Adapt loop (run from the repo root)
-requirements-*.txt  Host-side dependencies: -agentic (loop), -mcp (MCP server), -rag (RAG server)
+requirements-*.txt  Host-side dependencies: -agentic (loop), -mcp (MCP server), -rag (RAG server), -multi-agent (Multi-Agent server)
 ```
 
 ## Run the whole app
@@ -85,6 +86,35 @@ Windows may ask once to let Python accept connections on 8100 and 8200; allow
 it, or the containers cannot reach the two servers. Feature tabs then show
 the MCP and RAG panels live; with the servers off, the panels say so and the
 rest of each feature keeps working.
+
+## Release 2 demo run sheet
+
+Five terminals: the Release 1 run sheet plus the Multi-Agent server.
+
+```powershell
+# once, from the repo root: the Release 1 setup above, then
+pip install -r requirements-multi-agent.txt pre-commit
+pre-commit install
+
+# terminal 1 - shared MCP server, host process on 8100
+python -m mcp_server.server
+
+# terminal 2 - shared RAG server, host process on 8200
+python -m rag_server.server
+
+# terminal 3 - shared Multi-Agent server, host process on 8300
+python -m multi_agent_server.server
+
+# terminal 4 - the five features + home page
+docker compose up --build -d
+
+# terminal 5 - the agentic loop, once 1 to 4 are up
+python agentic_loop.py --mode multi_agent_review
+python agentic_loop.py --mode testing_review
+python agentic_loop.py --mode cloud_deployment_review
+```
+
+Budgeting's AI panels, including the Multi-Agent panel, are in its AI Mode tab.
 
 ## Run the agentic loop
 
@@ -151,3 +181,20 @@ rebuild the index on the host with `python -m rag_server.validate --refresh`
 (a restart also rebuilds it when the corpus changed). A rebuild touches the
 index every feature is querying, so feature UIs, backend proxies and loop runs
 never trigger one.
+
+## Run the shared Multi-Agent server
+
+One local Multi-Agent server for all five features (Release 2): Planner,
+Worker and Reviewer agents, then a human decision. Runs on the host, not a
+Compose service.
+
+```bash
+pip install -r requirements-multi-agent.txt
+python -m multi_agent_server.server              # http://localhost:8300
+python -m multi_agent_server.run --request "..." # one workflow from the terminal
+python -m multi_agent_server.review              # decide the waiting workflows
+python -m multi_agent_server.validate --evidence # 9-check test record, saved under docs/evidence/
+```
+
+Containers reach it at `http://host.docker.internal:8300`. Wiring a feature to
+it: [docs/multi-agent-integration.md](docs/multi-agent-integration.md).

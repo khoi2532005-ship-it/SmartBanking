@@ -388,4 +388,4 @@ def test_cloud_missing_configured_report_never_calls_the_model(answers, tmp_path
     monkeypatch.setenv("CLOUD_DEPLOYMENT_REPORT", str(tmp_path / "missing.json"))
     result = loop.run(CloudDeploymentReviewMode())
     assert not result.ok and result.attempts == []
-    assert "docs/deployment/README.md" in result.evidence.summary
+    assert "docs/deployment/cloud-deployment-report-format.md" in result.evidence.summary

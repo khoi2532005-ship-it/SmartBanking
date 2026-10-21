@@ -1,4 +1,4 @@
-# Cloud deployment report
+# Cloud deployment report format
 
 The agentic loop's `cloud_deployment_review` mode reads one JSON file and
 writes the Cloud Deployment Review entry that supports the final human release
