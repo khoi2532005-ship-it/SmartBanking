@@ -245,6 +245,24 @@ cd services\budgeting\backend
 `tests.test_multi_agent_contract` (Release 2) and `tests.test_budget_routes`.
 All run in CI by `.github/workflows/student-4.yml`.
 
+Release 2 post-commit endpoint tests: `budgeting_endpoint_tests/test_endpoints_post_commit.py`
+tests two endpoint functions, `GET /api/budgets/summary` (the seeded period,
+its totals and statuses, its 400s) and `POST /api/budgets` (create, the new
+line in the summary, then 409 and 400), as black-box HTTP calls against a
+running API with the seeded database and no AI service. They are steps of
+the smoke job in student-4.yml, which runs on pull requests into main and
+pushes to main that touch the watched paths; the job uploads the artifact
+`student-4-endpoint-tests` with `post-commit-endpoint-report-student-4.{json,md}`,
+also when an earlier step failed. `docs/testing/` keeps a report from a local run of
+the same tests against the same stack; each CI run's own report is in its artifact.
+Without a running API and with `BUDGET_API_URL` unset or empty they skip. Locally,
+with the database and API running:
+
+```bash
+BUDGET_API_URL=http://localhost:5004 ENDPOINT_REPORT_DIR=reports \
+  python -m pytest services/budgeting/backend/budgeting_endpoint_tests -q
+```
+
 ## Prompts
 
 `prompts/budgeting/` — `insight_system.txt` (persona and rules),

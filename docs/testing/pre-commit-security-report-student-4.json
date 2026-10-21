@@ -1,0 +1,58 @@
+{
+  "student": "student-4",
+  "name": "Cong Bao Nguyen",
+  "feature": "budgeting",
+  "paths": ["services/budgeting", "requirements-multi-agent.txt", "multi_agent_server"],
+  "commit": "524bac2",
+  "ran_at": "2026-10-20T11:56:09Z",
+  "config": ".pre-commit-config.yaml",
+  "command": "pre-commit run --all-files",
+  "tools": {"ruff": "0.6.9", "detect-secrets": "1.5.0", "pip-audit": "2.7.3"},
+  "scans": [
+    {
+      "name": "ruff-security",
+      "rules": "S (flake8-bandit); S101 ignored in test files only",
+      "result": "passed",
+      "findings": 4,
+      "fixed": 0,
+      "accepted": [
+        {"id": "S104", "file": "services/budgeting/backend/app.py", "line": 91,
+         "reason": "the API binds 0.0.0.0 so the Docker-published port and the frontend container can reach it"},
+        {"id": "S104", "file": "services/budgeting/database/app.py", "line": 428,
+         "reason": "the database service binds 0.0.0.0 for the same reason; it is reachable only on the compose network"},
+        {"id": "S104", "file": "services/budgeting/frontend/serve.py", "line": 52,
+         "reason": "the dev frontend server binds 0.0.0.0 so the tabs can be opened from another device on the LAN"},
+        {"id": "S106", "file": "services/budgeting/backend/tests/test_multi_agent_client.py", "line": 210,
+         "reason": "a made-up bearer token in a test fixture, never a real credential"}
+      ]
+    },
+    {
+      "name": "detect-secrets",
+      "baseline": ".secrets.baseline",
+      "result": "passed",
+      "findings": 0,
+      "fixed": 0,
+      "accepted": [],
+      "note": "the Gemini key lives in .env, which is gitignored; no secret appears in the budgeting files"
+    },
+    {
+      "name": "pip-audit",
+      "files": ["services/budgeting/backend/requirements.txt", "services/budgeting/database/requirements.txt",
+                "requirements-multi-agent.txt"],
+      "result": "passed",
+      "findings": 7,
+      "fixed": 7,
+      "fixed_by": "PR #62 (pin bumps), verified on this commit",
+      "vulnerabilities_fixed": [
+        {"id": "PYSEC-2026-2151", "package": "flask", "from": "3.0.3", "to": "3.1.3", "files": ["backend", "database"]},
+        {"id": "PYSEC-2026-1383", "package": "flask-cors", "from": "5.0.0", "to": "6.0.0", "files": ["backend"]},
+        {"id": "PYSEC-2026-1384", "package": "flask-cors", "from": "5.0.0", "to": "6.0.0", "files": ["backend"]},
+        {"id": "PYSEC-2026-1385", "package": "flask-cors", "from": "5.0.0", "to": "6.0.0", "files": ["backend"]},
+        {"id": "PYSEC-2026-1872", "package": "requests", "from": "2.32.3", "to": "2.33.0", "files": ["backend"]},
+        {"id": "PYSEC-2026-2275", "package": "requests", "from": "2.32.3", "to": "2.33.0", "files": ["backend"]}
+      ],
+      "accepted": []
+    }
+  ],
+  "summary": {"scans": 3, "passed": 3, "failed": 0, "findings": 11, "fixed": 7, "accepted": 4}
+}
