@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(REPO_ROOT / ".env")
 
-HOST = os.getenv("MULTI_AGENT_HOST", "0.0.0.0")
+HOST = os.getenv("MULTI_AGENT_HOST", "0.0.0.0")  # noqa: S104  # default bind for local Docker host access
 PORT = int(os.getenv("MULTI_AGENT_PORT", "8300"))
 
 # The feature APIs the Worker collects evidence from. Same variable names as
@@ -71,5 +71,5 @@ API_TOKEN = os.getenv("MULTI_AGENT_API_TOKEN", "").strip()
 
 
 def local_url() -> str:
-    host = "localhost" if HOST in ("0.0.0.0", "") else HOST
+    host = "localhost" if HOST in ("0.0.0.0", "") else HOST  # noqa: S104  # bind default is intentional for local host-only demo wiring
     return f"http://{host}:{PORT}"

@@ -10,41 +10,48 @@ on:
     paths:
       - 'services/transactions/**'
       - 'prompts/**'
+      - 'prompts/_multi_agent/**'
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-5.yml'
       - 'mcp_server/**'
       - 'rag_server/**'
+      - 'multi_agent_server/**'
       - 'prompts/_rag/**'
       - 'prompts/_mcp/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
       - 'requirements-rag.txt'
+      - 'requirements-multi-agent.txt'
   pull_request:
     branches: [main]
     paths:
       - 'services/transactions/**'
       - 'prompts/**'
+      - 'prompts/_multi_agent/**'
       - 'shared/frontend/**'
       - 'docker-compose.yml'
       - '.github/workflows/student-5.yml'
       - 'mcp_server/**'
       - 'rag_server/**'
+      - 'multi_agent_server/**'
       - 'prompts/_rag/**'
       - 'prompts/_mcp/**'
       - 'tests/**'
       - 'requirements-mcp.txt'
       - 'requirements-rag.txt'
+      - 'requirements-multi-agent.txt'
   workflow_dispatch:
 
 env:
   COMPOSE_FILE: docker-compose.yml
   SERVICES: transactions
-  # Keep the feature code and UI in place, but disable both shared integrations
-  # while the containerized CI stack is running. This still proves the routes
-  # and panels render the inactive state instead of crashing.
+  # Keep the feature code and UI in place, but disable the shared integrations
+  # while the containerized CI stack is running. This proves the routes and
+  # panels render the inactive state instead of crashing.
   MCP_ENABLED: "false"
   RAG_ENABLED: "false"
+  MULTI_AGENT_ENABLED: "false"
 
 jobs:
 
@@ -83,10 +90,15 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-rag.txt
+          pip install \
+            -r requirements-agentic.txt \
+            -r requirements-mcp.txt \
+            -r requirements-rag.txt \
+            -r requirements-multi-agent.txt \
+            -r services/transactions/backend/requirements.txt
 
       - name: Run relevant unit tests
-        run: python -m pytest -q tests/test_agentic_validation_modes.py tests/test_mcp_server.py tests/test_rag_server.py
+        run: python -m pytest -q tests/test_agentic_validation_modes.py tests/test_mcp_server.py tests/test_rag_server.py tests/test_multi_agent_server.py services/transactions/backend/tests/test_multi_agent_client.py
 
   # =====================================================================
   # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200
@@ -136,23 +148,28 @@ jobs:
             exit 1
           fi
 
-      - name: Verify MCP and RAG are configured but disabled in CI
+      - name: Verify MCP, RAG and Multi-Agent are configured but disabled in CI
         run: |
           curl -s http://localhost:5005/api/health | python3 -c '
           import json, sys
           h = json.load(sys.stdin)
           assert h["mcp"]["enabled"] is False, h["mcp"]
           assert h["rag"]["enabled"] is False, h["rag"]
+          assert h["multi_agent"]["enabled"] is False, h["multi_agent"]
           assert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"]
           assert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"]
+          assert h["multi_agent"]["url"].startswith("http://host.docker.internal:8300"), h["multi_agent"]
           print("mcp:", h["mcp"])
           print("rag:", h["rag"])
+          print("multi_agent:", h["multi_agent"])
           '
 
           curl -s http://localhost:5005/ui/mcp/status | grep -q "Inactive" \
             || { echo "FAIL /ui/mcp/status did not report the inactive state"; exit 1; }
           curl -s http://localhost:5005/ui/rag/status | grep -q "Inactive" \
             || { echo "FAIL /ui/rag/status did not report the inactive state"; exit 1; }
+          curl -s http://localhost:5005/ui/multi-agent/status | grep -q "Inactive" \
+            || { echo "FAIL /ui/multi-agent/status did not report the inactive state"; exit 1; }
 
           page=$(curl -s http://localhost:3005/tabs/transactions.html)
           for needle in 'hx-post="/ui/mcp/tool"' 'hx-get="/ui/mcp/tools"' 'hx-post="/ui/rag/query"'; do

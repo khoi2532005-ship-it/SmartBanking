@@ -10,9 +10,9 @@ import re
 from datetime import date
 from html import escape
 
-from flask import Blueprint, request
+from flask import Blueprint, make_response, request
 
-from routes.agents import decided_by, operator_check
+from routes.agents import MAX_REVIEWER_CHARS, decided_by, same_origin_marker
 from services import database_api, insight_service, mcp_client, multi_agent_client, rag_client, transactions_client
 from services.budget_logic import build_summary
 
@@ -618,12 +618,18 @@ def rag_query_fragment():
 # ---------------------------------------------------------------------------
 # Release 2: shared Multi-Agent Server (HTMX fragments)
 # ---------------------------------------------------------------------------
+#
+# One card carries the whole workflow, as the fraud panel does: the stages
+# while it runs, then the plan, the Worker result and the review, then the
+# decision block (name, note, Accept / Partially accept / Reject) inside the
+# same card once the state is awaiting_human_review, then the final response.
 
 _MA_ERRORS = (multi_agent_client.MultiAgentDisabled, multi_agent_client.MultiAgentUnreachable,
               multi_agent_client.MultiAgentError)
 STAGE_BADGE = {"completed": "ok", "running": "near", "timed_out": "near", "failed": "over"}
 VERDICT_BADGE = {"accept": "ok", "revise": "near", "escalate": "over"}
-DECISION_LABEL = {"accept": "Accept", "partially_accept": "Partially accept", "reject": "Reject"}
+STATE_BADGE = {"awaiting_human_review": "near", "accepted": "ok", "partially_accepted": "ok", "rejected": "over", "failed": "over"}
+DECISION_LABEL = {"accept": "Accept", "partially_accept": "Partially accept (correct)", "reject": "Reject"}
 
 
 def _ma_alert(exc):
@@ -739,36 +745,56 @@ def _review_html(review):
       </section>"""
 
 
-def _decision_form(workflow_id):
+def _decision_block(workflow_id):
+    """The human decision inside the card: reviewer name, note, three buttons.
+
+    There is no <form>: each button posts the block's two fields itself, so
+    Enter in the name box submits nothing and a second click while one
+    decision is in flight is dropped. The buttons target the block's message
+    slot, so a refused or failed decision shows its reason there and the name
+    and note stay typed; a decision that went through comes back as the whole
+    card with HX-Retarget, which replaces the article.
+    """
     workflow_id = escape(str(workflow_id))
     buttons = "".join(
-        f'<button type="submit" name="decision" value="{value}" class="btn{" btn-primary" if value == "accept" else ""}">{label}</button>'
+        f'<button type="button" class="btn{" btn-primary" if value == "accept" else ""}" '
+        f'hx-post="/ui/multi-agent/workflows/{workflow_id}/decision" hx-vals=\'{{"decision": "{value}"}}\' '
+        f'hx-include="closest .ma-decision" hx-target="#ma-msg-{workflow_id}" hx-swap="innerHTML" '
+        f'hx-sync="closest .ma-decision:drop" hx-disabled-elt="this" hx-indicator="closest .ma-decision">{label}</button>'
         for value, label in DECISION_LABEL.items())
     return f"""
-      <section class="ma-section">
+      <section class="ma-section ma-decision">
         <h4>Decision</h4>
-        <form class="decision-form" hx-post="/ui/multi-agent/workflows/{workflow_id}/decision"
-              hx-target="#ma-{workflow_id}" hx-swap="outerHTML" hx-indicator="#ma-{workflow_id} .htmx-indicator">
-          <input type="text" name="reviewer" maxlength="60" placeholder="Reviewer name">
-          <textarea name="note" rows="2" maxlength="{multi_agent_client.MAX_NOTE_CHARS}" placeholder="Correction note (required for partially accept)"></textarea>
-          <div class="form-actions">{buttons} <span class="htmx-indicator muted">Sending</span></div>
-        </form>
+        <div class="row">
+          <div>
+            <label for="ma-reviewer-{workflow_id}">Reviewer</label>
+            <input id="ma-reviewer-{workflow_id}" name="reviewer" type="text" maxlength="{MAX_REVIEWER_CHARS}"
+                   placeholder="Your name (recorded in the audit)">
+          </div>
+          <div class="grow">
+            <label for="ma-note-{workflow_id}">Note</label>
+            <textarea id="ma-note-{workflow_id}" name="note" rows="2" maxlength="{multi_agent_client.MAX_NOTE_CHARS}"
+                      placeholder="Correction note (required for Partially accept)"></textarea>
+          </div>
+        </div>
+        <div id="ma-msg-{workflow_id}" class="ma-message"></div>
+        <div class="form-actions">{buttons} <span class="htmx-indicator muted">Sending</span></div>
       </section>"""
 
 
 def _response_html(final):
     if not final:
         return ""
+    who = f'{escape(str(final.get("decision")))} by {escape(str(final.get("decided_by", "")))}'
     if not final.get("released"):
         return f"""
       <section class="ma-section">
-        <h4>Final response <span class="badge badge-over">withheld</span></h4>
-        <p class="muted">Decision {escape(str(final.get("decision")))} by {escape(str(final.get("decided_by", "")))}.</p>
+        <h4>Final response <span class="badge badge-over">withheld</span> <span class="muted">{who}</span></h4>
         {('<p>' + escape(str(final.get("correction_note"))) + '</p>') if final.get("correction_note") else ""}
       </section>"""
     return f"""
       <section class="ma-section ma-final">
-        <h4>Final response <span class="badge badge-ok">released</span> <span class="muted">{escape(str(final.get("decision")))} by {escape(str(final.get("decided_by", "")))} at {escape(str(final.get("released_at", "")))}</span></h4>
+        <h4>Final response <span class="badge badge-ok">released</span> <span class="muted">{who} at {escape(str(final.get("released_at", "")))}</span></h4>
         <p>{escape(str(final.get("answer") or ""))}</p>
         {('<p class="muted">Correction: ' + escape(str(final.get("correction_note"))) + '</p>') if final.get("correction_note") else ""}
         {('<p class="muted">Risks</p>' + _list(final.get("risks"))) if final.get("risks") else ""}
@@ -782,21 +808,20 @@ def _workflow_card(full, message=""):
     running = state not in (multi_agent_client.STATE_AWAITING, *multi_agent_client.TERMINAL_STATES)
     poll = (f' hx-get="/ui/multi-agent/workflows/{workflow_id}" hx-trigger="every 2s" hx-swap="outerHTML"'
             if running else "")
-    state_cls = {"awaiting_human_review": "near", "accepted": "ok", "partially_accepted": "ok", "rejected": "over", "failed": "over"}.get(state, "near")
     context = full.get("context") or {}
     head = (f'Customer {escape(str(context.get("customer_id", "")))}, '
             f'{escape(str(context.get("month", "")))}/{escape(str(context.get("year", "")))}')
     error = f'<p class="alert alert-error">{escape(str(full.get("error")))}</p>' if full.get("error") else ""
     body = _plan_html(full.get("plan")) + _result_html(full.get("result")) + _review_html(full.get("review"))
     if state == multi_agent_client.STATE_AWAITING:
-        body += _decision_form(workflow_id)
+        body += _decision_block(workflow_id)
     body += _response_html(full.get("final_response"))
     revisions = f' <span class="muted">revisions {escape(str(full.get("revisions")))}</span>' if full.get("revisions") else ""
     return f"""
     <article class="insight-card ma-card" id="ma-{workflow_id}"{poll}>
       <div class="history-head">
-        <span class="chip">{escape(str(workflow_id))}</span>
-        <span class="badge badge-{state_cls}">{escape(state)}</span>{revisions}
+        <span class="chip">{workflow_id}</span>
+        <span class="badge badge-{STATE_BADGE.get(state, "near")}">{escape(state)}</span>{revisions}
         <span class="htmx-indicator muted">{"Running" if running else ""}</span>
       </div>
       <p class="muted">{head} &middot; {escape(str(full.get("request", "")))}</p>
@@ -805,22 +830,40 @@ def _workflow_card(full, message=""):
     </article>"""
 
 
+def _retry_card(workflow_id, exc):
+    """A temporary failure (server down or failing) keeps the card, its id and
+    its polling, so the workflow is not lost from the page."""
+    workflow_id = escape(str(workflow_id))
+    return f"""
+    <article class="insight-card ma-card" id="ma-{workflow_id}"
+             hx-get="/ui/multi-agent/workflows/{workflow_id}" hx-trigger="every 5s" hx-swap="outerHTML">
+      <div class="history-head"><span class="chip">{workflow_id}</span><span class="badge badge-near">retrying</span></div>
+      <p class="alert alert-warn">{escape(str(exc).rstrip('.'))}. Checking again.</p>
+    </article>"""
+
+
+def _temporary(exc):
+    """A server that is down or failing may answer later; a reply that broke the
+    contract (missing fields, a non-object body) will not, so it is shown instead."""
+    return isinstance(exc, multi_agent_client.MultiAgentUnreachable) or (
+        isinstance(exc, multi_agent_client.MultiAgentError) and exc.temporary)
+
+
 def _load_card(workflow_id, message=""):
     try:
         full = multi_agent_client.workflow(workflow_id)
     except _MA_ERRORS as exc:
-        return _ma_alert(exc)
+        return _retry_card(workflow_id, exc) if _temporary(exc) else _ma_alert(exc)
     if not multi_agent_client.is_budgeting(full):
         return _alert(f"Unknown budgeting workflow {workflow_id}.", "warn")
     return _workflow_card(full, message)
 
 
-def _operator_alert(*, state_changing):
-    """The review desk is for the operator: same-origin marker on POSTs, reviewer token when configured."""
-    refused = operator_check(request.headers, state_changing=state_changing)
-    if refused:
-        return _alert(refused[0], "warn")
-    return None
+def _panel_only():
+    """Start and decide come from the panel: a cross-site form cannot set these headers."""
+    if same_origin_marker(request.headers):
+        return None
+    return _alert("Start and decide workflows from the budgeting panel (HX-Request or X-Requested-With header).", "warn")
 
 
 @ui_bp.get("/multi-agent/status")
@@ -835,8 +878,9 @@ def multi_agent_status_fragment():
 
 @ui_bp.post("/multi-agent/workflows")
 def multi_agent_start_fragment():
-    if not (request.headers.get("HX-Request", "").lower() == "true" or request.headers.get("X-Requested-With")):
-        return _alert("Start workflows from the budgeting panel.", "warn")   # a cross-site form cannot set these headers
+    refused = _panel_only()
+    if refused:
+        return refused
     text = (request.form.get("request") or "").strip()
     if not text:
         return _alert("Type the request first.", "warn")
@@ -848,32 +892,79 @@ def multi_agent_start_fragment():
         summary = multi_agent_client.start(text, customer_id, month, year)
     except _MA_ERRORS as exc:
         return _ma_alert(exc)
-    return _load_card(summary["workflow_id"])
+    response = make_response(_load_card(summary["workflow_id"]))
+    response.headers["HX-Trigger"] = "ma-started"           # the history list refreshes itself
+    return response
+
+
+@ui_bp.get("/multi-agent/history")
+def multi_agent_history_fragment():
+    """The selected customer's latest workflows, newest first; Open loads one into the panel."""
+    customer_id = _customer(request.args)
+    try:
+        listing = multi_agent_client.history(customer_id)
+    except _MA_ERRORS as exc:
+        return f'<p class="empty">{escape(str(exc).rstrip("."))}.</p>'
+    if not listing:
+        return f'<p class="empty">No workflows for customer {customer_id} yet.</p>'
+    items = ""
+    for w in listing:
+        workflow_id = escape(str(w.get("workflow_id")))
+        context = w.get("context") or {}
+        items += f"""
+        <li>
+          <div class="history-head">
+            <span class="chip">{workflow_id}</span>
+            <span class="badge badge-{STATE_BADGE.get(str(w.get("state")), "near")}">{escape(str(w.get("state", "")))}</span>
+            <span class="muted">{escape(str(w.get("created_at", "")))}</span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/multi-agent/workflows/{workflow_id}"
+                    hx-target="#ma-panel" hx-swap="innerHTML">Open</button>
+          </div>
+          <p class="muted">Customer {escape(str(context.get("customer_id", "")))}, {escape(str(context.get("month", "")))}/{escape(str(context.get("year", "")))} &middot; {escape(str(w.get("request", "")))}</p>
+        </li>"""
+    return f'<ul class="insight-history">{items}</ul>'
 
 
 @ui_bp.get("/multi-agent/workflows/<workflow_id>")
 def multi_agent_workflow_fragment(workflow_id):
-    """The review desk card: unreleased output, so operator only."""
-    return _operator_alert(state_changing=False) or _load_card(workflow_id)
+    """The card: polled every 2 s while the stages run, then the gate, then the answer.
+    When the card has stopped running, the history list is told to refresh, so
+    a workflow that reached the gate or failed while polling shows up right."""
+    response = make_response(_load_card(workflow_id))
+    if 'hx-trigger="every' not in response.get_data(as_text=True) and f'id="ma-{escape(str(workflow_id))}"' in response.get_data(as_text=True):
+        response.headers["HX-Trigger"] = "ma-updated"
+    return response
 
 
 @ui_bp.post("/multi-agent/workflows/<workflow_id>/decision")
 def multi_agent_decision_fragment(workflow_id):
-    refused = _operator_alert(state_changing=True)
+    refused = _panel_only()
     if refused:
         return refused
     decision = (request.form.get("decision") or "").strip()
     note = (request.form.get("note") or "").strip()
-    reviewer = (request.form.get("reviewer") or "").strip()[:60]
+    reviewer = (request.form.get("reviewer") or "").strip()[:MAX_REVIEWER_CHARS]
     try:
         summary = multi_agent_client.workflow_status(workflow_id)
         if not multi_agent_client.is_budgeting(summary):
-            return _alert(f"Unknown budgeting workflow {escape(str(workflow_id))}.", "warn")
+            return _alert(f"Unknown budgeting workflow {workflow_id}.", "warn")
         multi_agent_client.decide(workflow_id, decision, note, by=decided_by(reviewer))
     except multi_agent_client.MultiAgentError as exc:
-        if exc.status in (400, 409):
-            return _load_card(workflow_id, _alert(f"{str(exc).rstrip('.')}.", "warn"))
-        return _ma_alert(exc)
+        if exc.status == 409:                                   # decided elsewhere: show the card as it is now
+            return _replace_card(workflow_id, _alert(f"{str(exc).rstrip('.')}.", "warn"), "ma-updated")
+        if exc.temporary:                                       # the server failed just now: the note stays typed
+            return _alert(f"{str(exc).rstrip('.')}. Try again.", "warn")
+        return _ma_alert(exc)                                   # 400 bad note, 404: the reason, in the slot
     except _MA_ERRORS as exc:
-        return _ma_alert(exc)
-    return _load_card(workflow_id)
+        return _alert(f"{str(exc).rstrip('.')}. Try again.", "warn")
+    return _replace_card(workflow_id, "", "ma-decided")
+
+
+def _replace_card(workflow_id, message, trigger):
+    """The whole card instead of the message slot the button targeted."""
+    response = make_response(_load_card(workflow_id, message))
+    response.headers["HX-Retarget"] = f"#ma-{escape(str(workflow_id))}"
+    response.headers["HX-Reswap"] = "outerHTML"
+    response.headers["HX-Trigger"] = trigger                   # the history list refreshes itself
+    return response

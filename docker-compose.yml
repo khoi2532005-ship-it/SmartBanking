@@ -31,7 +31,7 @@ x-llm-env: &llm-env
   GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-lite-latest}
   GEMINI_REVIEW_MODEL: ${GEMINI_REVIEW_MODEL:-gemini-flash-lite-latest}
   OLLAMA_BASE_URL: http://ollama:11434/v1
-  OLLAMA_API_KEY: ollama
+  OLLAMA_API_KEY: ollama  # pragma: allowlist secret
   OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
   OLLAMA_REVIEW_MODEL: ${OLLAMA_REVIEW_MODEL:-llama3.1:8b}
   # Release 1: connection to the shared MCP and RAG servers, which are host
@@ -276,6 +276,8 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       USE_MOCK_TRANSACTIONS: auto
+      # Release 2: extra browser origins for the budgeting API; empty by default (see .env.example).
+      BUDGET_FRONTEND_ORIGINS: ${BUDGET_FRONTEND_ORIGINS:-}
     extra_hosts: *host-gateway
     depends_on:
       budgeting-database-service:

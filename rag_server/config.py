@@ -20,7 +20,7 @@ load_dotenv(REPO_ROOT / ".env")
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 
 # ---- where this server listens -------------------------------------------
-RAG_HOST = os.getenv("RAG_HOST", "0.0.0.0")
+RAG_HOST = os.getenv("RAG_HOST", "0.0.0.0")  # noqa: S104  # default bind for local Docker host access
 RAG_PORT = int(os.getenv("RAG_PORT", "8200"))
 
 # ---- corpus and index locations -----------------------------------------
@@ -46,5 +46,5 @@ ANSWER_TEMPERATURE = 0.1
 
 
 def local_url() -> str:
-    host = "localhost" if RAG_HOST in ("0.0.0.0", "") else RAG_HOST
+    host = "localhost" if RAG_HOST in ("0.0.0.0", "") else RAG_HOST  # noqa: S104  # bind default is intentional for host-only local services
     return f"http://{host}:{RAG_PORT}"

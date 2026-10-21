@@ -38,4 +38,4 @@ def shared_js(filename):
     return send_from_directory(os.path.join(TABS_DIR, "..", "js"), filename)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3001, debug=False)
+    app.run(host="0.0.0.0", port=3001, debug=False)  # noqa: S104  # frontend must bind on all interfaces for container reachability

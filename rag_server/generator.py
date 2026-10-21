@@ -12,7 +12,7 @@ from rag_server import config
 from rag_server.retriever import EvidenceRecord
 
 PROMPT_FAMILY = "_rag"
-INSUFFICIENT_TOKEN = "INSUFFICIENT_CONTEXT"
+INSUFFICIENT_TOKEN = "INSUFFICIENT_CONTEXT"  # noqa: S105  # response contract token, not a credential
 
 
 class GenerationUnavailable(Exception):

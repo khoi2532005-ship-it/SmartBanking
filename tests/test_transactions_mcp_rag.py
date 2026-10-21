@@ -9,7 +9,26 @@ from pathlib import Path
 import pytest
 
 TRANSACTIONS_BACKEND = Path(__file__).resolve().parent.parent / "services" / "transactions" / "backend"
+
+existing_modules = {
+    name: module
+    for name, module in list(sys.modules.items())
+    if name in {"app", "routes", "services"}
+    or name.startswith("app.")
+    or name.startswith("routes.")
+    or name.startswith("services.")
+}
+for name in list(existing_modules):
+    del sys.modules[name]
+
 sys.path.insert(0, str(TRANSACTIONS_BACKEND))
+try:
+    import app as transactions_app  # noqa: E402
+finally:
+    for name in list(sys.modules):
+        if name in {"app", "routes", "services"} or name.startswith("app.") or name.startswith("routes.") or name.startswith("services."):
+            del sys.modules[name]
+    sys.modules.update(existing_modules)
 
 pytest.importorskip("flask")
 pytest.importorskip("requests")
@@ -19,7 +38,7 @@ os.environ["RAG_ENABLED"] = "true"
 os.environ["MCP_SERVER_URL"] = "http://127.0.0.1:9/mcp"
 os.environ["RAG_SERVER_URL"] = "http://127.0.0.1:9"
 
-from app import app  # noqa: E402
+app = transactions_app.app
 
 
 @pytest.fixture()

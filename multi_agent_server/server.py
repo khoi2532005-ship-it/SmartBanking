@@ -148,10 +148,26 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
 
     @app.get("/workflows")
     def list_workflows():
+        """Newest first. ?state=, ?feature= and ?customer_id= narrow the list and
+        ?limit= caps it, so a feature's history is one small request."""
         state = request.args.get("state")
         if state and not is_valid_state(state):
             return jsonify({"error": f"unknown state {state!r}", "states": list(State.ALL)}), 400
-        return jsonify([w.summary() for w in store.list(state)])
+        feature = (request.args.get("feature") or "").strip().lower()
+        if feature and feature not in config.FEATURES:
+            return jsonify({"error": f"unknown feature {feature!r}", "features": list(config.FEATURES)}), 400
+        try:
+            customer_id = int(request.args["customer_id"]) if request.args.get("customer_id") else None
+            limit = int(request.args["limit"]) if request.args.get("limit") else None
+        except ValueError:
+            return jsonify({"error": "customer_id and limit must be integers"}), 400
+        if limit is not None and not 1 <= limit <= MAX_LIST_LIMIT:
+            return jsonify({"error": f"limit must be between 1 and {MAX_LIST_LIMIT}"}), 400
+        rows = [w for w in store.list(state)
+                if (not feature or w.feature == feature)
+                and (customer_id is None or (w.context or {}).get("customer_id") == customer_id)]
+        rows = rows[:limit] if limit else rows
+        return jsonify([{**w.summary(), "request": w.request, "context": w.context} for w in rows])
 
     @app.get("/workflow/<workflow_id>")
     def get_workflow(workflow_id: str):
@@ -233,6 +249,7 @@ def create_app(data_dir: Path | None = None, audit_dir: Path | None = None, *,
 
 
 MAX_BODY_BYTES = 64 * 1024
+MAX_LIST_LIMIT = 100                      # the most /workflows returns in one call
 
 
 def _validate_request(data: Any) -> tuple[dict[str, Any], dict[str, Any] | None]:
@@ -293,20 +310,45 @@ def _banner(app: Flask) -> None:
 
 
 def port_in_use(port: int, host: str = "127.0.0.1") -> bool:
-    """True when something already listens on the port (a connect probe works on every OS).
+    """True when something already listens on the port.
 
-    On localhost a refused connection is the only sign that nothing is there; a
-    timeout means a listener with a full backlog, so it counts as in use. Any
-    other error also counts as in use: refusing to start is safer than
-    touching another server's data.
+    A connect probe answers on every OS: refused means nothing is there and a
+    connection means a server is. A timeout is ambiguous. It can be a listener
+    with a full backlog, or a host whose firewall drops loopback connections to
+    closed ports instead of refusing them (the Hyper-V firewall that Docker
+    Desktop's WSL2 VM brings up on Windows does this), so a bind probe settles
+    it: a port that can be bound is free. Any other error counts as in use:
+    refusing to start is safer than touching another server's data.
     """
     try:
         with socket.create_connection((host, port), timeout=0.5):
             return True
     except ConnectionRefusedError:
         return False
+    except TimeoutError:
+        return not _can_bind(port)
     except OSError:
         return True
+
+
+def _can_bind(port: int) -> bool:
+    """True when the port can be bound the way werkzeug will bind it.
+
+    Werkzeug binds with SO_REUSEADDR, so on POSIX the probe does too: a port
+    that only has TIME_WAIT connections left from a server that just stopped
+    is free, and a port with a live listener is still refused. On Windows
+    SO_REUSEADDR would let the probe bind over a live listener, so there the
+    probe binds with no option at all: Windows refuses a port that has a
+    listener and allows one that only has TIME_WAIT connections.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        if not hasattr(socket, "SO_EXCLUSIVEADDRUSE"):            # every platform but Windows
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(("0.0.0.0", port))  # noqa: S104  # local availability probe intentionally attempts a wildcard bind
+        except OSError:
+            return False
+    return True
 
 
 def main() -> int:
