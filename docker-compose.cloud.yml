@@ -9,6 +9,9 @@
 # the required cloud baseline. Plain `docker compose up` is unaffected.
 
 x-cloud-ai-off: &cloud-ai-off
+  # No model key either: the cloud baseline passes none (deploy/azure/apps.json),
+  # and some backends call the model whatever the flags say.
+  GEMINI_API_KEY: ""
   AI_MODE_ENABLED: "false"
   MCP_ENABLED: "false"
   RAG_ENABLED: "false"
@@ -56,3 +59,74 @@ services:
   loans-frontend-service:
     environment:
       SMARTBANK_SAME_ORIGIN_API: "true"
+
+  # Accounts and Transactions ship one image that runs three processes
+  # (run.py). As in Azure, where an app exposes one port, each runs here as
+  # three services: database and API from the same image (one process each),
+  # and an nginx frontend. `accounts` and `transactions` keep their names as
+  # the API, so every other backend's *_SERVICE_URL still resolves.
+
+  accounts-database-service:
+    build:
+      context: .
+      dockerfile: services/accounts/Dockerfile
+    image: smartbank-accounts:0.1
+    container_name: accounts-database-service
+    command: ["python", "database/app.py"]
+    restart: unless-stopped
+    networks: [smartbank]
+
+  accounts:
+    command: ["python", "backend/app.py"]
+    ports: !reset []
+    environment:
+      <<: *cloud-ai-off
+      DATABASE_SERVICE_URL: http://accounts-database-service:5011
+    depends_on: [accounts-database-service]
+
+  accounts-frontend-service:
+    build:
+      context: .
+      dockerfile: services/accounts/frontend/Dockerfile.web
+    image: smartbank-accounts-web:0.1
+    container_name: accounts-frontend-service
+    ports:
+      - "3001:80"
+    environment:
+      SMARTBANK_SAME_ORIGIN_API: "true"
+    depends_on: [accounts]
+    restart: unless-stopped
+    networks: [smartbank]
+
+  transactions-database-service:
+    build:
+      context: .
+      dockerfile: services/transactions/Dockerfile
+    image: smartbank-transactions:0.1
+    container_name: transactions-database-service
+    command: ["python", "database/app.py"]
+    restart: unless-stopped
+    networks: [smartbank]
+
+  transactions:
+    command: ["python", "backend/app.py"]
+    ports: !reset []
+    environment:
+      <<: *cloud-ai-off
+      DATABASE_SERVICE_URL: http://transactions-database-service:5015
+      TRANSACTIONS_FRONTEND_ORIGINS: http://localhost:3005
+    depends_on: [transactions-database-service]
+
+  transactions-frontend-service:
+    build:
+      context: .
+      dockerfile: services/transactions/frontend/Dockerfile.web
+    image: smartbank-transactions-web:0.1
+    container_name: transactions-frontend-service
+    ports:
+      - "3005:80"
+    environment:
+      SMARTBANK_SAME_ORIGIN_API: "true"
+    depends_on: [transactions]
+    restart: unless-stopped
+    networks: [smartbank]

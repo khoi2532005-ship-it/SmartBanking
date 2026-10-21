@@ -15,7 +15,8 @@ import requests
 
 TIMEOUT = 10
 
-# Per feature: the local rehearsal ports, the page its frontend serves, whether
+# Per feature: the local rehearsal ports, the page its frontend serves, the
+# htmx fragment it loads from its backend outside /api/ (ui_page, if any), whether
 # its backend checks the browser origin (and so needs *_FRONTEND_ORIGINS), and
 # one create-read-update-delete cycle. "{tag}" in a create body becomes a fresh
 # id, so a check never collides with real data or with an earlier run.
@@ -44,14 +45,14 @@ FEATURES = {
                  "create_status": 201, "delete_status": 200},
     },
     "budgeting": {
-        "web_port": 3004, "api_port": 5004, "page": "/tabs/budgets.html", "origin_rule": True,
+        "web_port": 3004, "api_port": 5004, "page": "/tabs/budgets.html", "ui_page": "/ui/budgets", "origin_rule": True,
         "crud": {"collection": "/api/budgets",
                  "create": {"customer_id": 1, "category": "Cloud check {tag}", "monthly_limit": 100},
                  "id_path": "budget_id", "update": {"monthly_limit": 150},
                  "create_status": 201, "delete_status": 200},
     },
     "transactions": {
-        "web_port": 3005, "api_port": 5005, "page": "/", "origin_rule": True,
+        "web_port": 3005, "api_port": 5005, "page": "/", "ui_page": "/ui/mcp/status", "origin_rule": True,
         "crud": {"collection": "/api/transactions",
                  "create": {"account_id": 1, "amount": 12.5, "currency": "AUD", "type": "Deposit",
                             "date": "2026-10-01", "description": "cloud check"},
@@ -85,10 +86,14 @@ def _dig(data, path):
 
 
 def endpoint_checks(feature, web_url):
-    """The feature's page, its cloud config and its API health, all through the frontend."""
+    """The feature's page, its cloud config, its API health and (if it has one)
+    its backend htmx fragment, all through the frontend."""
     results = []
-    for name, path in ((f"{feature} page", FEATURES[feature]["page"]), (f"{feature} config", "/config.js"),
-                       (f"{feature} api health", "/api/health")):
+    paths = [(f"{feature} page", FEATURES[feature]["page"]), (f"{feature} config", "/config.js"),
+             (f"{feature} api health", "/api/health")]
+    if "ui_page" in FEATURES[feature]:
+        paths.append((f"{feature} ui fragment", FEATURES[feature]["ui_page"]))
+    for name, path in paths:
         _check(results, name, "GET", f"{web_url}{path}", 200)
     return results
 

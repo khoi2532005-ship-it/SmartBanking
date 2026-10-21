@@ -15,6 +15,7 @@ COPY services/loans/frontend/js/ /usr/share/nginx/html/loans-js/
 # Compose as it was: the tabs call loans-service on port 5002 themselves.
 COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
 ENV SMARTBANK_SAME_ORIGIN_API=false \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
     API_UPSTREAM=http://loans-service:5002
 
 EXPOSE 80

@@ -14,6 +14,7 @@ COPY services/fraud-alerts/frontend/templates/tabs/ /usr/share/nginx/html/tabs/
 # Compose as it was: the tabs call fraud-service on port 5003 themselves.
 COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
 ENV SMARTBANK_SAME_ORIGIN_API=false \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
     API_UPSTREAM=http://fraud-service:5003
 
 EXPOSE 80

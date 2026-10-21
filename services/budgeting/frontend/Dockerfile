@@ -14,6 +14,7 @@ COPY services/budgeting/frontend/tabs/ /usr/share/nginx/html/tabs/
 # Compose as it was: the tabs call budgeting-service on port 5004 themselves.
 COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
 ENV SMARTBANK_SAME_ORIGIN_API=false \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
     API_UPSTREAM=http://budgeting-service:5004
 
 EXPOSE 80
