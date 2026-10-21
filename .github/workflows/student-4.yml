@@ -226,14 +226,19 @@ jobs:
       # backend, as black-box HTTP calls against the stack started above, the
       # way a deployed service is tested. The report goes to the job summary
       # and to the student-4-endpoint-tests artifact.
+      # These run even when an earlier smoke step failed, so a failed run still
+      # leaves the endpoint report and the JUnit results behind.
       - uses: actions/setup-python@v5
+        if: ${{ !cancelled() }}
         with:
           python-version: '3.12'
 
       - name: Install the endpoint test runner
+        if: ${{ !cancelled() }}
         run: pip install pytest requests
 
       - name: Post-commit endpoint tests (GET /api/budgets/summary, POST /api/budgets)
+        if: ${{ !cancelled() }}
         env:
           BUDGET_API_URL: http://localhost:5004
           ENDPOINT_REPORT_DIR: reports
@@ -242,7 +247,7 @@ jobs:
           ENDPOINT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           python -m pytest services/budgeting/backend/tests/test_endpoints_post_commit.py \
-            -q -p no:cacheprovider --junitxml=reports/endpoint-tests-junit.xml
+            -q -p no:cacheprovider -o junit_family=xunit1 --junitxml=reports/endpoint-tests-junit.xml
 
       - name: Endpoint test report to the job summary
         if: always()
