@@ -177,6 +177,18 @@ def validate_alert_filters(args):
     return filters
 
 
+def validate_rule_filters(args):
+    """GET /api/rules query parameters. The database reads any enabled value
+    other than 1/true as 0, so enabled=yes used to list the disabled rules,
+    and a misspelt rule_type quietly matched nothing."""
+    filters = {}
+    if args.get("rule_type"):
+        filters["rule_type"] = choice(args["rule_type"], "rule_type", RULE_TYPES)
+    if args.get("enabled"):
+        filters["enabled"] = enabled_flag(args["enabled"])
+    return filters
+
+
 def workflow_id(value):
     """A Multi-Agent workflow id: the only thing this service puts in a server URL.
     fullmatch, because "$" would also accept a trailing newline."""
