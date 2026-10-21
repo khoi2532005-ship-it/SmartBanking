@@ -10,4 +10,10 @@ COPY shared/frontend/ /usr/share/nginx/html/
 # This feature's tabs.
 COPY services/fraud-alerts/frontend/templates/tabs/ /usr/share/nginx/html/tabs/
 
+# /config.js and the /api/ proxy for cloud mode. These defaults keep local
+# Compose as it was: the tabs call fraud-service on port 5003 themselves.
+COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
+ENV SMARTBANK_SAME_ORIGIN_API=false \
+    API_UPSTREAM=http://fraud-service:5003
+
 EXPOSE 80

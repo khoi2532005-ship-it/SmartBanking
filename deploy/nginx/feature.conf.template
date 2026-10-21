@@ -1,0 +1,35 @@
+# nginx for every feature frontend. The nginx image runs envsubst over this at
+# start-up, replacing only variables set in the environment:
+#   SMARTBANK_SAME_ORIGIN_API  false locally (the tabs call http://<host>:50xx),
+#                              true in the cloud (the tabs call this frontend)
+#   API_UPSTREAM               the feature's backend, no trailing slash
+# Each frontend Dockerfile sets the local defaults, so plain `docker compose up`
+# behaves as before. Pattern: Lab 11 §5 "Frontend Reverse Proxy Configuration".
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # The tabs read this before their own script (tests/test_cloud_frontends.py).
+    location = /config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store";
+        return 200 'window.SMARTBANK_SAME_ORIGIN_API = ${SMARTBANK_SAME_ORIGIN_API};';
+    }
+
+    # Same-origin API: the browser calls this frontend and nginx forwards the
+    # whole /api/... path. Host is the backend's own, because Container Apps
+    # routes internal traffic by Host.
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri.html $uri/ /index.html;
+    }
+}

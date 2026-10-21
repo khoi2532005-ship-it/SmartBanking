@@ -1,0 +1,32 @@
+# Cloud rehearsal: the Azure Container Apps layout on this machine.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --build
+#   .venv/bin/python -m pytest tests/test_cloud_rehearsal.py -v
+#
+# As in Azure, only the frontends are reachable: they run in cloud mode (the
+# tabs call their own frontend and its nginx forwards /api/ to the backend),
+# and backends and databases publish no port. The AI services are off, as in
+# the required cloud baseline. Plain `docker compose up` is unaffected.
+
+x-cloud-ai-off: &cloud-ai-off
+  AI_MODE_ENABLED: "false"
+  MCP_ENABLED: "false"
+  RAG_ENABLED: "false"
+  MULTI_AGENT_ENABLED: "false"
+
+services:
+
+  fraud-database-service:
+    ports: !reset []
+
+  fraud-service:
+    ports: !reset []
+    environment:
+      <<: *cloud-ai-off
+      # The proxy forwards the browser's Origin with fraud-service's own Host,
+      # so the same-host rule needs the frontend named explicitly.
+      FRAUD_FRONTEND_ORIGINS: http://localhost:3003
+
+  fraud-frontend-service:
+    environment:
+      SMARTBANK_SAME_ORIGIN_API: "true"
