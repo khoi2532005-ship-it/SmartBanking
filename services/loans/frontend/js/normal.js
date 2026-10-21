@@ -1,4 +1,5 @@
-const API = `http://${window.location.hostname}:5002`;
+// Cloud mode (config.js): call this page's own frontend, which forwards /api/.
+const API = window.SMARTBANK_SAME_ORIGIN_API ? window.location.origin : `http://${window.location.hostname}:5002`;
 
 async function api(path, options = {}) {
     options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});

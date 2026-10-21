@@ -30,3 +30,29 @@ services:
   fraud-frontend-service:
     environment:
       SMARTBANK_SAME_ORIGIN_API: "true"
+
+  budgeting-database-service:
+    ports: !reset []
+
+  budgeting-service:
+    ports: !reset []
+    environment:
+      <<: *cloud-ai-off
+      # Same reason as fraud-service: the proxied call carries the frontend's Origin.
+      BUDGET_FRONTEND_ORIGINS: http://localhost:3004
+
+  budgeting-frontend-service:
+    environment:
+      SMARTBANK_SAME_ORIGIN_API: "true"
+
+  loans-database-service:
+    ports: !reset []
+
+  loans-service:
+    ports: !reset []
+    environment:
+      <<: *cloud-ai-off
+
+  loans-frontend-service:
+    environment:
+      SMARTBANK_SAME_ORIGIN_API: "true"

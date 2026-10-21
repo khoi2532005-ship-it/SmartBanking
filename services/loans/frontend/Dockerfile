@@ -11,4 +11,10 @@ COPY shared/frontend/ /usr/share/nginx/html/
 COPY services/loans/frontend/tabs/ /usr/share/nginx/html/tabs/
 COPY services/loans/frontend/js/ /usr/share/nginx/html/loans-js/
 
+# /config.js and the /api/ proxy for cloud mode. These defaults keep local
+# Compose as it was: the tabs call loans-service on port 5002 themselves.
+COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
+ENV SMARTBANK_SAME_ORIGIN_API=false \
+    API_UPSTREAM=http://loans-service:5002
+
 EXPOSE 80
