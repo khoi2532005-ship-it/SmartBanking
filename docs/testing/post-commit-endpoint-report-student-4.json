@@ -4,11 +4,11 @@
   "feature": "budgeting",
   "workflow": "student-4-budgets-ci",
   "job": "local",
-  "commit": "c38435c",
+  "commit": "70196de",
   "branch": "local",
   "run_id": "local",
   "run_url": "",
-  "ran_at": "2026-10-21T02:22:36Z",
+  "ran_at": "2026-10-21T02:35:31Z",
   "api_url": "http://localhost:5004",
   "spending_source": "mock",
   "ai_services": {
@@ -23,7 +23,7 @@
       "method": "GET",
       "endpoint": "/api/budgets/summary",
       "outcome": "passed",
-      "duration_s": 0.019,
+      "duration_s": 0.012,
       "checks": [
         {
           "check": "answers 200 for the seeded period",
@@ -38,9 +38,9 @@
           "info": false
         },
         {
-          "check": "the seeded period has stored budgets",
+          "check": "the seeded period has stored budgets, each with an id",
           "ok": true,
-          "detail": "7 stored",
+          "detail": "7 stored; first [{'budget_id': 2, 'category': 'Dining Out', 'created_at': '2026-09-01 08:16:00', 'customer_id': 1, 'month': 9, 'monthly_limit': 300.0, 'year': 2026}]",
           "info": false
         },
         {
@@ -56,7 +56,7 @@
           "info": false
         },
         {
-          "check": "every budget line carries its limit, spend, remaining, percent and status",
+          "check": "every budget line carries its id, limit, spend, remaining, percent and status",
           "ok": true,
           "detail": "[]",
           "info": false
@@ -147,18 +147,18 @@
       "method": "POST",
       "endpoint": "/api/budgets",
       "outcome": "passed",
-      "duration_s": 0.025,
+      "duration_s": 0.028,
       "checks": [
         {
           "check": "creating a new budget answers 201 with its id",
           "ok": true,
-          "detail": "HTTP 201 '{\"budget_id\":43,\"message\":\"Budget created\"}\\n'",
+          "detail": "HTTP 201 '{\"budget_id\":50,\"message\":\"Budget created\"}\\n'",
           "info": false
         },
         {
           "check": "the new budget appears in the period summary with no spend, on track",
           "ok": true,
-          "detail": "{'budget_id': 43, 'category': 'CI check e972cfb4', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
+          "detail": "{'budget_id': 50, 'category': 'CI check d4bf0dc8', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
           "info": false
         },
         {
@@ -200,7 +200,7 @@
         {
           "check": "cleanup: every budget the test created is deleted",
           "ok": true,
-          "detail": "deleted {43: 200}",
+          "detail": "deleted {50: 200}",
           "info": false
         },
         {
