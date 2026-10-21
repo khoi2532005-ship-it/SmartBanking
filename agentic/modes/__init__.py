@@ -18,6 +18,9 @@ from agentic.modes.accounts import AccountsMode
 from agentic.modes.transactions import TransactionsMode
 from agentic.modes.mcp_validation import MCPValidationMode
 from agentic.modes.rag_validation import RAGValidationMode
+from agentic.modes.multi_agent_review import MultiAgentReviewMode
+from agentic.modes.testing_review import TestingReviewMode
+from agentic.modes.cloud_deployment_review import CloudDeploymentReviewMode
 
 # Implemented modes, in menu order.
 MODES: dict[str, Mode] = {
@@ -31,6 +34,10 @@ MODES: dict[str, Mode] = {
         # Release 1: the shared MCP and RAG servers, validated through the same loop.
         MCPValidationMode(),
         RAGValidationMode(),
+        # Release 2: the three review modes over the team's evidence files.
+        MultiAgentReviewMode(),
+        TestingReviewMode(),
+        CloudDeploymentReviewMode(),
     )
 }
 

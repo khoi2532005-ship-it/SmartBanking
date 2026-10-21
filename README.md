@@ -99,6 +99,9 @@ python agentic_loop.py --mode fraud    # one feature
 python agentic_loop.py --all --quiet   # CI; exit code only
 python agentic_loop.py --mode mcp_validation   # Release 1: shared MCP server test record
 python agentic_loop.py --mode rag_validation   # Release 1: shared RAG server evaluation
+python agentic_loop.py --mode multi_agent_review        # Release 2: the Multi-Agent audit files
+python agentic_loop.py --mode testing_review            # Release 2: pre-commit and post-commit reports
+python agentic_loop.py --mode cloud_deployment_review   # Release 2: the cloud deployment report
 ```
 
 Runs append evidence to `docs/evidence/` for the technical report.

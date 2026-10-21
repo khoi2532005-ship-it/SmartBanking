@@ -1,0 +1,35 @@
+{
+  "schema": "smartbank-cloud-deployment-report/1",
+  "sample": true,
+  "provider": "azure",
+  "region": "australiaeast",
+  "environment": "release-2-baseline",
+  "deployed_at": "2026-10-24T00:00:00Z",
+  "commit": "0000000",
+  "deployed_by": "cloud owner",
+  "workflow": {
+    "name": "cloud-deployment.yml",
+    "run_id": "0",
+    "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/0",
+    "conclusion": "success"
+  },
+  "scripts": ["deploy/azure/deploy.sh", "deploy/azure/main.bicep"],
+  "resources": [
+    {"name": "smartbank-vm", "type": "virtual-machine", "status": "running"},
+    {"name": "smartbank-nsg", "type": "network-security-group", "status": "applied"},
+    {"name": "smartbank-ip", "type": "public-ip", "status": "assigned"}
+  ],
+  "endpoints": [
+    {"name": "home page", "method": "GET", "url": "http://smartbank.example:3000/", "expected_status": 200, "status": 200},
+    {"name": "budgeting api health", "method": "GET", "url": "http://smartbank.example:5004/api/health", "expected_status": 200, "status": 200},
+    {"name": "budgets list", "method": "GET", "url": "http://smartbank.example:5004/api/budgets", "expected_status": 200, "status": 200}
+  ],
+  "crud_checks": [
+    {"name": "budget create", "method": "POST", "url": "http://smartbank.example:5004/api/budgets", "expected_status": 201, "status": 201},
+    {"name": "budget read", "method": "GET", "url": "http://smartbank.example:5004/api/budgets/15", "expected_status": 200, "status": 200},
+    {"name": "budget delete", "method": "DELETE", "url": "http://smartbank.example:5004/api/budgets/15", "expected_status": 200, "status": 200}
+  ],
+  "ai_services": {"ai_mode": "disabled", "mcp": "disabled", "rag": "disabled", "multi_agent": "disabled"},
+  "issues": [],
+  "release_decision": {"decision": "", "by": "", "note": "", "decided_at": ""}
+}
