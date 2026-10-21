@@ -4,11 +4,11 @@
   "feature": "budgeting",
   "workflow": "student-4-budgets-ci",
   "job": "local",
-  "commit": "2ea47fb",
+  "commit": "8a1fe42",
   "branch": "local",
   "run_id": "local",
   "run_url": "",
-  "ran_at": "2026-10-20T14:56:10Z",
+  "ran_at": "2026-10-21T01:49:34Z",
   "api_url": "http://localhost:5004",
   "spending_source": "mock",
   "ai_services": {
@@ -23,87 +23,115 @@
       "method": "GET",
       "endpoint": "/api/budgets/summary",
       "outcome": "passed",
-      "duration_s": 0.012,
+      "duration_s": 0.011,
       "checks": [
         {
           "check": "answers 200 for the seeded period",
           "ok": true,
-          "detail": "HTTP 200 '{\"budgets\":[{\"budget_id\":2,\"category\":\"Dining Out\",\"customer_id\":1,\"month\":9,\"monthly_limit\":300.0,\"over_budget\":true,\"o'"
+          "detail": "HTTP 200 '{\"budgets\":[{\"budget_id\":2,\"category\":\"Dining Out\",\"customer_id\":1,\"month\":9,\"monthly_limit\":300.0,\"over_budget\":true,\"o'",
+          "info": false
+        },
+        {
+          "check": "the answer carries a budgets list and a totals object with every total",
+          "ok": true,
+          "detail": "keys ['budgets', 'customer_id', 'month', 'over_budget_categories', 'spending_source', 'totals', 'unbudgeted_spending', 'year']",
+          "info": false
         },
         {
           "check": "echoes customer_id, month and year",
           "ok": true,
-          "detail": "{'budgets': [{'budget_id': 2, 'category': 'Dining Out', 'customer_id': 1, 'month': 9, 'monthly_limit': 300.0, 'over_budg"
+          "detail": "{'customer_id': 1, 'month': 9, 'year': 2026}",
+          "info": false
+        },
+        {
+          "check": "every budget line carries its limit, spend, remaining, percent and status",
+          "ok": true,
+          "detail": "[]",
+          "info": false
         },
         {
           "check": "the seven seeded budgets are present with their limits",
           "ok": true,
-          "detail": "['Dining Out', 'Entertainment', 'Groceries', 'Shopping', 'Subscriptions', 'Transport', 'Utilities']"
+          "detail": "['Dining Out', 'Entertainment', 'Groceries', 'Shopping', 'Subscriptions', 'Transport', 'Utilities']",
+          "info": false
         },
         {
           "check": "Dining Out: remaining, percent and status follow the limit and the spend",
           "ok": true,
-          "detail": "limit 300.0 spent 412.0 -> OVER_BUDGET remaining -112.0 137.3%"
+          "detail": "limit 300.0 spent 412.0 -> got {'remaining': -112.0, 'percent_used': 137.3, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 112.0}, expected {'remaining': -112.0, 'percent_used': 137.3, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 112.0}",
+          "info": false
         },
         {
           "check": "Entertainment: remaining, percent and status follow the limit and the spend",
           "ok": true,
-          "detail": "limit 150.0 spent 90.0 -> ON_TRACK remaining 60.0 60.0%"
+          "detail": "limit 150.0 spent 90.0 -> got {'remaining': 60.0, 'percent_used': 60.0, 'status': 'ON_TRACK', 'over_budget': False, 'over_by': 0.0}, expected {'remaining': 60.0, 'percent_used': 60.0, 'status': 'ON_TRACK', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
         },
         {
           "check": "Groceries: remaining, percent and status follow the limit and the spend",
           "ok": true,
-          "detail": "limit 800.0 spent 645.0 -> NEAR_LIMIT remaining 155.0 80.6%"
+          "detail": "limit 800.0 spent 645.0 -> got {'remaining': 155.0, 'percent_used': 80.6, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}, expected {'remaining': 155.0, 'percent_used': 80.6, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
         },
         {
           "check": "Shopping: remaining, percent and status follow the limit and the spend",
           "ok": true,
-          "detail": "limit 400.0 spent 505.0 -> OVER_BUDGET remaining -105.0 126.2%"
+          "detail": "limit 400.0 spent 505.0 -> got {'remaining': -105.0, 'percent_used': 126.2, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 105.0}, expected {'remaining': -105.0, 'percent_used': 126.2, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 105.0}",
+          "info": false
         },
         {
           "check": "Subscriptions: remaining, percent and status follow the limit and the spend",
           "ok": true,
-          "detail": "limit 60.0 spent 59.97 -> NEAR_LIMIT remaining 0.03 99.9%"
+          "detail": "limit 60.0 spent 59.97 -> got {'remaining': 0.03, 'percent_used': 99.9, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}, expected {'remaining': 0.03, 'percent_used': 99.9, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
         },
         {
           "check": "Transport: remaining, percent and status follow the limit and the spend",
           "ok": true,
-          "detail": "limit 200.0 spent 218.0 -> OVER_BUDGET remaining -18.0 109.0%"
+          "detail": "limit 200.0 spent 218.0 -> got {'remaining': -18.0, 'percent_used': 109.0, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 18.0}, expected {'remaining': -18.0, 'percent_used': 109.0, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 18.0}",
+          "info": false
         },
         {
           "check": "Utilities: remaining, percent and status follow the limit and the spend",
           "ok": true,
-          "detail": "limit 250.0 spent 240.0 -> NEAR_LIMIT remaining 10.0 96.0%"
+          "detail": "limit 250.0 spent 240.0 -> got {'remaining': 10.0, 'percent_used': 96.0, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}, expected {'remaining': 10.0, 'percent_used': 96.0, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
         },
         {
           "check": "totals add up across the lines",
           "ok": true,
-          "detail": "{'budget_count': 7, 'over_budget_count': 3, 'percent_used': 100.5, 'total_limit': 2160.0, 'total_remaining': -9.97, 'total_spent': 2169.97}"
+          "detail": "{'budget_count': 7, 'over_budget_count': 3, 'percent_used': 100.5, 'total_limit': 2160.0, 'total_remaining': -9.97, 'total_spent': 2169.97}",
+          "info": false
         },
         {
           "check": "mock spending source: the seeded categories carry the exact figures and statuses",
           "ok": true,
-          "detail": "[('Groceries', 645.0, 'NEAR_LIMIT'), ('Dining Out', 412.0, 'OVER_BUDGET'), ('Transport', 218.0, 'OVER_BUDGET'), ('Entertainment', 90.0, 'ON_TRACK'), ('Utilities', 240.0, 'NEAR_LIMIT'), ('Shopping', 505.0, 'OVER_BUDGET'), ('Subscriptions', 59.97, 'NEAR_LIMIT')]"
+          "detail": "[('Groceries', 645.0, 'NEAR_LIMIT'), ('Dining Out', 412.0, 'OVER_BUDGET'), ('Transport', 218.0, 'OVER_BUDGET'), ('Entertainment', 90.0, 'ON_TRACK'), ('Utilities', 240.0, 'NEAR_LIMIT'), ('Shopping', 505.0, 'OVER_BUDGET'), ('Subscriptions', 59.97, 'NEAR_LIMIT')]",
+          "info": false
         },
         {
           "check": "mock spending source: the exact seeded totals and over-budget categories",
           "ok": true,
-          "detail": "{'budget_count': 7, 'over_budget_count': 3, 'percent_used': 100.5, 'total_limit': 2160.0, 'total_remaining': -9.97, 'total_spent': 2169.97}"
+          "detail": "{'budget_count': 7, 'over_budget_count': 3, 'percent_used': 100.5, 'total_limit': 2160.0, 'total_remaining': -9.97, 'total_spent': 2169.97}",
+          "info": false
         },
         {
           "check": "400 for {'customer_id': 1, 'month': 13, 'year': 2026}",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'",
+          "info": false
         },
         {
           "check": "400 for {'customer_id': 'abc'}",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"customer_id must be an integer\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"customer_id must be an integer\"}\\n'",
+          "info": false
         },
         {
           "check": "400 for {'customer_id': 1, 'year': 1999}",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"year must be between 2000 and 2100\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"year must be between 2000 and 2100\"}\\n'",
+          "info": false
         }
       ],
       "error": ""
@@ -118,57 +146,68 @@
         {
           "check": "the period's budget count is known before the create",
           "ok": true,
-          "detail": "7"
+          "detail": "7",
+          "info": false
         },
         {
           "check": "creating a new budget answers 201 with its id",
           "ok": true,
-          "detail": "HTTP 201 '{\"budget_id\":18,\"message\":\"Budget created\"}\\n'"
+          "detail": "HTTP 201 '{\"budget_id\":25,\"message\":\"Budget created\"}\\n'",
+          "info": false
         },
         {
           "check": "the new budget appears in the period summary with no spend, on track",
           "ok": true,
-          "detail": "{'budget_id': 18, 'category': 'CI check c3788aa3', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}"
+          "detail": "{'budget_id': 25, 'category': 'CI check 24d064c8', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
+          "info": false
         },
         {
           "check": "the same customer, category and period again answers 409",
           "ok": true,
-          "detail": "HTTP 409 '{\"error\":\"A budget for that customer, category, month and year already exists\"}\\n'"
+          "detail": "HTTP 409 '{\"error\":\"A budget for that customer, category, month and year already exists\"}\\n'",
+          "info": false
         },
         {
           "check": "400 for greater than zero",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"monthly_limit must be greater than zero\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"monthly_limit must be greater than zero\"}\\n'",
+          "info": false
         },
         {
           "check": "400 for Invalid input",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"Invalid input: could not convert string to float: \\'lots\\'\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"Invalid input: could not convert string to float: \\'lots\\'\"}\\n'",
+          "info": false
         },
         {
           "check": "400 for category required",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"category required\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"category required\"}\\n'",
+          "info": false
         },
         {
           "check": "400 for month must be between 1 and 12",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'",
+          "info": false
         },
         {
           "check": "400 for a JSON body that is not an object",
           "ok": true,
-          "detail": "HTTP 400 '{\"error\":\"JSON object body required\"}\\n'"
+          "detail": "HTTP 400 '{\"error\":\"JSON object body required\"}\\n'",
+          "info": false
         },
         {
           "check": "cleanup: the test budget is deleted again",
           "ok": true,
-          "detail": "(200, '{\"message\":\"Budget deleted\"}\\n')"
+          "detail": "deleted [25]: HTTP [200]",
+          "info": false
         },
         {
           "check": "the period is back to its previous budget count",
           "ok": true,
-          "detail": "7 vs 7"
+          "detail": "7 vs 7",
+          "info": false
         }
       ],
       "error": ""
@@ -179,7 +218,7 @@
     "passed": 2,
     "failed": 0,
     "skipped": 0,
-    "checks": 27,
+    "checks": 29,
     "result": "passed"
   }
 }
