@@ -58,3 +58,10 @@ def test_backend_port_is_not_published(feature):
 def test_crud_cycle_through_the_frontend(feature):
     results = checks.crud_checks(feature, web(feature))
     assert [(c["name"], c["status"]) for c in results] == [(c["name"], c["expected_status"]) for c in results]
+
+
+def test_home_serves_the_frontend_map():
+    # In the cloud each feature has its own address, not a port on the home
+    # page's host: the home page reads the map from /config.js.
+    r = requests.get("http://localhost:3000/config.js", timeout=5)
+    assert r.status_code == 200 and '"3003": "http://127.0.0.1:3003"' in r.text

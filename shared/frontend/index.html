@@ -6,6 +6,7 @@
     <title>SmartBank</title>
     <link rel="stylesheet" href="/css/styles.css">
     <!-- Vendored so the showcase does not depend on network access. -->
+    <script src="/config.js"></script>
     <script src="/js/htmx.min.js"></script>
 </head>
 <body>
@@ -69,16 +70,24 @@
 </main>
 
 <script>
-// Sibling services are addressed by port. Rewrite "localhost" to whatever host
-// the browser actually used, so the shell keeps working when it is served from
-// the demo VM instead of a developer machine. Runs on every htmx swap because
-// the fragments carry the links.
-function rewriteHosts(root) {
+// The fragments link each feature as http://localhost:<port>/... . Locally (and
+// on the demo VM) a feature is that port on whatever host the browser used. In
+// the cloud each feature has its own address, which /config.js supplies as
+// SMARTBANK_FRONTENDS, keyed by the local port.
+function frontendUrl(url) {
+    const match = /^http:\/\/localhost:(\d+)(\/.*)?$/.exec(url);
+    if (!match) return url;
+    const deployed = (window.SMARTBANK_FRONTENDS || {})[match[1]];
+    if (deployed) return deployed.replace(/\/$/, "") + (match[2] || "/");
     const host = window.location.hostname;
-    if (host === "localhost") return;
+    return host === "localhost" ? url : url.replace("//localhost:", `//${host}:`);
+}
+
+// Runs on every htmx swap because the fragments carry the links.
+function rewriteHosts(root) {
     root.querySelectorAll('[href*="//localhost:"], [src*="//localhost:"]').forEach((el) => {
         const attr = el.hasAttribute("src") ? "src" : "href";
-        el.setAttribute(attr, el.getAttribute(attr).replace("//localhost:", `//${host}:`));
+        el.setAttribute(attr, frontendUrl(el.getAttribute(attr)));
     });
 }
 
@@ -130,7 +139,7 @@ document.body.addEventListener("htmx:responseError", (event) => {
     if (event.detail.target.id !== "feature-view") return;
     const href = event.detail.elt && event.detail.elt.dataset && event.detail.elt.dataset.href;
     if (href) {                      // a feature fragment is missing here: go to the feature directly
-        window.location.assign(href.replace("//localhost:", `//${window.location.hostname}:`));
+        window.location.assign(frontendUrl(href));
         return;
     }
     event.detail.target.innerHTML = inlineHome();   // the landing fragment is missing: draw it inline

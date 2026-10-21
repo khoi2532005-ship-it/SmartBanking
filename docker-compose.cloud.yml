@@ -130,3 +130,9 @@ services:
     depends_on: [transactions]
     restart: unless-stopped
     networks: [smartbank]
+
+  # The cloud gives each frontend its own address. Here one feature is mapped to
+  # a different host name (127.0.0.1) to prove the home page follows the map.
+  home:
+    environment:
+      SMARTBANK_FRONTENDS: '{"3003": "http://127.0.0.1:3003"}'

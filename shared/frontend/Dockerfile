@@ -5,14 +5,10 @@ FROM nginx:alpine
 
 COPY shared/frontend/ /usr/share/nginx/html/
 
-# Serve the htmx fragments with no caching so a redeploy is picked up on the
-# next click, and let a directory hit fall through to index.html.
-RUN printf 'server {\n\
-    listen 80;\n\
-    root /usr/share/nginx/html;\n\
-    index index.html;\n\
-    location /features/ { add_header Cache-Control "no-store"; }\n\
-    location / { try_files $uri $uri/ /index.html; }\n\
-}\n' > /etc/nginx/conf.d/default.conf
+# Serves the htmx fragments with no caching (a redeploy is picked up on the
+# next click), lets a directory hit fall through to index.html, and serves
+# /config.js with the map of deployed feature frontends (empty locally).
+COPY deploy/nginx/home.conf.template /etc/nginx/templates/default.conf.template
+ENV SMARTBANK_FRONTENDS={}
 
 EXPOSE 80
