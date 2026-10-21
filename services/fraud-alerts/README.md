@@ -41,6 +41,12 @@ integrations are switched on.
 
 Fraud only, no AI servers: `docker compose up -d --build fraud-database-service fraud-service fraud-frontend-service`.
 
+**Cloud (Azure Container Apps).** Only `fraud-frontend-service` is public. The
+tabs read `/config.js`, which switches on cloud mode, and call their own
+address; nginx forwards `/api/` to fraud-service, which is internal. Local runs
+are unchanged. The runbook is `docs/deployment/container-apps.md`. The CRUD
+check there is `FRAUD_API_URL=https://fraud-frontend-service.<domain> python -m pytest services/fraud-alerts/backend/tests/post_commit -v`.
+
 ## 2. Use the feature
 
 **Normal tab** (CRUD, no AI):
@@ -195,6 +201,7 @@ Runs Plan, Act, Observe, Adapt over the fraud API and appends evidence to
 | A panel says its server is not running | Start that server's terminal (section 1) |
 | "host.docker.internal could not be resolved" | On Linux the service needs `extra_hosts: ["host.docker.internal:host-gateway"]` |
 | Browser blocks calls to 5003 (CORS) | Open the tab from port 3003 on the same host, or add the page origin to `FRAUD_FRONTEND_ORIGINS` |
+| Cloud: every write answers 403 | `FRAUD_FRONTEND_ORIGINS` on fraud-service must be the frontend's own address (`deploy/azure/apps.json`) |
 | `503 fraud-database-service unavailable` | `docker compose ps`; restart `fraud-database-service` |
 | Workflow response returns 409 | Expected: the human decision has not been made yet |
 | Windows asks to allow Python on 8100, 8200 or 8300 | Allow it, or the containers cannot reach the host servers |
