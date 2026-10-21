@@ -493,6 +493,11 @@ $ python agentic_loop.py --mode testing_review
 
 ### cloud_deployment_review
 
+> Superseded. On `2c7fa3a` the mode approved the sample report below, which it must never do; the PR #65 review
+> caught it. Since `12d47a9` the sample is held with verdict ATTENTION, and the rerun is
+> `docs/evidence/cloud_deployment_review-20261021T203142Z.json`. The evidence file this block names was removed
+> for that reason.
+
 ```
 $ python agentic_loop.py --mode cloud_deployment_review
 
