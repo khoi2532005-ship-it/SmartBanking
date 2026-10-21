@@ -40,6 +40,13 @@ repos:
     rev: v2.7.3
     hooks:
       - id: pip-audit
+        name: pip-audit accounts backend requirements
+        args: [--requirement=services/accounts/backend/requirements.txt]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
         name: pip-audit accounts database requirements
         args: [--requirement=services/accounts/database/requirements.txt]
 
