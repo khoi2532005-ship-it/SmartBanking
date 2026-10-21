@@ -6,8 +6,8 @@ frontend, backend/API and database microservices run in Docker Compose; the MCP,
 Multi-Agent servers and the agentic loop run on the host. Every block below is the output that
 window printed (colour codes removed, the checkout path shown as `<repo>`, repeated `/health` polls
 collapsed, and PowerShell's `NativeCommandError` wrapper around the first stderr line of a native
-command reduced to that line). The commit under test is `78df53c` (branch `release2-local-docker-run`,
-based on `release2-review-modes`), as the validation record states.
+command reduced to that line). The commit under test is `78df53c` on `release2-review-modes` (PR #65),
+as the validation record states.
 
 Before this run the Compose volumes were reset with `docker compose down -v`, so every database started from its image's seed; terminal 4 shows it.
 
@@ -672,7 +672,7 @@ Opened at http://localhost:3000, then Budgeting & Spending Insights, then its AI
 
 The red text in terminals 2, 3 and 4 is PowerShell colouring stderr: Flask's development-server warning, its request log and docker compose's progress all go to stderr, so it does not mean a failure.
 
-The human decisions, from `GET http://localhost:8300/workflows?feature=budgeting&limit=5`:
+The five latest budgeting workflows and their decisions, the people's and the validation run's, from `GET http://localhost:8300/workflows?feature=budgeting&limit=5`:
 
 | Workflow | Source | State | Decided by | Note |
 |---|---|---|---|---|
