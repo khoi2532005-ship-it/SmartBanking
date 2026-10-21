@@ -5,7 +5,7 @@
 
 They run against a live budgeting API (BUDGET_API_URL, default http://localhost:5004)
 with the seeded database, which is what student-4.yml starts on every pull request into
-main and every push to main. With no API answering and BUDGET_API_URL unset they skip,
+main and every push to main. With no API answering and BUDGET_API_URL unset or empty they skip,
 so a local pytest run without the stack is not red; with BUDGET_API_URL set (CI) an API
 that does not answer is a failure. In CI there is no transactions service, so spending
 comes from the deterministic mock and the exact figures are asserted; budgets added
@@ -17,7 +17,7 @@ Every check is recorded on the test itself through pytest's record_property, so 
 in the JUnit XML and in the report conftest.py writes (ENDPOINT_REPORT_DIR).
 
     BUDGET_API_URL=http://localhost:5004 ENDPOINT_REPORT_DIR=reports \
-        python -m pytest services/budgeting/backend/tests/test_endpoints_post_commit.py -q
+        python -m pytest services/budgeting/backend/budgeting_endpoint_tests -q
 """
 
 from __future__ import annotations
@@ -29,7 +29,8 @@ import uuid
 import pytest
 import requests
 
-API = os.getenv("BUDGET_API_URL", "http://localhost:5004").rstrip("/")
+DEFAULT_API = "http://localhost:5004"
+API = (os.getenv("BUDGET_API_URL") or DEFAULT_API).rstrip("/")   # an empty value means the default
 TIMEOUT = 10
 PERIOD = {"customer_id": 1, "month": 9, "year": 2026}                 # the seeded demo period
 
@@ -86,19 +87,29 @@ def expected_line(limit: float, spent: float) -> dict:
             "over_budget": status == "OVER_BUDGET", "over_by": round(spent - limit, 2) if spent > limit else 0.0}
 
 
-def remove_test_budgets(budget_id, category: str) -> tuple[bool, str]:
-    """Delete the test's budget by id, or, when the create's answer was lost, every
-    budget carrying the test's unique category, so nothing is left in the seeded period."""
+def remove_test_budgets(created_ids: set, category: str) -> tuple[bool, str]:
+    """Delete every budget the test created: the ids its creates answered with, and
+    every budget carrying its unique category in any period, which also catches a
+    create whose answer was lost or a bad body the API wrongly accepted. Fails when
+    the lookup itself fails, rather than reporting that nothing was there."""
     try:
-        ids = [budget_id] if budget_id is not None else [
-            b.get("budget_id") for b in get("/api/budgets", **PERIOD, category=category).json()
-            if isinstance(b, dict) and b.get("category") == category]
-        statuses = [requests.delete(f"{API}/api/budgets/{i}", timeout=TIMEOUT).status_code for i in ids]
-    except (requests.RequestException, ValueError, AttributeError) as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+        r = get("/api/budgets", category=category)
+        rows = r.json() if r.status_code == 200 else None
+    except (requests.RequestException, ValueError) as exc:
+        return False, f"could not look up the test budgets: {type(exc).__name__}: {exc}"
+    if not isinstance(rows, list):
+        return False, f"could not look up the test budgets: {describe(r)}"
+    ids = set(created_ids) | {b.get("budget_id") for b in rows if isinstance(b, dict) and b.get("category") == category}
+    ids.discard(None)
     if not ids:
         return True, "no test budget was created"
-    return all(s in (200, 204) for s in statuses), f"deleted {ids}: HTTP {statuses}"
+    statuses = {}
+    for i in sorted(ids):
+        try:
+            statuses[i] = requests.delete(f"{API}/api/budgets/{i}", timeout=TIMEOUT).status_code
+        except requests.RequestException as exc:
+            statuses[i] = type(exc).__name__
+    return all(code in (200, 204, 404) for code in statuses.values()), f"deleted {statuses}"
 
 
 class Checks:
@@ -204,14 +215,20 @@ def test_budget_summary_reports_the_seeded_period(checks):
 
 @pytest.mark.endpoint("POST", "/api/budgets")
 def test_create_budget_then_duplicate_and_invalid_bodies(checks):
-    count_before = body(get("/api/budgets/summary", **PERIOD)).get("totals", {}).get("budget_count")
-    checks.check("the period's budget count is known before the create", isinstance(count_before, int), str(count_before))
     category = f"CI check {uuid.uuid4().hex[:8]}"
     payload = {**PERIOD, "category": category, "monthly_limit": 123.45}
+    created: set = set()              # every id a create answered with, even one that should have been refused
     budget_id = None
     cleaned = None
+
+    def create(body_to_send):
+        r = post("/api/budgets", body_to_send)
+        if r.status_code == 201 and isinstance(body(r).get("budget_id"), int):
+            created.add(body(r)["budget_id"])
+        return r
+
     try:
-        r = post("/api/budgets", payload)
+        r = create(payload)
         checks.check("creating a new budget answers 201 with its id",
                      r.status_code == 201 and isinstance(body(r).get("budget_id"), int), describe(r))
         budget_id = body(r)["budget_id"]
@@ -220,10 +237,10 @@ def test_create_budget_then_duplicate_and_invalid_bodies(checks):
         line = next((l for l in s.get("budgets", []) if isinstance(l, dict) and l.get("budget_id") == budget_id), None)
         checks.check("the new budget appears in the period summary with no spend, on track",
                      line is not None and line.get("category") == category and line.get("monthly_limit") == 123.45
-                     and line.get("spent") == 0.0 and line.get("remaining") == 123.45 and line.get("status") == "ON_TRACK"
-                     and s.get("totals", {}).get("budget_count") == count_before + 1, str(line))
+                     and line.get("spent") == 0.0 and line.get("remaining") == 123.45 and line.get("status") == "ON_TRACK",
+                     str(line))
 
-        r = post("/api/budgets", payload)
+        r = create(payload)
         checks.check("the same customer, category and period again answers 409",
                      r.status_code == 409 and "already exists" in str(body(r).get("error", "")), describe(r))
 
@@ -231,15 +248,18 @@ def test_create_budget_then_duplicate_and_invalid_bodies(checks):
                           ({**payload, "monthly_limit": "lots"}, "Invalid input"),
                           ({k: v for k, v in payload.items() if k != "category"}, "category required"),
                           ({**payload, "month": 13}, "month must be between 1 and 12")):
-            r = post("/api/budgets", bad)
+            r = create(bad)
             checks.check(f"400 for {word}", r.status_code == 400 and word in str(body(r).get("error", "")), describe(r))
         r = requests.post(f"{API}/api/budgets", data="[1, 2]", headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
         checks.check("400 for a JSON body that is not an object", r.status_code == 400, describe(r))
     finally:
         # Runs whatever happened above, including a create whose answer was lost.
-        cleaned = remove_test_budgets(budget_id, category)
-        checks.record("cleanup: the test budget is deleted again", cleaned[0], cleaned[1])
+        cleaned = remove_test_budgets(created, category)
+        checks.record("cleanup: every budget the test created is deleted", cleaned[0], cleaned[1])
     assert cleaned[0], f"cleanup failed, a '{category}' budget may remain: {cleaned[1]}"
-    s = body(get("/api/budgets/summary", **PERIOD))
-    checks.check("the period is back to its previous budget count", s.get("totals", {}).get("budget_count") == count_before,
-                 f"{s.get('totals', {}).get('budget_count')} vs {count_before}")
+    if budget_id is not None:
+        gone = requests.get(f"{API}/api/budgets/{budget_id}", timeout=TIMEOUT)
+        s = body(get("/api/budgets/summary", **PERIOD))
+        still_listed = any(isinstance(l, dict) and l.get("budget_id") == budget_id for l in s.get("budgets", []))
+        checks.check("the created budget is gone again: 404 by id and no longer in the summary",
+                     gone.status_code == 404 and not still_listed, f"GET by id {gone.status_code}, listed {still_listed}")

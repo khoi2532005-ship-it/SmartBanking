@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess  # noqa: S404  # local git metadata only
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,8 +80,13 @@ def _inline(value) -> str:
 
 
 def _block(text: str) -> list[str]:
-    """Text as an indented code block, which no backtick run inside it can break."""
-    return [""] + ["    " + line for line in str(text).splitlines()] + [""]
+    """Text as a fenced code block whose fence is longer than any backtick run in
+    it, so nothing inside renders as Markdown. A fence at column 0 also ends the
+    bullet list above it, which an indented block would have joined."""
+    text = str(text)
+    longest = max((len(run) for run in re.findall(r"`+", text)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return ["", fence, *text.splitlines(), fence, ""]
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -122,7 +128,7 @@ def pytest_sessionfinish(session, exitstatus):
         "run_url": (f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{run_id}"
                     if os.getenv("GITHUB_RUN_ID") and os.getenv("GITHUB_REPOSITORY") else ""),
         "ran_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "api_url": observed.get("api_url") or os.getenv("BUDGET_API_URL", "http://localhost:5004"),
+        "api_url": observed.get("api_url") or os.getenv("BUDGET_API_URL") or "http://localhost:5004",
         "spending_source": observed.get("spending_source", "not observed"),
         "ai_services": ai,
         "pytest_exit_status": int(exitstatus),
