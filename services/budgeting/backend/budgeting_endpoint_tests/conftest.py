@@ -131,6 +131,7 @@ def pytest_sessionfinish(session, exitstatus):
         "api_url": observed.get("api_url") or os.getenv("BUDGET_API_URL") or "http://localhost:5004",
         "spending_source": observed.get("spending_source", "not observed"),
         "ai_services": ai,
+        "leftovers": observed.get("leftovers", {}),
         "pytest_exit_status": int(exitstatus),
         "tests": tests,
         "summary": {"endpoints": len(tests), "passed": passed, "failed": failed, "skipped": skipped,
@@ -147,7 +148,11 @@ def pytest_sessionfinish(session, exitstatus):
         f"Target `{_inline(report['api_url'])}` with the seeded database; spending source `{_inline(report['spending_source'])}`;",
         f"AI services as the API reported them: {_inline(flags)}. Result: **{result}**,",
         f"{passed}/{len(tests)} endpoint tests passed, {report['summary']['checks']} checks"
-        + (f", {skipped} skipped" if skipped else "") + ".", "",
+        + (f", {skipped} skipped" if skipped else "") + ".",
+        *([f"Leftover test budgets from an interrupted run: removed {_inline(report['leftovers'].get('removed'))}, "
+           f"failed {_inline(report['leftovers'].get('failed'))}."]
+          if report["leftovers"].get("found") or report["leftovers"].get("error") else []),
+        "",
         "| Endpoint | Test | Outcome | Checks | Seconds |", "|---|---|---|---|---|",
     ]
     for t in tests:

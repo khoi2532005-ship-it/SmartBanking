@@ -7,6 +7,7 @@ Plain assertions with a __main__ runner, so CI needs no test framework
 """
 
 from pathlib import Path
+import importlib.util
 import sys
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -57,11 +58,27 @@ def test_near_limit_threshold():
     assert line["over_budget"] is False
 
 
-# Customer 1, September 2026, as services/budgeting/database/init_db.py seeds it.
-SEEDED_SEPTEMBER = [
-    (1, "Groceries", 800.0), (2, "Dining Out", 300.0), (3, "Transport", 200.0), (4, "Entertainment", 150.0),
-    (5, "Utilities", 250.0), (6, "Shopping", 400.0), (7, "Subscriptions", 60.0),
-]
+def _seed():
+    """The real seed: services/budgeting/database/init_db.py, whose rows are constants
+    (importing it writes nothing), loaded by path under a name of its own."""
+    path = BASE_DIR.parent / "database" / "init_db.py"
+    spec = importlib.util.spec_from_file_location("budgeting_seed_for_logic_tests", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _seeded_september():
+    """Customer 1's seeded budgets for September 2026, as budget dicts."""
+    return [_budget(budget_id, category, limit) for budget_id, customer, category, limit, month, year, _created
+            in _seed().BUDGETS if (customer, month, year) == (1, 9, 2026)]
+
+
+def test_seed_holds_the_known_september_budgets():
+    """Pinned by value: a changed seeded limit or an added or removed budget fails here."""
+    got = [(b["budget_id"], b["category"], b["monthly_limit"]) for b in _seeded_september()]
+    assert got == [(1, "Groceries", 800.0), (2, "Dining Out", 300.0), (3, "Transport", 200.0), (4, "Entertainment", 150.0),
+                   (5, "Utilities", 250.0), (6, "Shopping", 400.0), (7, "Subscriptions", 60.0)], got
 
 
 def test_near_limit_threshold_is_80_percent():
@@ -72,11 +89,11 @@ def test_near_limit_threshold_is_80_percent():
 
 
 def test_seeded_period_with_mock_spending_gives_the_known_figures():
-    """The seeded budgets against the mock spending: the figures the demo and the
+    """The real seed against the mock spending: the figures the demo and the
     post-commit endpoint tests rest on, pinned here by value."""
     totals, source, _ = transactions_client.spend_by_category(1, 9, 2026)
     assert source == "mock", source
-    summary = build_summary([_budget(i, c, limit) for i, c, limit in SEEDED_SEPTEMBER], totals)
+    summary = build_summary(_seeded_september(), totals)
     got = {line["category"]: (line["spent"], line["status"]) for line in summary["budgets"]}
     assert got == {
         "Groceries": (645.0, "NEAR_LIMIT"), "Dining Out": (412.0, "OVER_BUDGET"), "Transport": (218.0, "OVER_BUDGET"),

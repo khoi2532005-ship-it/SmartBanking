@@ -9,14 +9,17 @@ main and every push to main. With no API answering and BUDGET_API_URL unset or e
 skip, so a local pytest run without the stack is not red; with BUDGET_API_URL set (CI) an
 API that does not answer is a failure.
 
-Nothing about the data is copied into this file. The expected summary is built from what
-the API itself serves (the period's stored budgets from GET /api/budgets and its spending
-from GET /api/transactions/spending) run through the backend's own budget logic, loaded
-from services/budget_logic.py. The logic's rules (the statuses, the 80% threshold) and the
-seeded figures are pinned by value in tests/test_budget_logic.py; this test checks
-that the endpoint applies them to the right budgets and spend: any budget the summary drops or
-adds, or any figure it gets wrong, fails a check. No AI service is involved;
-the health answer's MCP, RAG and Multi-Agent flags are recorded and must all be off in CI.
+Nothing about the data is copied into this file. The period's stored budgets must be
+exactly the rows the real seed script holds (services/budgeting/database/init_db.py,
+read directly), so a query that widens or narrows the period fails. The expected summary
+is those budgets and the period's spending (GET /api/transactions/spending) run through the
+backend's own budget logic (services/budget_logic.py), so any budget the summary drops or
+adds, or any figure it gets wrong, fails a check. The seeded figures themselves (the
+limits, the totals 2160.00 / 2169.97, the over-budget list) and the 80% threshold are
+pinned by value against the same seed in tests/test_budget_logic.py. Budgets left by a run
+killed before its cleanup are removed before any test reads the period. No AI service is
+involved; the health answer's MCP, RAG and Multi-Agent flags are recorded and must all be
+off in CI.
 
 Every check is recorded on the test itself through pytest's record_property, so it lands
 in the JUnit XML and in the report conftest.py writes (ENDPOINT_REPORT_DIR).
@@ -44,6 +47,18 @@ PERIOD = {"customer_id": 1, "month": 9, "year": 2026}                 # the seed
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TEST_CATEGORY_PREFIX = "CI check "                                    # the create test's own budgets
 STALE_AFTER = timedelta(minutes=10)                                  # older test budgets are leftovers
+
+
+def load_seed_budgets() -> list[dict]:
+    """The seeded budgets of the test period, read from the real seed script
+    (services/budgeting/database/init_db.py; importing it writes nothing)."""
+    spec = importlib.util.spec_from_file_location("budgeting_seed_under_test",
+                                                  BACKEND_DIR.parent / "database" / "init_db.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return [{"budget_id": bid, "customer_id": cust, "category": cat, "monthly_limit": limit, "month": month, "year": year}
+            for bid, cust, cat, limit, month, year, _created in module.BUDGETS
+            if (cust, month, year) == (PERIOD["customer_id"], PERIOD["month"], PERIOD["year"])]
 
 
 def load_budget_logic():
@@ -94,18 +109,21 @@ def json_list(r: requests.Response):
     return data if isinstance(data, list) else None
 
 
-def remove_stale_test_budgets() -> tuple[list, str]:
+def remove_stale_test_budgets() -> dict:
     """Budgets this test created in a run that was killed before its cleanup: the test's
     category prefix, created more than STALE_AFTER ago (a run going on right now is
-    seconds old, so it is never touched). Returns the deleted ids and a note."""
+    seconds old, so it is never touched). Reports what was found, what was removed and
+    what could not be, so nothing is claimed that did not happen."""
+    outcome = {"found": [], "removed": [], "failed": {}, "error": ""}
     try:
         rows = json_list(get("/api/budgets"))
     except requests.RequestException as exc:
-        return [], f"could not list budgets: {type(exc).__name__}"
+        outcome["error"] = f"could not list budgets: {type(exc).__name__}"
+        return outcome
     if rows is None:
-        return [], "could not list budgets"
+        outcome["error"] = "could not list budgets"
+        return outcome
     now = datetime.now(timezone.utc)
-    stale = []
     for b in rows:
         if not (isinstance(b, dict) and str(b.get("category", "")).startswith(TEST_CATEGORY_PREFIX)):
             continue
@@ -114,13 +132,17 @@ def remove_stale_test_budgets() -> tuple[list, str]:
         except ValueError:
             continue
         if now - created > STALE_AFTER and isinstance(b.get("budget_id"), int):
-            stale.append(b["budget_id"])
-    for i in stale:
+            outcome["found"].append(b["budget_id"])
+    for i in outcome["found"]:
         try:
-            requests.delete(f"{API}/api/budgets/{i}", timeout=TIMEOUT)
-        except requests.RequestException:
-            pass
-    return stale, (f"removed {len(stale)} leftover test budget(s) from an interrupted run: {stale}" if stale else "")
+            code = requests.delete(f"{API}/api/budgets/{i}", timeout=TIMEOUT).status_code
+        except requests.RequestException as exc:
+            code = type(exc).__name__
+        if code in (200, 204, 404):                      # 404: already gone
+            outcome["removed"].append(i)
+        else:
+            outcome["failed"][i] = code
+    return outcome
 
 
 def remove_test_budgets(created_ids: set, category: str) -> tuple[bool, str]:
@@ -186,17 +208,28 @@ def api_is_up():
     return {"ai_services": {name: ("enabled" if on else "disabled") for name, on in flags.items()}}
 
 
+@pytest.fixture(scope="session", autouse=True)
+def leftovers(api_is_up):
+    """Before any test reads the period, budgets left by an interrupted run are removed."""
+    return remove_stale_test_budgets()
+
+
 @pytest.fixture
-def checks(api_is_up, record_property):
+def checks(api_is_up, leftovers, record_property):
     recorder = Checks(record_property)
-    recorder.observe(api_url=API, **api_is_up)
+    recorder.observe(api_url=API, leftovers=leftovers, **api_is_up)
     return recorder
 
 
 # ---------------------------------------------------------------- 1. GET /api/budgets/summary
 
 @pytest.mark.endpoint("GET", "/api/budgets/summary")
-def test_budget_summary_reports_the_seeded_period(checks):
+def test_budget_summary_reports_the_seeded_period(checks, leftovers):
+    checks.check("budgets left by an interrupted run were removed before the period was read",
+                 not leftovers["failed"] and not leftovers["error"],
+                 f"found {leftovers['found']}, removed {leftovers['removed']}, failed {leftovers['failed']} {leftovers['error']}".strip())
+    if leftovers["removed"]:
+        checks.note(f"removed {len(leftovers['removed'])} leftover test budget(s) from an interrupted run: {leftovers['removed']}")
     logic = load_budget_logic()
     stored_r = get("/api/budgets", **PERIOD)
     r = get("/api/budgets/summary", **PERIOD)
@@ -225,6 +258,13 @@ def test_budget_summary_reports_the_seeded_period(checks):
     checks.check("every budget line carries its id, limit, spend, remaining, percent and status", not malformed, str(malformed[:1]))
     checks.check("the summary and the spending endpoint name the same spending source",
                  s.get("spending_source") == sp.get("spending_source"), f"{s.get('spending_source')} vs {sp.get('spending_source')}")
+    seed = load_seed_budgets()
+    stored_seeded = [{k: b.get(k) for k in ("budget_id", "customer_id", "category", "monthly_limit", "month", "year")}
+                     for b in stored if not str(b.get("category", "")).startswith(TEST_CATEGORY_PREFIX)]
+    checks.check("the period's stored budgets are exactly the seeded ones (init_db.py)",
+                 sorted(stored_seeded, key=lambda b: b["budget_id"]) == sorted(seed, key=lambda b: b["budget_id"]),
+                 f"stored {[(b['budget_id'], b['category'], b['monthly_limit']) for b in stored_seeded]}, "
+                 f"seeded {[(b['budget_id'], b['category'], b['monthly_limit']) for b in seed]}")
     checks.check("the summary lists exactly the period's stored budgets", ids(stored) == ids(s["budgets"]),
                  f"stored {ids(stored)}, listed {ids(s['budgets'])}")
 
@@ -249,9 +289,6 @@ def test_budget_summary_reports_the_seeded_period(checks):
 
 @pytest.mark.endpoint("POST", "/api/budgets")
 def test_create_budget_then_duplicate_and_invalid_bodies(checks):
-    stale, note = remove_stale_test_budgets()
-    if note:
-        checks.note(note)
     category = f"{TEST_CATEGORY_PREFIX}{uuid.uuid4().hex[:8]}"
     payload = {**PERIOD, "category": category, "monthly_limit": 123.45}
     created: set = set()              # every id a create answered with, even one that should have been refused

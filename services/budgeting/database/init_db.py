@@ -1,31 +1,22 @@
+"""Seed data for the budgeting database, and the script that loads it.
+
+    python init_db.py      creates the tables and loads the seed (the Dockerfile and CI run this)
+
+The seed rows are module-level constants, so tests can read the real seed
+without touching a database: importing this module writes nothing.
+"""
+
 import os
 import sqlite3
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 DATABASE_NAME = os.path.join(DATA_DIR, "budgeting_and_insights.db")
 
-os.makedirs(DATA_DIR, exist_ok=True)
-
-conn = sqlite3.connect(DATABASE_NAME)
-cursor = conn.cursor()
-
-cursor.execute("PRAGMA foreign_keys = ON")
-
 # ============================================================
-# CATEGORIES
+# SEED DATA
 # ============================================================
 
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS categories (
-        category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        description TEXT NOT NULL
-    )
-""")
-
-cursor.execute("DELETE FROM categories")
-
-categories = [
+CATEGORIES = [
     (1, "Groceries", "Supermarkets, food markets and grocery delivery"),
     (2, "Dining Out", "Restaurants, cafes, takeaway and food delivery"),
     (3, "Transport", "Public transport, fuel, tolls and rideshare"),
@@ -38,32 +29,7 @@ categories = [
     (10, "Savings", "Transfers into savings and investment accounts"),
 ]
 
-cursor.executemany("""
-    INSERT INTO categories (category_id, name, description)
-    VALUES (?, ?, ?)
-""", categories)
-
-# ============================================================
-# BUDGETS
-# ============================================================
-
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS budgets (
-        budget_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        customer_id INTEGER NOT NULL,
-        category TEXT NOT NULL,
-        monthly_limit REAL NOT NULL,
-        month INTEGER NOT NULL,
-        year INTEGER NOT NULL,
-        created_at TEXT NOT NULL,
-
-        UNIQUE (customer_id, category, month, year)
-    )
-""")
-
-cursor.execute("DELETE FROM budgets")
-
-budgets = [
+BUDGETS = [
     # Customer 1 - current month (September 2026)
     (1, 1, "Groceries", 800.00, 9, 2026, "2026-09-01 08:15:00"),
     (2, 1, "Dining Out", 300.00, 9, 2026, "2026-09-01 08:16:00"),
@@ -83,40 +49,7 @@ budgets = [
     (14, 2, "Education", 350.00, 9, 2026, "2026-09-02 17:48:00"),
 ]
 
-cursor.executemany("""
-    INSERT INTO budgets (
-        budget_id,
-        customer_id,
-        category,
-        monthly_limit,
-        month,
-        year,
-        created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-""", budgets)
-
-# ============================================================
-# BUDGET INSIGHTS
-# ============================================================
-
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS budget_insights (
-        insight_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        budget_id INTEGER NOT NULL,
-        insight_text TEXT NOT NULL,
-        generated_at TEXT NOT NULL,
-        model_used TEXT NOT NULL,
-
-        FOREIGN KEY (budget_id)
-            REFERENCES budgets(budget_id)
-            ON DELETE CASCADE
-    )
-""")
-
-cursor.execute("DELETE FROM budget_insights")
-
-insights = [
+INSIGHTS = [
     (1, 2, "You have spent $412 of your $300 Dining Out budget, putting you 37% over "
         "with most of the month still to run. Cutting back to two takeaway meals a week "
         "would bring you close to your limit.",
@@ -152,22 +85,107 @@ insights = [
         "2026-09-03 07:21:00", "qwen2.5:0.5b"),
 ]
 
-cursor.executemany("""
-    INSERT INTO budget_insights (
-        insight_id,
-        budget_id,
-        insight_text,
-        generated_at,
-        model_used
-    )
-    VALUES (?, ?, ?, ?, ?)
-""", insights)
 
-conn.commit()
+def main():
+    os.makedirs(DATA_DIR, exist_ok=True)
 
-conn.close()
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
 
-print(f"Database created successfully: {DATABASE_NAME}")
-print(f"  categories: {len(categories)}")
-print(f"  budgets: {len(budgets)}")
-print(f"  budget_insights: {len(insights)}")
+    cursor.execute("PRAGMA foreign_keys = ON")
+
+    # ============================================================
+    # CATEGORIES
+    # ============================================================
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("DELETE FROM categories")
+
+    cursor.executemany("""
+        INSERT INTO categories (category_id, name, description)
+        VALUES (?, ?, ?)
+    """, CATEGORIES)
+
+    # ============================================================
+    # BUDGETS
+    # ============================================================
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS budgets (
+            budget_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            monthly_limit REAL NOT NULL,
+            month INTEGER NOT NULL,
+            year INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+
+            UNIQUE (customer_id, category, month, year)
+        )
+    """)
+
+    cursor.execute("DELETE FROM budgets")
+
+    cursor.executemany("""
+        INSERT INTO budgets (
+            budget_id,
+            customer_id,
+            category,
+            monthly_limit,
+            month,
+            year,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, BUDGETS)
+
+    # ============================================================
+    # BUDGET INSIGHTS
+    # ============================================================
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS budget_insights (
+            insight_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            budget_id INTEGER NOT NULL,
+            insight_text TEXT NOT NULL,
+            generated_at TEXT NOT NULL,
+            model_used TEXT NOT NULL,
+
+            FOREIGN KEY (budget_id)
+                REFERENCES budgets(budget_id)
+                ON DELETE CASCADE
+        )
+    """)
+
+    cursor.execute("DELETE FROM budget_insights")
+
+    cursor.executemany("""
+        INSERT INTO budget_insights (
+            insight_id,
+            budget_id,
+            insight_text,
+            generated_at,
+            model_used
+        )
+        VALUES (?, ?, ?, ?, ?)
+    """, INSIGHTS)
+
+    conn.commit()
+
+    conn.close()
+
+    print(f"Database created successfully: {DATABASE_NAME}")
+    print(f"  categories: {len(CATEGORIES)}")
+    print(f"  budgets: {len(BUDGETS)}")
+    print(f"  budget_insights: {len(INSIGHTS)}")
+
+
+if __name__ == "__main__":
+    main()
