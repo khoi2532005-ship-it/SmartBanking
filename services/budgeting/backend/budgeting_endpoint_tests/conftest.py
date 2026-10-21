@@ -117,7 +117,8 @@ def pytest_sessionfinish(session, exitstatus):
         result = "skipped"
     else:
         result = "passed"
-    ai = observed.get("ai_services") or {"mcp": "not observed", "rag": "not observed", "multi_agent": "not observed"}
+    ai = observed.get("ai_services") or {"ai_mode": "not observed", "mcp": "not observed", "rag": "not observed",
+                                          "multi_agent": "not observed"}
     run_id = os.getenv("GITHUB_RUN_ID", "local")
     report = {
         "student": "student-4", "name": "Cong Bao Nguyen", "feature": "budgeting",

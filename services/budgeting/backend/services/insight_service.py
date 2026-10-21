@@ -2,13 +2,15 @@
 
 Each function returns (payload, status_code) so callers can relay the result
 without duplicating any of the LLM or budget-analysis logic. The LLM is
-reached through services.llm_client (Gemini by default).
+reached through services.llm_client (Gemini by default). With AI-Mode
+switched off (AI_MODE_ENABLED=false) both answer 503 with "disabled": true
+before any database, Transactions or model call, as fraud's Explain does.
 """
 
 import json
 from datetime import date
 
-from services import database_api, transactions_client
+from services import database_api, llm_client, transactions_client
 from services.budget_logic import build_summary, evaluate_budget
 from services.llm_client import create_chat_completion, get_model
 from services.prompt_loader import load_prompt
@@ -20,6 +22,11 @@ PROMPT_DIR = "budgeting"
 def current_period():
     today = date.today()
     return today.month, today.year
+
+
+def _switched_off():
+    """Switched off is not an error to retry, so it is said before any other work."""
+    return {"error": llm_client.DISABLED_MESSAGE, "disabled": True}, 503
 
 
 def _ask(task_file, context, max_tokens=3000):
@@ -50,6 +57,8 @@ def _store(budget_id, insight_text, model_used):
 
 def monthly_insight(customer_id, month, year):
     """Generate a whole-of-month spending insight for one customer."""
+    if not llm_client.enabled():
+        return _switched_off()
     try:
         customer_id = int(customer_id)
         month = int(month)
@@ -131,6 +140,8 @@ def monthly_insight(customer_id, month, year):
 
 def explain_budget(budget_id):
     """Explain why one category is over or under its limit."""
+    if not llm_client.enabled():
+        return _switched_off()
     response = database_api.get_budget_response(budget_id)
     if response.status_code == 404:
         return {"error": "Budget not found"}, 404
