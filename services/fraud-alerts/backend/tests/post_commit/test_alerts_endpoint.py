@@ -61,6 +61,7 @@ def test_list_returns_alerts_newest_first(api, planted):
     ({}, [2, 1, 0]),
     ({"status": "reviewed"}, [1]),
     ({"customer_id": TEST_CUSTOMER}, [2, 1, 0]),
+    ({"customer_id": TEST_CUSTOMER + 1}, []),   # the case above alone passes even if customer_id is ignored
     ({"min_amount": 5000}, [2, 1]),
     ({"max_amount": 5000}, [1, 0]),
     ({"date_from": "2026-02-15"}, [2, 1]),

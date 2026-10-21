@@ -30,9 +30,10 @@ def test_rule_crud_cycle(api, created):
     row = stored(api, rule_id).json()
     assert (row["rule_type"], row["threshold_value"], row["threshold_secondary"], row["severity"], row["enabled"]) == \
            ("amount_over", 7500, None, "high", 0)
-    assert requests.put(f"{api}/api/rules/{rule_id}", json={"severity": "medium", "enabled": True}, timeout=5).status_code == 200
+    assert requests.put(f"{api}/api/rules/{rule_id}", json={"severity": "medium", "threshold_value": 8000}, timeout=5).status_code == 200
     row = stored(api, rule_id).json()
-    assert (row["severity"], row["enabled"]) == ("medium", 1)
+    # Still disabled: a run cut off before the DELETE must not leave a rule that fires on real customers.
+    assert (row["severity"], row["threshold_value"], row["enabled"]) == ("medium", 8000, 0)
     assert requests.delete(f"{api}/api/rules/{rule_id}", timeout=5).status_code == 200
     created.remove(rule_id)
     assert stored(api, rule_id).status_code == 404
@@ -60,10 +61,32 @@ def test_form_posts_are_400(api):
 
 
 def test_sweep_removes_what_an_interrupted_run_left(api):
-    rule_id = requests.post(f"{api}/api/rules", json=new_rule(), timeout=TIMEOUT).json()["rule_id"]
+    r = requests.post(f"{api}/api/rules", json=new_rule(), timeout=TIMEOUT)
+    assert r.status_code == 201, r.text
+    rule_id = r.json()["rule_id"]
     alert = {"rule_id": rule_id, "customer_id": TEST_CUSTOMER, "transaction_id": 1,
              "transaction_amount": 7500, "severity": "high"}
     assert requests.post(f"{api}/api/alerts", json=alert, timeout=TIMEOUT).status_code == 201
     assert rule_id in sweep_leftovers(api)
     assert stored(api, rule_id).status_code == 404
     assert requests.get(f"{api}/api/alerts", params={"rule_id": rule_id}, timeout=TIMEOUT).json() == []
+
+
+def test_a_test_rule_with_other_customers_alerts_is_left_for_a_person(api):
+    # Such a rule fired on real data (an older suite created its rules enabled):
+    # those alerts may carry an analyst's work, so cleanup refuses them loudly.
+    r = requests.post(f"{api}/api/rules", json=new_rule(), timeout=TIMEOUT)
+    assert r.status_code == 201, r.text
+    rule_id = r.json()["rule_id"]
+    alert = {"rule_id": rule_id, "customer_id": TEST_CUSTOMER - 1, "transaction_id": 1,
+             "transaction_amount": 7500, "severity": "high"}
+    r = requests.post(f"{api}/api/alerts", json=alert, timeout=TIMEOUT)
+    assert r.status_code == 201, r.text
+    alert_id = r.json()["alert_id"]
+    try:
+        with pytest.raises(AssertionError, match=str(TEST_CUSTOMER - 1)):
+            remove_rule(api, rule_id)
+        assert requests.get(f"{api}/api/alerts/{alert_id}", timeout=TIMEOUT).status_code == 200
+    finally:
+        requests.delete(f"{api}/api/alerts/{alert_id}", timeout=TIMEOUT)
+        requests.delete(f"{api}/api/rules/{rule_id}", timeout=TIMEOUT)
