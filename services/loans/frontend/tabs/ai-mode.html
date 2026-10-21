@@ -1,122 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Loans AI Mode - SmartBank</title>
+    <title>AI Mode</title>
     <link rel="stylesheet" href="/css/styles.css">
-    <!-- Vendored locally so the demo does not depend on network access. -->
-    <script src="/js/htmx.min.js"></script>
     <style>
-        body { background: #fff; }
+        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
         .app-shell { max-width: none; padding: 1rem; }
         .card { margin-bottom: 1.5rem; }
-        /* Pinned tabs: keep the view switcher visible while the page scrolls. */
-        .tab-strip {
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            background: #fff;
-            padding: 0.6rem 0;
-            margin: 0 0 1rem;
-        }
-        .grow { flex: 1 1 320px; }
-        .insight-card h3 { margin: 0 0 0.5rem; font-size: 0.98rem; }
-        .insight-card h4 { margin: 0.7rem 0 0.2rem; font-size: 0.78rem;
-                           text-transform: uppercase; letter-spacing: 0.04em; }
-        .insight-card p { margin: 0 0 0.6rem; }
+        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
+        th { background: #f0f3f7; cursor: pointer; }
+        /* Long unbroken names and explanations wrap instead of widening the page. */
+        td { overflow-wrap: anywhere; }
+        .table-wrap { overflow-x: auto; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > div { display: flex; flex-direction: column; }
+        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
+        .is-hidden { display: none; }
+        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
+        .sev-high { background: #c0392b; }
+        .sev-medium { background: #d68910; }
+        .sev-low { background: #7f8c8d; }
+        button { cursor: pointer; }
+        /* Tab strip linking the Normal and AI Mode views. */
+        .tab-strip { margin: 0 0 1rem; }
+        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
     </style>
 </head>
 <body>
-
 <main class="app-shell">
-
-    <nav class="feature-nav tab-strip" aria-label="Loans views">
-        <a class="nav-item" href="/tabs/loans.html">Normal</a>
-        <a class="nav-item is-active" href="/tabs/ai-mode.html" aria-current="page">AI Mode</a>
-        <a class="nav-item" href="/tabs/mcp.html">MCP</a>
-        <a class="nav-item" href="/tabs/rag.html">RAG</a>
-        <a class="nav-item" href="/tabs/multi-agent.html">Multi-Agent</a>
-    </nav>
-
     <section class="card">
         <h2>AI Explanations for a Loan</h2>
-        <p class="muted">Enter a loan ID to get plain-language explanations of its
-        eligibility checks, approval or rejection decision, and repayment schedule.</p>
-
-        <form class="row" id="ai-loan-form">
+        <p>Enter a loan ID to get plain-language explanations of its eligibility checks, approval or rejection decision, and repayment schedule.</p>
+        <form id="loan-ai-form" class="row">
             <div><label for="ai_loan_id">Loan ID</label>
-                <input id="ai_loan_id" name="loan_id" type="number" min="1" placeholder="4"></div>
-            <div><button type="submit" class="btn-ai" hx-get="/ui/ai/explain-eligibility"
-                         hx-target="#explanation-result" hx-swap="innerHTML"
-                         hx-indicator="#ai-spinner">Explain Eligibility</button></div>
-            <div><button type="submit" class="btn-ai" hx-get="/ui/ai/explain-decision"
-                         hx-target="#explanation-result" hx-swap="innerHTML"
-                         hx-indicator="#ai-spinner">Explain Decision</button></div>
-            <div><button type="submit" class="btn-ai" hx-get="/ui/ai/explain-repayments"
-                         hx-target="#explanation-result" hx-swap="innerHTML"
-                         hx-indicator="#ai-spinner">Explain Repayments</button></div>
-            <div><span id="ai-spinner" class="htmx-indicator spinner">
-                Asking the model, this can take a few seconds...</span></div>
+                <input id="ai_loan_id" type="number" min="1" placeholder="4"></div>
+            <button type="button" class="btn-ai" id="explain-eligibility-btn">Explain Eligibility</button>
+            <button type="button" class="btn-ai" id="explain-decision-btn">Explain Decision</button>
+            <button type="button" class="btn-ai" id="explain-repayments-btn">Explain Repayments</button>
         </form>
+        <div id="explanation-result" class="panel is-hidden"></div>
 
-        <div id="explanation-result" class="panel">
-            <p class="empty">No explanation requested yet.</p>
-        </div>
-    </section>
-
-    <section class="card">
         <h2>Compare Repayment Options &amp; Get a Recommendation</h2>
-        <p class="muted">Compare monthly payments and total interest across different
-        loan terms, using an existing loan or the amount, rate, and income you provide.</p>
-
-        <form class="row" hx-post="/ui/ai/repayment-options" hx-target="#compare-result"
-              hx-swap="innerHTML" hx-indicator="#cmp-spinner">
+        <p>Compare monthly payments and total interest across different loan terms, using an existing loan or the amount, rate, and income you provide.</p>
+        <form id="compare-form" class="row">
             <div><label for="cmp_loan_id">Existing Loan ID (optional)</label>
-                <input id="cmp_loan_id" name="loan_id" type="number" min="1" placeholder="1"></div>
+                <input id="cmp_loan_id" type="number" min="1" placeholder="1"></div>
             <div><label for="cmp_amount">Amount (if no loan ID)</label>
-                <input id="cmp_amount" name="amount" type="number" min="100" step="0.01" placeholder="15000"></div>
+                <input id="cmp_amount" type="number" min="100" step="0.01" placeholder="15000"></div>
             <div><label for="cmp_rate">Interest rate %</label>
-                <input id="cmp_rate" name="interest_rate" type="number" min="0" step="0.1" placeholder="8.5"></div>
+                <input id="cmp_rate" type="number" min="0" step="0.1" placeholder="8.5"></div>
             <div><label for="cmp_income">Monthly income</label>
-                <input id="cmp_income" name="monthly_income" type="number" min="0" step="0.01" placeholder="4200"></div>
+                <input id="cmp_income" type="number" min="0" step="0.01" placeholder="4200"></div>
             <div><label for="cmp_terms">Terms (comma separated)</label>
-                <input id="cmp_terms" name="terms" type="text" placeholder="12,24,36,48,60"></div>
-            <div><button type="submit" class="btn-ai">Compare Options</button></div>
-            <div><span id="cmp-spinner" class="htmx-indicator spinner">
-                Comparing options...</span></div>
+                <input id="cmp_terms" type="text" placeholder="12,24,36,48,60"></div>
+            <button type="submit" class="btn-ai">Compare Options</button>
         </form>
-
-        <div id="compare-result" class="panel">
-            <p class="empty">No comparison run yet.</p>
-        </div>
+        <div id="compare-result" class="panel is-hidden"></div>
     </section>
-
 </main>
-
-<script>
-
-const LOANS_API = window.LOANS_API || `http://${window.location.hostname}:5002`;
-
-document.body.addEventListener("htmx:configRequest", (event) => {
-    if (event.detail.path.startsWith("/ui/")) {
-        event.detail.path = LOANS_API + event.detail.path;
-    }
-});
-
-document.body.addEventListener("htmx:responseError", (event) => {
-    event.detail.target.innerHTML =
-        '<p class="alert alert-error">Request failed (HTTP ' +
-        event.detail.xhr.status + "). Is the loans API running on " +
-        LOANS_API + "?</p>";
-});
-
-document.body.addEventListener("htmx:sendError", (event) => {
-    event.detail.target.innerHTML =
-        '<p class="alert alert-error">Could not reach the loans API at ' +
-        LOANS_API + ". Start loans-service and try again.</p>";
-});
-</script>
-
+<script src="/loans-js/ai-mode.js"></script>
 </body>
 </html>

@@ -1,12 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="utf-8">
     <title>Loans &amp; Credit</title>
-    <meta http-equiv="refresh" content="0; url=/tabs/loans.html">
-    <link rel="canonical" href="/tabs/loans.html">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { background: #fff; }
+        .app-shell { max-width: none; padding: 0; }
+        .tab-strip { margin: 1rem 1rem 0; }
+        .tab-frame {
+            display: block;
+            width: 100%;
+            min-height: 560px;
+            border: 0;
+        }
+        .tab-frame[hidden] {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-<p>Redirecting to <a href="/tabs/loans.html">Loans &amp; Credit</a>&hellip;</p>
+<main class="app-shell">
+    <nav class="feature-nav tab-strip" role="tablist" aria-label="Loans and credit tabs">
+        <button id="tab-normal" class="nav-item tab-btn is-active" data-tab="normal" type="button"
+                role="tab" aria-controls="tab-frame-normal" aria-selected="true">Normal UI</button>
+        <button id="tab-ai-mode" class="nav-item tab-btn" data-tab="ai-mode" type="button"
+                role="tab" aria-controls="tab-frame-ai-mode" aria-selected="false" tabindex="-1">AI Mode</button>
+        <button id="tab-mcp" class="nav-item tab-btn" data-tab="mcp" type="button"
+                role="tab" aria-controls="tab-frame-mcp" aria-selected="false" tabindex="-1">MCP</button>
+        <button id="tab-rag" class="nav-item tab-btn" data-tab="rag" type="button"
+                role="tab" aria-controls="tab-frame-rag" aria-selected="false" tabindex="-1">RAG</button>
+        <button id="tab-multi-agent" class="nav-item tab-btn" data-tab="multi-agent" type="button"
+                role="tab" aria-controls="tab-frame-multi-agent" aria-selected="false" tabindex="-1">Multi-Agent</button>
+    </nav>
+    <div class="tab-content">
+        <iframe id="tab-frame-normal" class="tab-frame is-active" src="/tabs/normal.html"
+                title="Normal UI" role="tabpanel" aria-labelledby="tab-normal"></iframe>
+        <iframe id="tab-frame-ai-mode" class="tab-frame" src="/tabs/ai-mode.html"
+                title="AI Mode" role="tabpanel" aria-labelledby="tab-ai-mode" hidden></iframe>
+        <iframe id="tab-frame-mcp" class="tab-frame" src="/tabs/mcp.html"
+                title="MCP" role="tabpanel" aria-labelledby="tab-mcp" hidden></iframe>
+        <iframe id="tab-frame-rag" class="tab-frame" src="/tabs/rag.html"
+                title="RAG" role="tabpanel" aria-labelledby="tab-rag" hidden></iframe>
+        <iframe id="tab-frame-multi-agent" class="tab-frame" src="/tabs/multi-agent.html"
+                title="Multi-Agent" role="tabpanel" aria-labelledby="tab-multi-agent" hidden></iframe>
+    </div>
+</main>
+<script src="/loans-js/index.js"></script>
 </body>
 </html>
