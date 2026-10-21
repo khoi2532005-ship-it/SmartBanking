@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
-# Builds every SmartBanking image in Azure Container Registry, tagged with the
-# git commit, so each deployment names exactly the code it runs. The builds
-# run in ACR (`az acr build`), from the repository root as build context, the
-# same as docker-compose.yml.
+# Builds every SmartBanking image for linux/amd64 (what Container Apps runs),
+# tags it with the git commit, so each deployment names exactly the code it
+# runs, and pushes it to Azure Container Registry. The images are built where
+# this script runs - the GitHub runner, or a machine with Docker - because ACR
+# Tasks (`az acr build`) are paused on free-credit subscriptions such as Azure
+# for Students. Build context: the repository root, as in docker-compose.yml.
 #   ACR_NAME=<registry> [IMAGE_TAG=<sha>] bash deploy/azure/build-images.sh
 set -euo pipefail
 
 : "${ACR_NAME:?set ACR_NAME to the registry deploy/azure/setup.sh created}"
 cd "$(git rev-parse --show-toplevel)"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse HEAD)}"
+REGISTRY="${ACR_NAME}.azurecr.io"
 
 # <image> <Dockerfile>: the names in docker-compose.yml plus the two nginx
 # frontends Accounts and Transactions run as separate apps in the cloud.
 # tests/test_cloud_infra.py checks this list against deploy/azure/apps.json.
-while read -r image dockerfile; do
-  echo "== ${image}:${IMAGE_TAG} (${dockerfile})"
-  az acr build --registry "$ACR_NAME" --image "${image}:${IMAGE_TAG}" --file "$dockerfile" --output none .
-done <<'LIST'
+# It is read into an array first, so no command in the build loop can read
+# (and swallow) the rest of the list from stdin.
+IMAGES=()
+while read -r entry; do IMAGES+=("$entry"); done <<'LIST'
 smartbank-home shared/frontend/Dockerfile
 smartbank-accounts services/accounts/Dockerfile
 smartbank-accounts-web services/accounts/frontend/Dockerfile.web
@@ -32,3 +35,12 @@ smartbank-budgeting-web services/budgeting/frontend/Dockerfile
 smartbank-transactions services/transactions/Dockerfile
 smartbank-transactions-web services/transactions/frontend/Dockerfile.web
 LIST
+
+az acr login --name "$ACR_NAME"
+for entry in "${IMAGES[@]}"; do
+  read -r image dockerfile <<< "$entry"
+  ref="${REGISTRY}/${image}:${IMAGE_TAG}"
+  echo "== ${ref} (${dockerfile})"
+  docker build --platform linux/amd64 --file "$dockerfile" --tag "$ref" .
+  docker push "$ref"
+done

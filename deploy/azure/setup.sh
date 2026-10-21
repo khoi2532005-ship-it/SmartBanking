@@ -9,10 +9,11 @@ AZ_RG="${AZ_RG:-rg-smartbank}"
 AZ_LOCATION="${AZ_LOCATION:-australiaeast}"
 : "${ACR_NAME:?set ACR_NAME to a globally unique, lower-case registry name}"
 
-# Container Apps needs these providers once per subscription. The CI identity
+# The deployment needs these providers (Container Apps, its logs, the registry,
+# the pull identity) once per subscription. The CI identity
 # may only hold rights on the resource group, so register only when missing
 # (deploy/azure/oidc-setup.sh registers them with the owner's login).
-for namespace in Microsoft.App Microsoft.OperationalInsights; do
+for namespace in Microsoft.App Microsoft.OperationalInsights Microsoft.ContainerRegistry Microsoft.ManagedIdentity; do
   if [ "$(az provider show --namespace "$namespace" --query registrationState --output tsv)" != "Registered" ]; then
     az provider register --namespace "$namespace" --wait
   fi

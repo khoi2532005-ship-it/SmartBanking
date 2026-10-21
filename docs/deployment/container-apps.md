@@ -15,7 +15,7 @@ follows the reference architecture in Lecture 11 (slides 12-14) and Lab 11 §5.
 | Local rehearsal of the same layout | `docker-compose.cloud.yml` |
 
 ```
-GitHub Actions --(student-1..5 pass)--> az acr build (14 images, tag = commit)
+GitHub Actions --(student-1..5 pass)--> docker build (linux/amd64) + push to ACR (14 images, tag = commit)
       --> Bicep: Container Apps environment + 16 apps, pulling from ACR with a managed identity
 Browser --HTTPS--> <feature>-frontend-service (nginx, public)
                      |- /config.js        cloud mode: the tabs call this same address
@@ -37,16 +37,23 @@ the override is the normal local stack, unchanged.
 
 ## 2. One-time setup (the subscription owner)
 
-Prerequisites: an Azure subscription (Azure for Students is enough), the Azure
-CLI (`brew install azure-cli`), and the GitHub CLI logged in with admin rights on
-the repository.
+Prerequisites: an Azure subscription, the Azure CLI (`brew install azure-cli`),
+and the GitHub CLI logged in with admin rights on the repository. Azure for
+Students is enough: the images are built on the GitHub runner and pushed, not
+built with ACR Tasks (`az acr build`), which free-credit subscriptions cannot run.
 
 ```bash
 az login
 ACR_NAME=smartbank<something unique, lower-case> bash deploy/azure/oidc-setup.sh
 ```
 
-This registers the Container Apps providers and creates `rg-smartbank`. It then
+If the subscription only allows some regions (Azure for Students often does),
+prefix the command with `AZ_LOCATION=<allowed region>`. Everything follows the
+resource group's region, and the workflow reads the `AZ_LOCATION` variable this
+script sets.
+
+This registers the resource providers the deployment uses (Container Apps, Log
+Analytics, Container Registry, Managed Identity) and creates `rg-smartbank`. It then
 creates the `smartbank-github-oidc` app registration, which trusts this
 repository's `azure` GitHub environment, so no Azure password is stored. That
 app gets Contributor and User Access Administrator on **that resource group
@@ -56,24 +63,33 @@ only**. Finally, the script stores `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
 
 ## 3. Deploy
 
-GitHub: **Actions → cloud-deployment → Run workflow**, or from the terminal:
+**First deployment, from the `acr-conversion` branch.** GitHub only offers "Run
+workflow" for workflows on the default branch, so until this branch is merged it
+deploys on its own pushes:
 
 ```bash
-gh workflow run cloud-deployment.yml --ref <branch>
+gh variable set AZURE_DEPLOY_ENABLED --body true
+git push -u origin acr-conversion
 gh run watch
+gh variable set AZURE_DEPLOY_ENABLED --body false   # afterwards, if pushes should not redeploy
 ```
+
+**Once merged into `main`:** **Actions → cloud-deployment → Run workflow**, or
+`gh workflow run cloud-deployment.yml`.
 
 The workflow runs in this order:
 1. The five student workflows, which are the CI gate.
 2. `tests/test_cloud_infra.py`.
 3. The OIDC login.
-4. `setup.sh`, then `build-images.sh` (in ACR), then `deploy.sh`.
+4. `setup.sh`, then `build-images.sh` (built on the runner, pushed to ACR), then `deploy.sh`.
 5. `checks.py`.
 
 It then uploads the `cloud-deployment-report` artifact. To deploy on every push
 to `main` as well, set the repository variable `AZURE_DEPLOY_ENABLED` to `true`.
 
-The same scripts run from a terminal after `az login`:
+The same scripts run from a terminal after `az login`, with Docker running.
+The images are built for linux/amd64, which is slow under emulation on Apple
+Silicon, so prefer the workflow:
 `ACR_NAME=… bash deploy/azure/setup.sh && ACR_NAME=… bash deploy/azure/build-images.sh && ACR_NAME=… bash deploy/azure/deploy.sh`.
 Then run `python deploy/azure/checks.py --outputs reports/cloud/outputs.json --out reports/cloud/cloud-deployment-report.json`.
 

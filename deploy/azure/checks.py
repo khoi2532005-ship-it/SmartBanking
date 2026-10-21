@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -116,8 +117,11 @@ def crud_checks(feature, web_url):
     spec = FEATURES[feature]["crud"]
     collection = f"{web_url}{spec['collection']}"
     results = []
+    # A browser sends Origin on every write, and three backends refuse a page
+    # they do not know: the checks write as that page would.
+    origin = {"Origin": web_url}
     created = _check(results, f"{feature} create", "POST", collection, spec["create_status"],
-                     json=_fill(spec["create"], uuid.uuid4().hex[:8]))
+                     json=_fill(spec["create"], uuid.uuid4().hex[:8]), headers=origin)
     if created is None or created.status_code != spec["create_status"]:
         return results
     try:
@@ -131,11 +135,29 @@ def crud_checks(feature, web_url):
     item = f"{collection}/{item_id}"
     try:
         _check(results, f"{feature} read", "GET", item, 200)
-        _check(results, f"{feature} update", "PUT", item, 200, json=spec["update"])
+        _check(results, f"{feature} update", "PUT", item, 200, json=spec["update"], headers=origin)
     finally:
-        _check(results, f"{feature} delete", "DELETE", item, spec["delete_status"])
+        _check(results, f"{feature} delete", "DELETE", item, spec["delete_status"], headers=origin)
     _check(results, f"{feature} read after delete", "GET", item, 404)
     return results
+
+
+def wait_until_ready(web_urls, timeout=180, interval=5):
+    """Polls each frontend's /api/health until it answers 200. A new revision can
+    still be starting when the deployment returns. Returns the names that never did."""
+    waiting = dict(web_urls)
+    deadline = time.monotonic() + timeout
+    while waiting:
+        for name, url in list(waiting.items()):
+            try:
+                if requests.get(f"{url}/api/health", timeout=TIMEOUT).status_code == 200:
+                    del waiting[name]
+            except requests.RequestException:
+                pass
+        if not waiting or time.monotonic() >= deadline:
+            break
+        time.sleep(min(interval, max(0.0, deadline - time.monotonic())))
+    return sorted(waiting)
 
 
 SCRIPTS = ["deploy/azure/setup.sh", "deploy/azure/build-images.sh", "deploy/azure/deploy.sh",
@@ -205,6 +227,8 @@ def main(argv=None):
     parser.add_argument("--out", required=True, help="where to write the report JSON; the Markdown goes beside it")
     args = parser.parse_args(argv)
     outputs = json.loads(Path(args.outputs).read_text())
+    for name in wait_until_ready(outputs["frontends"]):
+        print(f"WAIT {name} did not answer /api/health within the wait; checking anyway")
     report = build_report(outputs["frontends"], outputs["homeUrl"], _run_meta(), outputs.get("resources", []))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

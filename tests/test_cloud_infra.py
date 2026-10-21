@@ -68,3 +68,13 @@ def test_every_app_image_is_built():
     used = {a["image"].split("/", 1)[1].split(":")[0] for a in APPS.values()}
     assert set(pairs) == used
     assert [d for d in pairs.values() if not (ROOT / d).is_file()] == []
+
+
+def test_bicep_takes_the_region_from_the_resource_group():
+    # A subscription may only allow some regions; the resource group is created
+    # where AZ_LOCATION says, and every resource must follow it.
+    az, bicep = shutil.which("az"), shutil.which("bicep")
+    template = str(ROOT / "deploy/azure/main.bicep")
+    command = [az, "bicep", "build", "--file", template, "--stdout"] if az else [bicep, "build", template, "--stdout"]
+    compiled = json.loads(subprocess.run(command, capture_output=True, text=True, check=True).stdout)  # noqa: S603  # the az/bicep CLI on PATH compiling a file in this repo
+    assert compiled["parameters"]["location"]["defaultValue"] == "[resourceGroup().location]"

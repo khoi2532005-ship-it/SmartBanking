@@ -65,3 +65,17 @@ def test_home_serves_the_frontend_map():
     # page's host: the home page reads the map from /config.js.
     r = requests.get("http://localhost:3000/config.js", timeout=5)
     assert r.status_code == 200 and '"3003": "http://127.0.0.1:3003"' in r.text
+
+
+def test_crud_checks_write_with_the_browser_origin():
+    # A browser sends Origin on writes, so the checks must too: otherwise a wrong
+    # *_FRONTEND_ORIGINS passes the report while every write from the UI is
+    # refused. 127.0.0.1:3003 is the fraud frontend under a host fraud-service
+    # does not allow.
+    results = checks.crud_checks("fraud", "http://127.0.0.1:3003")
+    assert (results[0]["name"], results[0]["status"]) == ("fraud create", 403)
+
+
+def test_checks_wait_for_the_frontends_to_answer():
+    assert checks.wait_until_ready({"fraud": "http://localhost:3003"}, timeout=10) == []
+    assert checks.wait_until_ready({"nowhere": "http://localhost:3999"}, timeout=3) == ["nowhere"]

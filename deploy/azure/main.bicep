@@ -5,8 +5,8 @@
 //   az deployment group create -g rg-smartbank --template-file deploy/azure/main.bicep \
 //       --parameters acrName=<registry> imageTag=<git sha>
 
-@description('Azure region for every resource.')
-param location string = 'australiaeast'
+@description('Azure region for every resource: the resource group\'s, which setup.sh creates in AZ_LOCATION.')
+param location string = resourceGroup().location
 
 @description('Name of the existing Azure Container Registry (deploy/azure/setup.sh creates it).')
 param acrName string

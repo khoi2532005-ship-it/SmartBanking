@@ -33,3 +33,15 @@ def test_deploy_logs_in_with_oidc_and_reports():
     for needle in ("azure/login@v2", "deploy/azure/setup.sh", "deploy/azure/build-images.sh", "deploy/azure/deploy.sh",
                    "deploy/azure/checks.py", "actions/upload-artifact"):
         assert needle in runs, needle
+
+
+def test_the_first_deploy_can_run_from_the_conversion_branch():
+    # workflow_dispatch only finds workflows that are on the default branch,
+    # so until this is merged the branch's own pushes must be able to deploy.
+    push = triggers(WF / "cloud-deployment.yml")["push"]
+    assert set(push["branches"]) == {"main", "acr-conversion"}
+
+
+def test_the_region_comes_from_a_repository_variable():
+    deploy = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]
+    assert deploy["env"]["AZ_LOCATION"] == "${{ vars.AZ_LOCATION || 'australiaeast' }}"
