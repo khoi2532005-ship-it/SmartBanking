@@ -7,9 +7,21 @@ checks prove that path works. They run against the local rehearsal stack
 (tests/test_cloud_rehearsal.py) and against the deployed Container Apps
 (cloud-deployment.yml). Every check is one record in the shape the group's
 cloud_deployment_review mode reads: {name, method, url, expected_status, status}.
+
+After a deployment, the whole report in that mode's schema
+(docs/deployment/cloud-deployment-report-format.md):
+
+    python deploy/azure/checks.py --outputs reports/cloud/outputs.json \
+        --out reports/cloud/cloud-deployment-report.json
 """
 
+import argparse
+import json
+import os
+import sys
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 
@@ -124,3 +136,86 @@ def crud_checks(feature, web_url):
         _check(results, f"{feature} delete", "DELETE", item, spec["delete_status"])
     _check(results, f"{feature} read after delete", "GET", item, 404)
     return results
+
+
+SCRIPTS = ["deploy/azure/setup.sh", "deploy/azure/build-images.sh", "deploy/azure/deploy.sh",
+           "deploy/azure/main.bicep", "deploy/azure/apps.json"]
+AI_SERVICES = ("ai_mode", "mcp", "rag", "multi_agent")
+
+
+def ai_services(fraud_web_url):
+    """The four AI flags as fraud-service reports them; it is the backend whose
+    /api/health names all four. "unknown" when they cannot be read."""
+    try:
+        health = requests.get(f"{fraud_web_url}/api/health", timeout=TIMEOUT).json()
+        return {name: "enabled" if health[name]["enabled"] else "disabled" for name in AI_SERVICES}
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        return dict.fromkeys(AI_SERVICES, "unknown")
+
+
+def _run_meta():
+    """Who, when and which run, from GitHub Actions when there, else the local shell."""
+    server, repo, run_id = (os.getenv(k) for k in ("GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID"))
+    return {
+        "region": os.getenv("AZ_LOCATION", "australiaeast"),
+        "deployed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "commit": (os.getenv("GITHUB_SHA") or os.getenv("IMAGE_TAG") or "")[:7] or None,
+        "deployed_by": os.getenv("GITHUB_ACTOR") or os.getenv("USER"),
+        # The deployment steps before this one succeeded, or this would not run.
+        "workflow": {"name": "cloud-deployment.yml", "run_id": run_id,
+                     "run_url": f"{server}/{repo}/actions/runs/{run_id}" if run_id else None,
+                     "conclusion": "success" if run_id else None},
+    }
+
+
+def build_report(web_urls, home_url, meta, resources=()):
+    """The cloud deployment report: every endpoint and CRUD check, the AI flags,
+    and one issue per check that did not return its expected status."""
+    endpoints = []
+    _check(endpoints, "home page", "GET", f"{home_url}/", 200)
+    for feature in FEATURES:
+        endpoints += endpoint_checks(feature, web_urls[feature])
+    crud = [check for feature in FEATURES for check in crud_checks(feature, web_urls[feature])]
+    ai = ai_services(web_urls["fraud"])
+    issues = [f"{c['name']}: {c['method']} {c['url']} returned {c['status']}, expected {c['expected_status']}"
+              for c in endpoints + crud if c["status"] != c["expected_status"]]
+    issues += [f"{name} is {state} in the cloud baseline" for name, state in ai.items() if state != "disabled"]
+    return {"schema": "smartbank-cloud-deployment-report/1", "sample": False, "provider": "azure",
+            "region": meta["region"], "environment": "release-2-baseline", "deployed_at": meta["deployed_at"],
+            "commit": meta["commit"], "deployed_by": meta["deployed_by"], "workflow": meta["workflow"],
+            "scripts": SCRIPTS, "resources": list(resources), "endpoints": endpoints, "crud_checks": crud,
+            "ai_services": ai, "issues": issues}
+
+
+def results_markdown(report):
+    rows = "\n".join(f"| {c['name']} | {c['method']} | {c['url']} | {c['expected_status']} | {c['status']} | "
+                      f"{'PASS' if c['status'] == c['expected_status'] else 'FAIL'} |"
+                      for c in report["endpoints"] + report["crud_checks"])
+    ai = ", ".join(f"{name} {state}" for name, state in report["ai_services"].items())
+    issues = "\n".join(f"- {issue}" for issue in report["issues"]) or "- none"
+    return (f"# Cloud deployment results\n\nCommit `{report['commit']}`, {report['deployed_at']}, "
+            f"run {report['workflow']['run_url'] or 'local'}.\n\nAI services: {ai}.\n\n"
+            f"| Check | Method | URL | Expected | Got | Result |\n|---|---|---|---|---|---|\n{rows}\n\n"
+            f"## Issues\n\n{issues}\n")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--outputs", required=True, help="deploy.sh's outputs.json: frontends, homeUrl, resources")
+    parser.add_argument("--out", required=True, help="where to write the report JSON; the Markdown goes beside it")
+    args = parser.parse_args(argv)
+    outputs = json.loads(Path(args.outputs).read_text())
+    report = build_report(outputs["frontends"], outputs["homeUrl"], _run_meta(), outputs.get("resources", []))
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2) + "\n")
+    out.with_name("deployment-results.md").write_text(results_markdown(report))
+    print(f"{len(report['endpoints'])} endpoint checks, {len(report['crud_checks'])} CRUD checks, "
+          f"{len(report['issues'])} issue(s); AI services: {report['ai_services']}")
+    for issue in report["issues"]:
+        print("ISSUE", issue)
+    return 1 if report["issues"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

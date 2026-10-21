@@ -1,0 +1,249 @@
+{
+  "_comment": [
+    "The SmartBanking container apps: deploy/azure/main.bicep deploys one per entry, and",
+    "tests/test_cloud_infra.py checks them. {acr}, {tag} and {defaultDomain} are filled in at",
+    "deploy time. Only frontends are public; databases stay at one replica (SQLite);",
+    "every backend starts with the four AI services off (the required cloud baseline)."
+  ],
+  "apps": [
+    {
+      "name": "home",
+      "role": "frontend",
+      "image": "{acr}.azurecr.io/smartbank-home:{tag}",
+      "targetPort": 80,
+      "external": true,
+      "env": {
+        "SMARTBANK_FRONTENDS": "{\"3001\": \"https://accounts-frontend-service.{defaultDomain}\", \"3002\": \"https://loans-frontend-service.{defaultDomain}\", \"3003\": \"https://fraud-frontend-service.{defaultDomain}\", \"3004\": \"https://budgeting-frontend-service.{defaultDomain}\", \"3005\": \"https://transactions-frontend-service.{defaultDomain}\"}"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "accounts-database-service",
+      "role": "database",
+      "image": "{acr}.azurecr.io/smartbank-accounts:{tag}",
+      "targetPort": 5011,
+      "external": false,
+      "env": {
+        "FLASK_OPEN_CHROME": "0"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1,
+      "command": [
+        "python",
+        "database/app.py"
+      ]
+    },
+    {
+      "name": "accounts",
+      "role": "backend",
+      "image": "{acr}.azurecr.io/smartbank-accounts:{tag}",
+      "targetPort": 5001,
+      "external": false,
+      "env": {
+        "DATABASE_SERVICE_URL": "http://accounts-database-service",
+        "FLASK_OPEN_CHROME": "0",
+        "AI_MODE_ENABLED": "false",
+        "MCP_ENABLED": "false",
+        "RAG_ENABLED": "false",
+        "MULTI_AGENT_ENABLED": "false"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1,
+      "command": [
+        "python",
+        "backend/app.py"
+      ]
+    },
+    {
+      "name": "accounts-frontend-service",
+      "role": "frontend",
+      "image": "{acr}.azurecr.io/smartbank-accounts-web:{tag}",
+      "targetPort": 80,
+      "external": true,
+      "env": {
+        "API_UPSTREAM": "https://accounts.internal.{defaultDomain}",
+        "SMARTBANK_SAME_ORIGIN_API": "true"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "loans-database-service",
+      "role": "database",
+      "image": "{acr}.azurecr.io/smartbank-loans-db:{tag}",
+      "targetPort": 5012,
+      "external": false,
+      "env": {},
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "loans-service",
+      "role": "backend",
+      "image": "{acr}.azurecr.io/smartbank-loans-api:{tag}",
+      "targetPort": 5002,
+      "external": false,
+      "env": {
+        "DATABASE_SERVICE_URL": "http://loans-database-service",
+        "ACCOUNTS_SERVICE_URL": "http://accounts",
+        "AI_MODE_ENABLED": "false",
+        "MCP_ENABLED": "false",
+        "RAG_ENABLED": "false",
+        "MULTI_AGENT_ENABLED": "false"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "loans-frontend-service",
+      "role": "frontend",
+      "image": "{acr}.azurecr.io/smartbank-loans-web:{tag}",
+      "targetPort": 80,
+      "external": true,
+      "env": {
+        "API_UPSTREAM": "https://loans-service.internal.{defaultDomain}",
+        "SMARTBANK_SAME_ORIGIN_API": "true"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "fraud-database-service",
+      "role": "database",
+      "image": "{acr}.azurecr.io/smartbank-fraud-db:{tag}",
+      "targetPort": 5013,
+      "external": false,
+      "env": {},
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "fraud-service",
+      "role": "backend",
+      "image": "{acr}.azurecr.io/smartbank-fraud-api:{tag}",
+      "targetPort": 5003,
+      "external": false,
+      "env": {
+        "FRAUD_DB_URL": "http://fraud-database-service",
+        "ACCOUNTS_SERVICE_URL": "http://accounts",
+        "TRANSACTIONS_SERVICE_URL": "http://transactions",
+        "TRANSACTIONS_SOURCE": "seed",
+        "FRAUD_FRONTEND_ORIGINS": "https://fraud-frontend-service.{defaultDomain}",
+        "AI_MODE_ENABLED": "false",
+        "MCP_ENABLED": "false",
+        "RAG_ENABLED": "false",
+        "MULTI_AGENT_ENABLED": "false"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "fraud-frontend-service",
+      "role": "frontend",
+      "image": "{acr}.azurecr.io/smartbank-fraud-web:{tag}",
+      "targetPort": 80,
+      "external": true,
+      "env": {
+        "API_UPSTREAM": "https://fraud-service.internal.{defaultDomain}",
+        "SMARTBANK_SAME_ORIGIN_API": "true"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "budgeting-database-service",
+      "role": "database",
+      "image": "{acr}.azurecr.io/smartbank-budgeting-db:{tag}",
+      "targetPort": 5014,
+      "external": false,
+      "env": {},
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "budgeting-service",
+      "role": "backend",
+      "image": "{acr}.azurecr.io/smartbank-budgeting-api:{tag}",
+      "targetPort": 5004,
+      "external": false,
+      "env": {
+        "BUDGET_DB_URL": "http://budgeting-database-service",
+        "ACCOUNTS_SERVICE_URL": "http://accounts",
+        "TRANSACTIONS_SERVICE_URL": "http://transactions",
+        "BUDGET_FRONTEND_ORIGINS": "https://budgeting-frontend-service.{defaultDomain}",
+        "AI_MODE_ENABLED": "false",
+        "MCP_ENABLED": "false",
+        "RAG_ENABLED": "false",
+        "MULTI_AGENT_ENABLED": "false"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "budgeting-frontend-service",
+      "role": "frontend",
+      "image": "{acr}.azurecr.io/smartbank-budgeting-web:{tag}",
+      "targetPort": 80,
+      "external": true,
+      "env": {
+        "API_UPSTREAM": "https://budgeting-service.internal.{defaultDomain}",
+        "SMARTBANK_SAME_ORIGIN_API": "true"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "transactions-database-service",
+      "role": "database",
+      "image": "{acr}.azurecr.io/smartbank-transactions:{tag}",
+      "targetPort": 5015,
+      "external": false,
+      "env": {
+        "FLASK_OPEN_CHROME": "0"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1,
+      "command": [
+        "python",
+        "database/app.py"
+      ]
+    },
+    {
+      "name": "transactions",
+      "role": "backend",
+      "image": "{acr}.azurecr.io/smartbank-transactions:{tag}",
+      "targetPort": 5005,
+      "external": false,
+      "env": {
+        "DATABASE_SERVICE_URL": "http://transactions-database-service",
+        "ACCOUNTS_SERVICE_URL": "http://accounts",
+        "TRANSACTIONS_FRONTEND_ORIGINS": "https://transactions-frontend-service.{defaultDomain}",
+        "FLASK_OPEN_CHROME": "0",
+        "AI_MODE_ENABLED": "false",
+        "MCP_ENABLED": "false",
+        "RAG_ENABLED": "false",
+        "MULTI_AGENT_ENABLED": "false"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1,
+      "command": [
+        "python",
+        "backend/app.py"
+      ]
+    },
+    {
+      "name": "transactions-frontend-service",
+      "role": "frontend",
+      "image": "{acr}.azurecr.io/smartbank-transactions-web:{tag}",
+      "targetPort": 80,
+      "external": true,
+      "env": {
+        "API_UPSTREAM": "https://transactions.internal.{defaultDomain}",
+        "SMARTBANK_SAME_ORIGIN_API": "true"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    }
+  ]
+}
