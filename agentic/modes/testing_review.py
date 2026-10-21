@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import re
 import xml.etree.ElementTree as ET  # noqa: S405  # the team's own JUnit files, not untrusted input
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -34,10 +35,23 @@ from agentic.modes._review_common import DOCS_DIR, line_for, read_json, rel
 PROMPT_FAMILY = "_testing_review"
 STUDENTS = {1: "accounts", 2: "loans", 3: "fraud-alerts", 4: "budgeting", 5: "transactions"}
 REQUIRED_LINES = ("pre-commit", "post-commit", "coverage", "recommendation", "verdict")
-SCAN_RE = re.compile(r"([a-z][a-z0-9-]*)\s+(\d+)\s*/\s*(\d+)\s*/\s*(\d+)\s+(passed|failed)")
-ENDPOINT_RE = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/\S+)\s+(passed|failed|error|skipped)", re.I)
+COUNTS_RE = re.compile(r"(?<![\d/])(\d+)\s*/\s*(\d+)\s*/\s*(\d+)\s+(passed|failed)\b")   # any scan's figures
+ENDPOINT_RE = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[^\s,;]+?)[\s:]+(passed|failed|error|skipped)\b", re.I)
 JUNIT_RE = re.compile(r"(\d+)\s+tests?\s+(\d+)\s+failures?\s+(\d+)\s+errors?")
 STUDENT_RE = re.compile(r"student-(\d)\b")
+COVERAGE_RE = re.compile(r"(?<!\d)(\d+)\s+of\s+(\d+)(?!\d)")
+
+
+def _scan_re(name: str) -> re.Pattern[str]:
+    """A scan's name, spelled any way the report spells it (spaces, capitals), then its figures."""
+    words = r"\s+".join(re.escape(word) for word in name.split())
+    return re.compile(rf"(?<![\w-]){words}\s*:?\s*(\d+)\s*/\s*(\d+)\s*/\s*(\d+)\s+(passed|failed)\b")
+
+
+def _label_before(text: str, pos: int) -> str:
+    """The words in front of a figure, back to the previous comma or semicolon: the name the entry gave it."""
+    start = max(text.rfind(",", 0, pos), text.rfind(";", 0, pos)) + 1
+    return " ".join(text[start:pos].split()) or "an unnamed scan"
 
 
 def reports_dir() -> Path:
@@ -65,7 +79,7 @@ def _pre_commit(path: Path) -> dict[str, Any] | None:
     for scan in data["scans"]:
         if not isinstance(scan, dict) or not scan.get("name"):
             continue
-        scans.append({"name": str(scan["name"]).lower(), "result": str(scan.get("result", "")).lower(),
+        scans.append({"name": " ".join(str(scan["name"]).lower().split()), "result": str(scan.get("result", "")).lower(),
                       "findings": _count(scan.get("findings")), "fixed": _count(scan.get("fixed")),
                       "accepted": _count(scan.get("accepted"))})
     if not scans:
@@ -241,22 +255,27 @@ class TestingReviewMode(Mode):
                 pre = s["pre_commit"]
                 seg = segs.get(s["student"], "")
                 if pre is None:
-                    if seg and "none" not in seg and SCAN_RE.search(seg):
+                    if seg and "none" not in seg and COUNTS_RE.search(seg):
                         reasons.append(f"the Pre-commit line reports scans for {s['student']}, who has no pre-commit report")
                     continue
                 if not seg:
                     reasons.append(f"the Pre-commit line did not report {s['student']}")
                     continue
-                found = {m.group(1): m.groups()[1:] for m in SCAN_RE.finditer(seg)}
+                quoted_spans = []
                 for scan in pre["scans"]:
                     expected = (str(scan["findings"]), str(scan["fixed"]), str(scan["accepted"]), scan["result"])
-                    if scan["name"] not in found:
+                    match = _scan_re(scan["name"]).search(seg)
+                    if not match:
                         reasons.append(f"the Pre-commit line must state for {s['student']}: {scan['name']} "
                                        f"{scan['findings']}/{scan['fixed']}/{scan['accepted']} {scan['result']}")
-                    elif found[scan["name"]] != expected:
+                        continue
+                    quoted_spans.append(match.span())
+                    if match.groups() != expected:
                         reasons.append(f"the Pre-commit line misquotes {s['student']} {scan['name']}: the report says "
                                        f"{scan['findings']}/{scan['fixed']}/{scan['accepted']} {scan['result']}")
-                invented = sorted(set(found) - {scan["name"] for scan in pre["scans"]})
+                # Figures that belong to none of the report's scans name a scan the student did not run.
+                invented = [_label_before(seg, m.start()) for m in COUNTS_RE.finditer(seg)
+                            if not any(start <= m.start() < end for start, end in quoted_spans)]
                 if invented:
                     reasons.append(f"the Pre-commit line names scan(s) {s['student']} did not run: " + ", ".join(invented))
 
@@ -274,14 +293,27 @@ class TestingReviewMode(Mode):
                     reasons.append(f"the Post-commit line did not report {s['student']}")
                     continue
                 if post["source"] == "json":
-                    found = {(m.group(1).upper(), m.group(2)): m.group(3).lower() for m in ENDPOINT_RE.finditer(seg)}
+                    # Outcomes are compared per endpoint as lists, so two tests of one endpoint can both be quoted.
+                    expected: dict[tuple[str, str], list[str]] = {}
+                    shown: dict[tuple[str, str], str] = {}
                     for t in post["tests"]:
                         key = (t["method"], t["endpoint"].lower())
-                        if key not in found:
-                            reasons.append(f"the Post-commit line must state for {s['student']}: {t['method']} {t['endpoint']} {t['outcome']}")
-                        elif found[key] != t["outcome"]:
-                            reasons.append(f"the Post-commit line misquotes {s['student']} {t['method']} {t['endpoint']}: "
-                                           f"the report says {t['outcome']}")
+                        expected.setdefault(key, []).append(t["outcome"])
+                        shown[key] = f"{t['method']} {t['endpoint']}"
+                    quoted: dict[tuple[str, str], list[str]] = {}
+                    for m in ENDPOINT_RE.finditer(seg):
+                        quoted.setdefault((m.group(1).upper(), m.group(2).lower()), []).append(m.group(3).lower())
+                    for key, outcomes in expected.items():
+                        got = quoted.get(key, [])
+                        if not got:
+                            reasons.append(f"the Post-commit line must state for {s['student']}: "
+                                           + ", ".join(f"{shown[key]} {o}" for o in outcomes))
+                        elif Counter(got) != Counter(outcomes):
+                            reasons.append(f"the Post-commit line misquotes {s['student']} {shown[key]}: the report says "
+                                           + ", ".join(outcomes))
+                    for key in sorted(set(quoted) - set(expected)):
+                        reasons.append(f"the Post-commit line names {key[0]} {key[1]} for {s['student']}, "
+                                       "which that report does not test")
                     match = re.search(r"(\d+)\s*/\s*(\d+)\s+endpoints", seg)
                     if not match or match.groups() != (str(post["passed"]), str(post["endpoints"])):
                         reasons.append(f"the Post-commit line must state for {s['student']}: {post['passed']}/{post['endpoints']} endpoints")
@@ -296,8 +328,11 @@ class TestingReviewMode(Mode):
 
         coverage = lines["coverage"].lower()
         if coverage:
+            # Each count is read from its own clause, so one report type's figure never answers for the other.
+            clauses = re.split(r"[;,]|\band\b", coverage)
             for count, word in ((len(f["with_pre_commit"]), "pre-commit"), (len(f["with_post_commit"]), "post-commit")):
-                if not re.search(rf"{count}\s+of\s+{f['student_count']}[^;]*{word}", coverage):
+                stated = [COVERAGE_RE.findall(c) for c in clauses if re.search(rf"(?<![\w-]){word}\b", c)]
+                if not any(pairs == [(str(count), str(f["student_count"]))] for pairs in stated):
                     reasons.append(f"the Coverage line must state {count} of {f['student_count']} students for {word}")
             if f["missing"]:
                 for student in f["missing"]:

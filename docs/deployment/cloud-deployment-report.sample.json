@@ -4,6 +4,7 @@
   "provider": "azure",
   "region": "australiaeast",
   "environment": "release-2-baseline",
+  "profile": "baseline",
   "deployed_at": "2026-10-24T00:00:00Z",
   "commit": "0000000",
   "deployed_by": "cloud owner",

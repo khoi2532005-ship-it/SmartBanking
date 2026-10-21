@@ -12,11 +12,18 @@ workflow id the records do not contain, drops one of the four stages, misquotes
 a decision or a metric, or calls ATTENTION a PASS; ADAPT retries with that
 complaint. With no audit file in reach the run stops before any token is spent.
 
-Where the records come from, first match wins:
-  MULTI_AGENT_AUDIT_DIR         an explicit folder with the two files
-  multi_agent_server/data/audit the running server's own audit folder
+Where the records come from:
+  MULTI_AGENT_AUDIT_DIR         an explicit folder: used alone, never swapped for another
+otherwise the first of these that holds records:
+  <MULTI_AGENT_DATA_DIR>/audit  the running server's own audit folder (default multi_agent_server/data/audit)
   docs/evidence/multi_agent/    the newest validation snapshot
   docs/release-2/multi-agent/   a feature's committed evidence folder
+
+Records the review cannot trust are never reviewed as if they were complete:
+a line that is not JSON or lacks the fields the server writes is left out and
+makes the verdict ATTENTION, so do metrics that cannot be computed, and the
+lines of a decision the server rolled back (a decision_rolled_back marker
+follows them) are void, so that decision is not counted.
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ from typing import Any
 
 from agentic import prompts
 from agentic.core import Evidence, Mode, Plan, Verdict
-from agentic.modes._review_common import DOCS_DIR, REPO_ROOT, has_number, line_for, rate, read_jsonl, rel
+from agentic.modes._review_common import DOCS_DIR, REPO_ROOT, has_number, line_for, rate, read_jsonl_counted, rel
 
 PROMPT_FAMILY = "_multi_agent_review"
 HISTORY_FILE = "workflow_history.jsonl"
@@ -39,9 +46,53 @@ DECISIONS = ("accept", "partially_accept", "reject")
 REQUIRED_LINES = ("workflows", "stages", "decisions", "metrics", "recommendation", "verdict")
 METRIC_LABELS = {"plan_acceptance_rate": "plan acceptance", "worker_completion_rate": "worker completion",
                  "handoff_success_rate": "handoff success", "human_acceptance_rate": "human acceptance"}
-WORKFLOW_ID = re.compile(r"wf_[0-9a-f]{8}")
+ID_TOKEN = re.compile(r"(?<![0-9A-Za-z_])wf_[0-9A-Za-z_]+")    # anything id-like, so a longer or altered id is caught
 START_HINT = ("run a workflow first: python -m multi_agent_server.server, then "
               "python -m multi_agent_server.run --request \"...\" (or python -m multi_agent_server.validate --evidence)")
+# The fields multi_agent_server/audit.py writes on every line; a line without them is not the server's.
+HISTORY_FIELDS = (("ts", str), ("workflow_id", str), ("event", str), ("role", str), ("detail", dict))
+COORDINATION_FIELDS = (("ts", str), ("workflow_id", str), ("decision", str), ("detail", dict))
+ROLLED_BACK = "decision_rolled_back"
+
+
+def _well_formed(record: dict[str, Any], fields: tuple[tuple[str, type], ...]) -> bool:
+    return all(isinstance(record.get(name), kind) for name, kind in fields)
+
+
+def _is_decision_line(record: dict[str, Any], kind: str) -> bool:
+    """A line the server writes as part of a human decision (see Orchestrator.decide)."""
+    if kind == "event":
+        return ((record["event"] == "state_changed" and record["detail"].get("from") == "awaiting_human_review")
+                or (record["event"] == "stage_completed" and record["role"] == "human")
+                or record["event"] == "workflow_completed")
+    return record["decision"] in ("human_decision", "response_released", "response_withheld")
+
+
+def _void_rolled_back(records: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
+    """The records without the lines of a decision the server took back.
+
+    When a decision's audit lines cannot all be written, the server restores the
+    workflow and appends a decision_rolled_back marker: the decision lines just
+    above it, for that workflow, are void. They are dropped here; the marker is
+    kept, so the server's metrics still count the rollback."""
+    void: set[int] = set()
+    positions: dict[str, list[int]] = {}
+    for i, r in enumerate(records):
+        positions.setdefault(r["workflow_id"], []).append(i)
+    for indexes in positions.values():
+        for n, i in enumerate(indexes):
+            if records[i][kind] != ROLLED_BACK:
+                continue
+            for j in reversed(indexes[:n]):
+                if not _is_decision_line(records[j], kind):
+                    break
+                void.add(j)
+    return [r for i, r in enumerate(records) if i not in void]
+
+
+def _server_audit_dir() -> Path:
+    """Where the running server writes its audit files, from the same settings as multi_agent_server.config."""
+    return Path(os.getenv("MULTI_AGENT_DATA_DIR") or (REPO_ROOT / "multi_agent_server" / "data")) / "audit"
 
 
 def _limit() -> int:
@@ -52,10 +103,10 @@ def _limit() -> int:
 
 
 def _candidate_dirs() -> list[tuple[Path, str]]:
-    found: list[tuple[Path, str]] = []
     if os.getenv("MULTI_AGENT_AUDIT_DIR"):
-        found.append((Path(os.environ["MULTI_AGENT_AUDIT_DIR"]), "MULTI_AGENT_AUDIT_DIR"))
-    found.append((REPO_ROOT / "multi_agent_server" / "data" / "audit", "the running server's audit folder"))
+        # An explicit folder is the only one: reviewing some other folder's records instead would mislead.
+        return [(Path(os.environ["MULTI_AGENT_AUDIT_DIR"]), "MULTI_AGENT_AUDIT_DIR")]
+    found: list[tuple[Path, str]] = [(_server_audit_dir(), "the running server's audit folder")]
     snapshots = sorted((DOCS_DIR / "evidence" / "multi_agent").glob("validation-*"), reverse=True)
     found.extend((p, "the newest validation snapshot") for p in snapshots[:1])
     committed = sorted(p for p in (DOCS_DIR / "release-2" / "multi-agent").glob("*") if p.is_dir())
@@ -146,23 +197,35 @@ class MultiAgentReviewMode(Mode):
     def collect(self) -> Evidence:
         folder, source = audit_dir()
         if folder is None:
-            return Evidence(ok=False, summary=f"no Multi-Agent audit files found; {START_HINT}")
-        history = read_jsonl(folder / HISTORY_FILE)
-        coordination = read_jsonl(folder / COORDINATION_FILE)
-        ids = [r.get("workflow_id") for r in history if r.get("event") == "workflow_created"]
-        ids = [i for i in ids if isinstance(i, str)]
+            explicit = os.getenv("MULTI_AGENT_AUDIT_DIR")
+            where = (f"MULTI_AGENT_AUDIT_DIR ({explicit}) does not hold both audit files with records in them"
+                     if explicit else "no Multi-Agent audit files found")
+            return Evidence(ok=False, summary=f"{where}; {START_HINT}")
+        history_lines, unreadable_history = read_jsonl_counted(folder / HISTORY_FILE)
+        coordination_lines, unreadable_coordination = read_jsonl_counted(folder / COORDINATION_FILE)
+        history = [r for r in history_lines if _well_formed(r, HISTORY_FIELDS)]
+        coordination = [r for r in coordination_lines if _well_formed(r, COORDINATION_FIELDS)]
+        left_out = (unreadable_history + unreadable_coordination
+                    + len(history_lines) - len(history) + len(coordination_lines) - len(coordination))
+        ids = [r["workflow_id"] for r in history if r["event"] == "workflow_created"]
         if not ids:
-            return Evidence(ok=False, summary=f"{rel(folder)} holds no workflow_created record; {START_HINT}")
+            return Evidence(ok=False, summary=(f"{rel(folder)} holds no readable workflow_created record"
+                                               + (f" ({left_out} line(s) could not be read)" if left_out else "")
+                                               + f"; {START_HINT}"))
         reviewed = list(dict.fromkeys(ids))[-_limit():]                    # the latest workflows, in creation order
         chosen = set(reviewed)
-        history = [r for r in history if r.get("workflow_id") in chosen]
-        coordination = [r for r in coordination if r.get("workflow_id") in chosen]
+        history = _void_rolled_back([r for r in history if r["workflow_id"] in chosen], "event")
+        coordination = _void_rolled_back([r for r in coordination if r["workflow_id"] in chosen], "decision")
+        rolled_back = max(sum(1 for r in history if r["event"] == ROLLED_BACK),
+                          sum(1 for r in coordination if r["decision"] == ROLLED_BACK))
 
+        metrics_error = ""
         try:
             from multi_agent_server import metrics as ma_metrics
             metrics = ma_metrics.compute(history, coordination)
-        except Exception as exc:                                             # the server package is not installed here
-            metrics = {"error": f"{type(exc).__name__}: {exc}", "counts": {}, "workflows": {}}
+        except Exception as exc:                             # records the server's metrics cannot read: said, never hidden
+            metrics_error = f"{type(exc).__name__}: {exc}"
+            metrics = {"counts": {}, "workflows": {}}
 
         workflows = [
             _workflow_facts(wid, [r for r in history if r["workflow_id"] == wid],
@@ -178,8 +241,24 @@ class MultiAgentReviewMode(Mode):
         fallbacks = sum(w["fallbacks"] for w in workflows)
         revisions = sum(w["revisions"] for w in workflows)
         anomalies = int((metrics.get("counts") or {}).get("handoff_anomalies", 0) or 0)
-        attention = failed > 0 or fallbacks > 0 or anomalies > 0 or any(w["error"] for w in workflows)
         rates = {key: metrics.get(key) for key in METRIC_LABELS}
+        why: list[str] = []
+        if failed:
+            why.append(f"{failed} failed workflow(s)")
+        if fallbacks:
+            why.append(f"{fallbacks} fallback stage(s)")
+        if anomalies:
+            why.append(f"{anomalies} handoff anomal(ies)")
+        errors = [w["workflow_id"] for w in workflows if w["error"]]
+        if errors:
+            why.append("stage errors in " + ", ".join(errors))
+        if left_out:
+            why.append(f"{left_out} audit line(s) could not be read and were left out")
+        if metrics_error:
+            why.append(f"the metrics could not be computed ({metrics_error})")
+        if rolled_back:
+            why.append(f"{rolled_back} decision(s) rolled back after an audit write failure")
+        attention = bool(why)
 
         facts = {
             "source": rel(folder), "source_kind": source,
@@ -187,7 +266,8 @@ class MultiAgentReviewMode(Mode):
             "count": len(workflows), "ids": reviewed, "workflows": workflows,
             "stage_totals": stage_totals, "decisions": dict(decisions), "pending": pending, "failed": failed,
             "fallbacks": fallbacks, "revisions": revisions, "handoff_anomalies": anomalies,
-            "rates": rates, "metrics": metrics, "attention": attention,
+            "left_out": left_out, "metrics_error": metrics_error, "rolled_back": rolled_back,
+            "rates": rates, "metrics": metrics, "attention": attention, "attention_reasons": why,
         }
         outcomes = ", ".join(
             f"{w['workflow_id']} {w['final_state']}" + (f" ({w['decision']} by {w['decided_by']})" if w["decision"] else "")
@@ -201,9 +281,14 @@ class MultiAgentReviewMode(Mode):
                      f"reject {decisions.get('reject', 0)}, pending {pending}, failed {failed}. "
                      + ", ".join(f"{label} {rate(rates[key])}" for key, label in METRIC_LABELS.items())),
             facts=facts,
-            degraded=fallbacks > 0,
-            note=(f"{fallbacks} model stage(s) answered by a fallback (the server's model was unavailable); "
-                  "the workflow records are complete but those stages carry no model output" if fallbacks else ""),
+            degraded=bool(fallbacks or left_out or metrics_error),
+            note="; ".join(part for part in (
+                (f"{fallbacks} model stage(s) answered by a fallback (the server's model was unavailable); "
+                 "the workflow records are complete but those stages carry no model output") if fallbacks else "",
+                (f"{left_out} audit line(s) were not JSON or lacked the fields the server writes, so they were "
+                 "left out of the review and the metrics") if left_out else "",
+                f"the coordination metrics could not be computed: {metrics_error}" if metrics_error else "",
+            ) if part),
         )
 
     def build_prompt(self, plan: Plan, evidence: Evidence, feedback: str) -> tuple[str, str]:
@@ -229,8 +314,12 @@ class MultiAgentReviewMode(Mode):
             + f"; fallbacks {f['fallbacks']}; revisions {f['revisions']}; handoff anomalies {f['handoff_anomalies']}",
             f"Decisions: accept {d.get('accept', 0)}, partially_accept {d.get('partially_accept', 0)}, "
             f"reject {d.get('reject', 0)}, pending {f['pending']}, failed {f['failed']}",
-            "Metrics: " + ", ".join(f"{label} {rate(f['rates'][key])}" for key, label in METRIC_LABELS.items()),
-            f"Required verdict word: {'ATTENTION' if f['attention'] else 'PASS'}",
+            "Metrics: " + ", ".join(f"{label} {rate(f['rates'][key])}" for key, label in METRIC_LABELS.items())
+            + (f" (could not be computed: {f['metrics_error']})" if f["metrics_error"] else ""),
+            f"Audit lines left out (not JSON, or missing the fields the server writes): {f['left_out']}",
+            f"Decisions rolled back after an audit write failure: {f['rolled_back']}",
+            f"Required verdict word: {'ATTENTION' if f['attention'] else 'PASS'}"
+            + (f" ({'; '.join(f['attention_reasons'])})" if f["attention_reasons"] else ""),
         ]
         correction = ""
         if feedback:
@@ -249,16 +338,18 @@ class MultiAgentReviewMode(Mode):
             if not line:
                 reasons.append(f"it did not include the '{label.capitalize()}:' line")
 
-        invented = sorted(set(WORKFLOW_ID.findall(output)) - set(f["ids"]))
+        invented = sorted(set(ID_TOKEN.findall(output)) - set(f["ids"]))
         if invented:
             reasons.append("it named workflow id(s) that are not in the evidence: " + ", ".join(invented)
                            + "; use only the listed ids")
 
         workflows_line = lines["workflows"]
         if workflows_line:
-            if not has_number(workflows_line, f["count"]):
+            # The count is looked for with the ids taken out, so a digit inside an id never stands in for it.
+            if not has_number(ID_TOKEN.sub(" ", workflows_line), f["count"]):
                 reasons.append(f"the Workflows line did not state the number reviewed ({f['count']}) as a number")
-            missing = [wid for wid in f["ids"] if wid not in workflows_line]
+            listed = set(ID_TOKEN.findall(workflows_line))
+            missing = [wid for wid in f["ids"] if wid not in listed]
             if missing:
                 reasons.append("the Workflows line did not list these workflow ids: " + ", ".join(missing))
 
@@ -286,7 +377,8 @@ class MultiAgentReviewMode(Mode):
                     reasons.append(f"the Decisions line must state {word} {d.get(word, 0)}")
             for w in f["workflows"]:
                 expected = w["decision"] or ("failed" if w["failed"] else "pending")
-                match = re.search(rf"{w['workflow_id']}\s+(accept|partially_accept|reject|pending|failed)", decisions_line)
+                match = re.search(rf"(?<![0-9a-z_]){w['workflow_id']}\s+(accept|partially_accept|reject|pending|failed)",
+                                  decisions_line)
                 if not match:
                     reasons.append(f"the Decisions line must list {w['workflow_id']} {expected}")
                 elif match.group(1) != expected:
@@ -306,8 +398,8 @@ class MultiAgentReviewMode(Mode):
             expected_word = "attention" if f["attention"] else "pass"
             words = re.findall(r"\b(pass|attention)\b", verdict_line)
             if not words or words[0] != expected_word:
-                why = (f"{f['failed']} failed workflow(s), {f['fallbacks']} fallback stage(s), "
-                       f"{f['handoff_anomalies']} handoff anomal(ies)")
+                why = ("; ".join(f["attention_reasons"]) or
+                       "no failed workflow, fallback, handoff anomaly, unreadable line or rolled-back decision")
                 reasons.append(f"the Verdict line must start with {expected_word.upper()}: the records show {why}")
 
         recommendation = lines["recommendation"]

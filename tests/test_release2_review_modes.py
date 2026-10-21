@@ -184,6 +184,107 @@ def test_multi_agent_no_audit_files_never_calls_the_model(answers, tmp_path, mon
     assert "multi_agent_server.server" in result.evidence.summary
 
 
+def _append(path: Path, *lines) -> None:
+    with path.open("a", encoding="utf-8") as handle:
+        for line in lines:
+            handle.write((line if isinstance(line, str) else json.dumps(line)) + "\n")
+
+
+ATTENTION_MA = GOOD_MA.replace(
+    "Verdict: PASS - every stage completed, no fallback, no handoff anomaly and both decisions are recorded.",
+    "Verdict: ATTENTION - part of the audit evidence could not be trusted, although both workflows completed.")
+
+
+def test_multi_agent_unreadable_audit_lines_are_left_out_and_need_attention(answers, audit):
+    _append(audit / "workflow_history.jsonl", "{not json",
+            {"ts": "2026-10-20T10:30:00+00:00", "workflow_id": WF_A, "event": "stage_completed", "role": "worker", "detail": "oops"})
+    answers.extend([GOOD_MA, ATTENTION_MA])
+    result = loop.run(MultiAgentReviewMode())
+    f = result.evidence.facts
+    assert result.ok and result.adapted and result.evidence.degraded
+    assert f["left_out"] == 2 and f["attention"] and f["ids"] == [WF_A, WF_B]
+    assert "2 audit line(s) could not be read" in result.attempts[0].verdict.feedback
+    assert "left out" in result.evidence.note
+
+
+def test_multi_agent_metrics_that_cannot_be_computed_need_attention(answers, audit, monkeypatch):
+    def broken(history, coordination):
+        raise RuntimeError("cannot read the records")
+
+    monkeypatch.setattr("multi_agent_server.metrics.compute", broken)
+    no_metrics = ATTENTION_MA.replace(
+        "Metrics: plan acceptance 1.00, worker completion 1.00, handoff success 1.00, human acceptance 0.50",
+        "Metrics: plan acceptance n/a, worker completion n/a, handoff success n/a, human acceptance n/a")
+    claimed_pass = no_metrics.replace(ATTENTION_MA.splitlines()[-1], "Verdict: PASS - every stage completed.")
+    answers.extend([claimed_pass, no_metrics])
+    result = loop.run(MultiAgentReviewMode())
+    f = result.evidence.facts
+    assert result.ok and result.adapted and result.evidence.degraded
+    assert f["metrics_error"].startswith("RuntimeError") and all(v is None for v in f["rates"].values())
+    assert "metrics could not be computed" in result.attempts[0].verdict.feedback
+
+
+def test_multi_agent_rolled_back_decision_is_not_counted(answers, audit):
+    marker = {"decision": "accept", "reason": "audit write failed: OSError: disk full",
+              "effect": "the decision was not applied; lines above for it are void"}
+    # The markers land after the other workflow's lines, as they can on a busy server.
+    _append(audit / "workflow_history.jsonl", {"ts": "2026-10-20T10:20:00+00:00", "workflow_id": WF_A, "feature": "budgeting",
+                                               "state": "awaiting_human_review", "event": "decision_rolled_back",
+                                               "role": "human", "model": "", "detail": marker})
+    _append(audit / "coordination_audit.jsonl", {"ts": "2026-10-20T10:20:00+00:00", "workflow_id": WF_A,
+                                                 "state": "awaiting_human_review", "decision": "decision_rolled_back",
+                                                 "actor": "human", "detail": marker})
+    answers.append(
+        f"Workflows: 2 reviewed - {WF_A}, {WF_B}\n"
+        "Stages: planner 2/2, worker 2/2, reviewer 2/2, human 1/2; fallbacks 0; revisions 0\n"
+        f"Decisions: accept 0, partially_accept 0, reject 1; {WF_A} pending, {WF_B} reject\n"
+        "Metrics: plan acceptance 1.00, worker completion 1.00, handoff success 1.00, human acceptance 0.00\n"
+        f"Recommendation: Decide {WF_A} again once the audit disk is healthy, because its first decision was rolled back.\n"
+        f"Verdict: ATTENTION - one decision was rolled back after an audit write failure, so {WF_A} still waits for a person.")
+    result = loop.run(MultiAgentReviewMode())
+    f = result.evidence.facts
+    assert result.ok and not result.adapted
+    first = f["workflows"][0]
+    assert first["decision"] is None and first["final_state"] == "awaiting_human_review" and first["released"] is None
+    assert f["decisions"] == {"reject": 1} and f["pending"] == 1 and f["rolled_back"] == 1 and f["attention"]
+    assert f["rates"]["human_acceptance_rate"] == 0.0
+
+
+def test_multi_agent_count_is_never_read_from_inside_an_id(audit):
+    mode = MultiAgentReviewMode()
+    evidence = mode.collect()
+    no_count = GOOD_MA.replace("Workflows: 2 reviewed - ", "Workflows: reviewed - ")      # WF_A itself holds a 2
+    assert any("number reviewed (2)" in r for r in mode.validate(no_count, evidence).reasons)
+    reasons = mode.validate(GOOD_MA.replace(f"{WF_A}, {WF_B}\n", f"{WF_A}ff, {WF_B}\n", 1), evidence).reasons
+    assert any(f"{WF_A}ff" in r and "not in the evidence" in r for r in reasons)
+    assert any(f"did not list these workflow ids: {WF_A}" in r for r in reasons)
+
+
+def _server_data_dir(tmp_path: Path, audit: Path) -> Path:
+    data = tmp_path / "server-data"
+    (data / "audit").mkdir(parents=True)
+    for name in ("workflow_history.jsonl", "coordination_audit.jsonl"):
+        (data / "audit" / name).write_text((audit / name).read_text(encoding="utf-8"), encoding="utf-8")
+    return data
+
+
+def test_multi_agent_explicit_audit_dir_is_never_swapped_for_another(answers, audit, tmp_path, monkeypatch):
+    monkeypatch.setenv("MULTI_AGENT_DATA_DIR", str(_server_data_dir(tmp_path, audit)))   # records the review must not use
+    monkeypatch.setenv("MULTI_AGENT_AUDIT_DIR", str(tmp_path / "missing"))
+    result = loop.run(MultiAgentReviewMode())
+    assert not result.ok and result.attempts == []
+    assert "MULTI_AGENT_AUDIT_DIR" in result.evidence.summary and "missing" in result.evidence.summary
+
+
+def test_multi_agent_reads_the_running_servers_data_dir(audit, tmp_path, monkeypatch):
+    data = _server_data_dir(tmp_path, audit)
+    monkeypatch.delenv("MULTI_AGENT_AUDIT_DIR")
+    monkeypatch.setenv("MULTI_AGENT_DATA_DIR", str(data))
+    evidence = MultiAgentReviewMode().collect()
+    assert evidence.ok and evidence.facts["source_kind"] == "the running server's audit folder"
+    assert Path(evidence.facts["source"]) == data / "audit"
+
+
 # ---------------------------------------------------------------- testing_review
 
 PRE_4 = {"student": "student-4", "feature": "budgeting", "commit": "524bac2",
@@ -277,6 +378,46 @@ def test_testing_unreadable_report_counts_as_missing_and_degrades(answers, repor
     assert "student-2" in result.evidence.note and "student-2" in result.evidence.facts["missing"]
 
 
+def test_testing_two_tests_of_one_endpoint_are_both_quoted(answers, reports):
+    post = dict(POST_4, tests=POST_4["tests"] + [{"test": "t3", "method": "POST", "endpoint": "/api/budgets", "outcome": "failed"}],
+                summary={"endpoints": 3, "passed": 2, "failed": 1, "checks": 27, "result": "failed"})
+    (reports / "post-commit-endpoint-report-student-4.json").write_text(json.dumps(post), encoding="utf-8")
+    both = GOOD_TR.replace("POST /api/budgets passed (2/2 endpoints, 27 checks)",
+                           "POST /api/budgets passed, POST /api/budgets failed (2/3 endpoints, 27 checks)")
+    one = both.replace("POST /api/budgets passed, POST /api/budgets failed", "POST /api/budgets passed")
+    answers.extend([one, both])
+    result = loop.run(TestingReviewMode())
+    assert result.ok and result.adapted and "student-4" in result.evidence.facts["failed"]
+    assert "misquotes student-4 POST /api/budgets: the report says passed, failed" in result.attempts[0].verdict.feedback
+
+
+def test_testing_scan_names_in_the_hooks_own_words_are_accepted(answers, reports):
+    pre = json.loads(json.dumps(PRE_4))
+    for scan, name in zip(pre["scans"], ("Ruff security checks", "detect secrets", "pip-audit budgeting backend requirements")):
+        scan["name"] = name
+    (reports / "pre-commit-security-report-student-4.json").write_text(json.dumps(pre), encoding="utf-8")
+    worded = GOOD_TR.replace("ruff-security 4/0/4 passed, detect-secrets 0/0/0 passed, pip-audit 7/7/0 passed",
+                             "ruff security checks 4/0/4 passed, detect secrets 0/0/0 passed, "
+                             "pip-audit budgeting backend requirements 7/7/0 passed")
+    answers.extend([worded.replace("requirements 7/7/0 passed", "requirements 7/7/0 passed, bandit 0/0/0 passed"), worded])
+    result = loop.run(TestingReviewMode())
+    assert result.ok and result.adapted
+    assert "did not run: bandit" in result.attempts[0].verdict.feedback
+
+
+def test_testing_coverage_counts_are_read_from_their_own_clause(answers, reports):
+    (reports.parent / "ci" / "student-3" / "student-3-endpoint-tests.xml").unlink()    # now 1 of 5 for both
+    good = (GOOD_TR.replace("student-3 14 tests 0 failures 0 errors (junit); ", "student-3 none; ")
+            .replace("2 of 5 have a post-commit report", "1 of 5 have a post-commit report"))
+    crossed = good.replace("1 of 5 have a post-commit report", "3 of 5 have a post-commit report")
+    reordered = good.replace("Coverage: 1 of 5 students have a pre-commit report, 1 of 5 have a post-commit report;",
+                             "Coverage: pre-commit 1 of 5 students, post-commit 1 of 5;")
+    answers.extend([crossed, reordered])
+    result = loop.run(TestingReviewMode())
+    assert result.ok and result.adapted
+    assert "1 of 5 students for post-commit" in result.attempts[0].verdict.feedback
+
+
 # ---------------------------------------------------------------- cloud_deployment_review
 
 REPORT = {
@@ -355,33 +496,121 @@ def test_cloud_human_decision_is_recorded_and_must_be_quoted(answers, cloud_repo
     assert "approved" in result.attempts[0].verdict.feedback and result.evidence.facts["decided_by"] == "Khoi"
 
 
-def test_cloud_sample_report_is_reviewed_as_degraded(answers, monkeypatch):
+SAMPLE_ENTRY = (
+    "Deployment: azure australiaeast, commit 0000000, workflow run none, 3 resources\n"
+    "Endpoints: 3/3 checks passed - home page 200, budgeting api health 200, budgets list 200\n"
+    "AI services: ai-mode disabled, mcp disabled, rag disabled, multi-agent disabled\n"
+    "CRUD: 3/3 checks passed - budget create 201, budget read 200, budget delete 200\n"
+    "Release recommendation: approve - every check returned its expected status and no issue is open.\n"
+    "Human decision: pending\n"
+    "Verdict: PASS - this is the sample report, not a real deployment; every sample check passed."
+)
+
+
+def _rewrite(path: Path, change) -> None:
+    report = json.loads(path.read_text(encoding="utf-8"))
+    change(report)
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+
+def test_cloud_sample_report_is_held_never_approved(answers, monkeypatch):
     monkeypatch.delenv("CLOUD_DEPLOYMENT_REPORT", raising=False)
     monkeypatch.setattr("agentic.modes.cloud_deployment_review.DEFAULT_REPORT", Path("/nonexistent/cloud-deployment-report.json"))
     mode = CloudDeploymentReviewMode()
     evidence = mode.collect()
-    assert evidence.ok and evidence.degraded and evidence.facts["is_sample"]
-    assert "sample" in evidence.note and evidence.facts["provider"] == "azure"
-    # the entry must admit it reviewed the sample
-    answers.extend([
-        "Deployment: azure australiaeast, commit 0000000, workflow run 0 success, 3 resources\n"
-        "Endpoints: 3/3 checks passed - home page 200, budgeting api health 200, budgets list 200\n"
-        "AI services: ai-mode disabled, mcp disabled, rag disabled, multi-agent disabled\n"
-        "CRUD: 3/3 checks passed - budget create 201, budget read 200, budget delete 200\n"
-        "Release recommendation: approve - every check returned its expected status and no issue is open.\n"
-        "Human decision: pending\n"
-        "Verdict: PASS - every check passed.",
-        "Deployment: azure australiaeast, commit 0000000, workflow run 0 success, 3 resources\n"
-        "Endpoints: 3/3 checks passed - home page 200, budgeting api health 200, budgets list 200\n"
-        "AI services: ai-mode disabled, mcp disabled, rag disabled, multi-agent disabled\n"
-        "CRUD: 3/3 checks passed - budget create 201, budget read 200, budget delete 200\n"
-        "Release recommendation: approve - every check returned its expected status and no issue is open.\n"
-        "Human decision: pending\n"
-        "Verdict: PASS - this is the sample report, not a real deployment; every sample check passed.",
-    ])
+    f = evidence.facts
+    assert evidence.ok and evidence.degraded and f["is_sample"] and f["provider"] == "azure"
+    assert f["recommendation"] == "hold" and f["attention"] and "held" in evidence.note
+    assert "this is the sample report, not a real deployment" in f["hold_reasons"]
+    held = (SAMPLE_ENTRY.replace("Release recommendation: approve - every check returned its expected status and no issue is open.",
+                                 "Release recommendation: hold - this is the sample report, not a real deployment.")
+            .replace("Verdict: PASS - this is the sample report, not a real deployment; every sample check passed.",
+                     "Verdict: ATTENTION - this is the sample report, so no real deployment has been reviewed."))
+    answers.extend([SAMPLE_ENTRY, held])
     result = loop.run(mode)
     assert result.ok and result.adapted and result.evidence.degraded
-    assert "sample" in result.attempts[0].verdict.feedback
+    feedback = result.attempts[0].verdict.feedback
+    assert "must read hold" in feedback and "sample report" in feedback and "must start with ATTENTION" in feedback
+
+
+def test_cloud_copy_of_the_sample_at_the_real_path_is_still_held(cloud_report):
+    _rewrite(cloud_report, lambda r: r.update(sample=True))
+    f = CloudDeploymentReviewMode().collect().facts
+    assert f["is_sample"] and f["recommendation"] == "hold"
+
+
+def test_cloud_report_without_a_successful_run_is_held(cloud_report):
+    _rewrite(cloud_report, lambda r: r.pop("workflow"))
+    mode = CloudDeploymentReviewMode()
+    evidence = mode.collect()
+    assert evidence.facts["recommendation"] == "hold" and evidence.facts["run_id"] == ""
+    assert "the report names no cloud-deployment.yml run" in evidence.facts["hold_reasons"]
+    verdict = mode.validate(GOOD_CD.replace("workflow run 41000000001 success", "workflow run none"), evidence)
+    assert any("must read hold" in r and "no cloud-deployment.yml run" in r for r in verdict.reasons)
+    _rewrite(cloud_report, lambda r: r.update(workflow={"name": "cloud-deployment.yml", "run_id": "41000000002", "conclusion": "failure"}))
+    f = CloudDeploymentReviewMode().collect().facts
+    assert f["recommendation"] == "hold" and any("ended failure" in r for r in f["hold_reasons"])
+
+
+def test_cloud_run_conclusion_is_quoted_and_never_invented(cloud_report):
+    mode = CloudDeploymentReviewMode()
+    reasons = mode.validate(GOOD_CD.replace("workflow run 41000000001 success", "workflow run 41000000001"), mode.collect()).reasons
+    assert any("run 41000000001 its conclusion success" in r for r in reasons)
+    _rewrite(cloud_report, lambda r: r.pop("workflow"))
+    evidence = mode.collect()
+    reasons = mode.validate(GOOD_CD.replace("workflow run 41000000001 success", "workflow run none skipped"), evidence).reasons
+    assert any("without a conclusion (it wrote skipped)" in r for r in reasons)
+    reasons = mode.validate(GOOD_CD.replace("workflow run 41000000001 success", "workflow run none"), evidence).reasons
+    assert not any("Deployment line" in r for r in reasons)
+
+
+def test_cloud_ok_false_as_text_fails_the_check(cloud_report):
+    _rewrite(cloud_report, lambda r: r["crud_checks"][0].update(ok="false"))
+    f = CloudDeploymentReviewMode().collect().facts
+    assert not f["crud"][0]["ok"] and f["crud_passed"] == 1 and f["recommendation"] == "hold"
+
+
+def test_cloud_ai_service_left_on_holds_the_baseline_but_not_the_bonus_profile(cloud_report):
+    _rewrite(cloud_report, lambda r: r["ai_services"].update(mcp="enabled"))
+    f = CloudDeploymentReviewMode().collect().facts
+    assert f["profile"] == "baseline" and f["recommendation"] == "hold"
+    assert any("all four AI services disabled" in r and "mcp enabled" in r for r in f["hold_reasons"])
+    _rewrite(cloud_report, lambda r: r.update(profile="bonus"))
+    f = CloudDeploymentReviewMode().collect().facts
+    assert f["profile"] == "bonus" and f["recommendation"] == "approve"
+
+
+def test_cloud_ai_states_left_out_are_unknown_not_disabled(cloud_report):
+    _rewrite(cloud_report, lambda r: r.pop("ai_services"))
+    f = CloudDeploymentReviewMode().collect().facts
+    assert set(f["ai_services"].values()) == {"unknown"} and f["recommendation"] == "hold"
+
+
+def test_cloud_check_with_no_status_code_can_be_reviewed(cloud_report):
+    _rewrite(cloud_report, lambda r: r["endpoints"][0].update(status=None))
+    mode = CloudDeploymentReviewMode()
+    evidence = mode.collect()
+    assert evidence.facts["endpoints"][0]["status"] == "no response" and evidence.facts["recommendation"] == "hold"
+    honest = (GOOD_CD.replace("Endpoints: 2/2 checks passed - home page 200", "Endpoints: 1/2 checks passed - home page no response")
+              .replace("Release recommendation: approve - every endpoint and CRUD check returned its expected status, the run succeeded and no issue is open.",
+                       "Release recommendation: hold - the home page did not respond.")
+              .replace("Verdict: PASS", "Verdict: ATTENTION"))
+    assert mode.validate(honest, evidence).ok
+
+
+def test_cloud_two_checks_with_one_name_are_both_quoted(cloud_report):
+    _rewrite(cloud_report, lambda r: r.update(crud_checks=[
+        {"name": "budget read", "method": "GET", "url": "http://20.1.2.3:5004/api/budgets/1", "expected_status": 200, "status": 200},
+        {"name": "budget read", "method": "GET", "url": "http://20.1.2.3:5004/api/budgets/2", "expected_status": 200, "status": 404}]))
+    mode = CloudDeploymentReviewMode()
+    evidence = mode.collect()
+    held = (GOOD_CD.replace("CRUD: 2/2 checks passed - budget create 201, budget delete 200", "CRUD: 1/2 checks passed - budget read 200, budget read 404")
+            .replace("Release recommendation: approve - every endpoint and CRUD check returned its expected status, the run succeeded and no issue is open.",
+                     "Release recommendation: hold - the second budget read returned 404.")
+            .replace("Verdict: PASS", "Verdict: ATTENTION"))
+    assert mode.validate(held, evidence).ok
+    verdict = mode.validate(held.replace("budget read 404", "budget read 200"), evidence)
+    assert any("'budget read' its status 404" in r for r in verdict.reasons)
 
 
 def test_cloud_missing_configured_report_never_calls_the_model(answers, tmp_path, monkeypatch):

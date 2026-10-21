@@ -41,11 +41,20 @@ def read_json(path: Path) -> dict[str, Any] | None:
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Every JSON object line of `path`; lines that are not objects are skipped."""
+    return read_jsonl_counted(path)[0]
+
+
+def read_jsonl_counted(path: Path) -> tuple[list[dict[str, Any]], int]:
+    """(every JSON object line of `path`, how many non-blank lines were not one).
+
+    The count lets a review say that part of an audit file could not be read
+    instead of reviewing what is left as if it were complete."""
     records: list[dict[str, Any]] = []
+    unreadable = 0
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
-        return records
+        return records, 0
     for line in lines:
         line = line.strip()
         if not line:
@@ -53,10 +62,13 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
         try:
             item = json.loads(line)
         except ValueError:
+            unreadable += 1
             continue
         if isinstance(item, dict):
             records.append(item)
-    return records
+        else:
+            unreadable += 1
+    return records, unreadable
 
 
 def rate(value: Any) -> str:

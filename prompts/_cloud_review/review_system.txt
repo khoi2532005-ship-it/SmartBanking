@@ -7,4 +7,5 @@ Rules:
 - Write every number as digits and quote status codes exactly.
 - AI-Mode, MCP, RAG and the Multi-Agent Server are each enabled or disabled exactly as the report says; the required cloud deployment keeps them disabled.
 - The release recommendation and the verdict word are given in the evidence; do not approve a deployment the checks did not pass.
+- A report marked SAMPLE describes no real deployment: it is held, never approved.
 - No praise, no filler. Plain English a marker can verify line by line against the report.
