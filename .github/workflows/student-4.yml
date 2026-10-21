@@ -224,7 +224,10 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: services/budgeting/backend/requirements.txt
+          # pytest's pin is in this file, requests' pin in the backend requirements
+          cache-dependency-path: |
+            .github/workflows/student-4.yml
+            services/budgeting/backend/requirements.txt
 
       # The tests are black-box HTTP calls: only pytest and requests, with requests
       # at the pin the backend's requirements carry (and pip-audit checks).
@@ -309,6 +312,10 @@ jobs:
               d = d[key]
           print(d)' "$1" 2>/dev/null || echo "missing"
           }
+          gate() {                       # GitHub's job results in the report's words
+            case "$1" in success) echo passed ;; failure) echo failed ;; *) echo "$1" ;; esac
+          }
+          BUILD_GATE=$(gate "$BUILD_RESULT"); UNIT_GATE=$(gate "$UNIT_RESULT"); SMOKE_GATE=$(gate "$SMOKE_RESULT")
           ENDPOINT_RESULT=$(field summary.result)
           ENDPOINT_CHECKS=$(field summary.checks)
           ENDPOINT_COMMIT=$(field commit)
@@ -327,9 +334,9 @@ jobs:
             "branch": "${HEAD_BRANCH}",
             "generated_timestamp": "${NOW}",
             "gates": {
-              "build": "${BUILD_RESULT}",
-              "unit": "${UNIT_RESULT}",
-              "smoke": "${SMOKE_RESULT}",
+              "build": "${BUILD_GATE}",
+              "unit": "${UNIT_GATE}",
+              "smoke": "${SMOKE_GATE}",
               "endpoint_tests": "${ENDPOINT_RESULT}"
             },
             "endpoint_tests_checks": "${ENDPOINT_CHECKS}",
@@ -353,9 +360,9 @@ jobs:
 
           | Gate | Result |
           |---|---|
-          | Build: the three service images | ${BUILD_RESULT} |
-          | Unit: budget logic, clients, routes, shared servers | ${UNIT_RESULT} |
-          | Smoke: the stack answers on 5014, 5004 and 3004 | ${SMOKE_RESULT} |
+          | Build: the three service images | ${BUILD_GATE} |
+          | Unit: budget logic, clients, routes, shared servers | ${UNIT_GATE} |
+          | Smoke: the stack answers on 5014, 5004 and 3004 | ${SMOKE_GATE} |
           | Endpoint tests: \`GET /api/budgets/summary\`, \`POST /api/budgets\` (${ENDPOINT_CHECKS} checks) | ${ENDPOINT_RESULT} |
 
           The endpoint report and its JUnit results are in the artifact \`student-4-endpoint-tests\`.
@@ -388,3 +395,12 @@ jobs:
           name: student-4-report
           path: reports/
           retention-days: 30
+
+      # The report is uploaded either way; the job itself is red when a gate did not pass.
+      - name: Every gate passed
+        run: |
+          python3 -c 'import json, sys
+          gates = json.load(open("reports/report.json"))["gates"]
+          failed = {name: result for name, result in gates.items() if result != "passed"}
+          print("gates:", gates)
+          sys.exit(f"gates that did not pass: {failed}" if failed else 0)'

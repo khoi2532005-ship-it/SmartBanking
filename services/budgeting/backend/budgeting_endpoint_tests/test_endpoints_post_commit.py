@@ -12,9 +12,10 @@ API that does not answer is a failure.
 Nothing about the data is copied into this file. The expected summary is built from what
 the API itself serves (the period's stored budgets from GET /api/budgets and its spending
 from GET /api/transactions/spending) run through the backend's own budget logic, loaded
-from services/budget_logic.py. The logic's rules (the statuses, the near-limit threshold)
-are pinned with their own expected values by tests/test_budget_logic.py; this test checks
-that the endpoint applies them to the right budgets and spend. No AI service is involved;
+from services/budget_logic.py. The logic's rules (the statuses, the 80% threshold) and the
+seeded figures are pinned by value in tests/test_budget_logic.py; this test checks
+that the endpoint applies them to the right budgets and spend: any budget the summary drops or
+adds, or any figure it gets wrong, fails a check. No AI service is involved;
 the health answer's MCP, RAG and Multi-Agent flags are recorded and must all be off in CI.
 
 Every check is recorded on the test itself through pytest's record_property, so it lands
@@ -30,6 +31,7 @@ import importlib.util
 import json
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -41,6 +43,7 @@ TIMEOUT = 10
 PERIOD = {"customer_id": 1, "month": 9, "year": 2026}                 # the seeded demo period
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TEST_CATEGORY_PREFIX = "CI check "                                    # the create test's own budgets
+STALE_AFTER = timedelta(minutes=10)                                  # older test budgets are leftovers
 
 
 def load_budget_logic():
@@ -78,27 +81,46 @@ def post(path: str, payload):
 
 
 def ids(rows) -> list:
-    return sorted(r.get("budget_id") for r in rows if isinstance(r, dict))
+    """The budget ids of a list of rows; rows without an integer id are left out (and
+    caught by the check that every row carries one)."""
+    return sorted(r["budget_id"] for r in rows if isinstance(r, dict) and isinstance(r.get("budget_id"), int))
 
 
-def snapshot():
-    """The period's stored budgets, spending and summary, read until the stored budgets are
-    the same before and after the summary: another run on the same stack may be adding or
-    removing its own test budget in between. Returns the responses and whether they agree."""
-    for _ in range(5):
-        before = get("/api/budgets", **PERIOD)
-        summary = get("/api/budgets/summary", **PERIOD)
-        spending = get("/api/transactions/spending", **PERIOD)
-        after = get("/api/budgets", **PERIOD)
+def json_list(r: requests.Response):
+    try:
+        data = r.json()
+    except ValueError:
+        return None
+    return data if isinstance(data, list) else None
+
+
+def remove_stale_test_budgets() -> tuple[list, str]:
+    """Budgets this test created in a run that was killed before its cleanup: the test's
+    category prefix, created more than STALE_AFTER ago (a run going on right now is
+    seconds old, so it is never touched). Returns the deleted ids and a note."""
+    try:
+        rows = json_list(get("/api/budgets"))
+    except requests.RequestException as exc:
+        return [], f"could not list budgets: {type(exc).__name__}"
+    if rows is None:
+        return [], "could not list budgets"
+    now = datetime.now(timezone.utc)
+    stale = []
+    for b in rows:
+        if not (isinstance(b, dict) and str(b.get("category", "")).startswith(TEST_CATEGORY_PREFIX)):
+            continue
         try:
-            stored_before, stored_after = before.json(), after.json()
+            created = datetime.strptime(str(b.get("created_at")), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
         except ValueError:
-            return before, summary, spending, False
-        lines = body(summary).get("budgets")
-        if (isinstance(stored_before, list) and isinstance(lines, list)
-                and ids(stored_before) == ids(stored_after) == ids(lines)):
-            return before, summary, spending, True
-    return before, summary, spending, False
+            continue
+        if now - created > STALE_AFTER and isinstance(b.get("budget_id"), int):
+            stale.append(b["budget_id"])
+    for i in stale:
+        try:
+            requests.delete(f"{API}/api/budgets/{i}", timeout=TIMEOUT)
+        except requests.RequestException:
+            pass
+    return stale, (f"removed {len(stale)} leftover test budget(s) from an interrupted run: {stale}" if stale else "")
 
 
 def remove_test_budgets(created_ids: set, category: str) -> tuple[bool, str]:
@@ -176,19 +198,20 @@ def checks(api_is_up, record_property):
 @pytest.mark.endpoint("GET", "/api/budgets/summary")
 def test_budget_summary_reports_the_seeded_period(checks):
     logic = load_budget_logic()
-    before, r, spending, agreed = snapshot()
+    stored_r = get("/api/budgets", **PERIOD)
+    r = get("/api/budgets/summary", **PERIOD)
+    spending = get("/api/transactions/spending", **PERIOD)
     checks.check("answers 200 for the seeded period", r.status_code == 200, describe(r))
     s = body(r)
     sp = body(spending)
     checks.observe(spending_source=str(s.get("spending_source")))
-    try:
-        stored = before.json()
-    except ValueError:
-        stored = None
+    stored = json_list(stored_r)
     checks.check("the period's stored budgets and its spending can be read",
-                 isinstance(stored, list) and spending.status_code == 200 and isinstance(sp.get("totals_by_category"), dict),
-                 f"GET /api/budgets {describe(before)}; GET /api/transactions/spending {describe(spending)}")
-    checks.check("the seeded period has stored budgets", len(stored) > 0, f"{len(stored)} stored")
+                 stored is not None and spending.status_code == 200 and isinstance(sp.get("totals_by_category"), dict),
+                 f"GET /api/budgets {describe(stored_r)}; GET /api/transactions/spending {describe(spending)}")
+    checks.check("the seeded period has stored budgets, each with an id",
+                 len(stored) > 0 and all(isinstance(b, dict) and isinstance(b.get("budget_id"), int) for b in stored),
+                 f"{len(stored)} stored; first {stored[:1]}")
 
     expected = logic.build_summary(stored, sp["totals_by_category"])
     line_keys = sorted(expected["budgets"][0])
@@ -197,30 +220,24 @@ def test_budget_summary_reports_the_seeded_period(checks):
                  and set(expected["totals"]) <= set(s["totals"]), f"keys {sorted(s)}")
     checks.check("echoes customer_id, month and year", (s.get("customer_id"), s.get("month"), s.get("year")) == (1, 9, 2026),
                  str({k: s.get(k) for k in ("customer_id", "month", "year")}))
-    malformed = [l for l in s["budgets"] if not (isinstance(l, dict) and set(line_keys) <= set(l))]
-    checks.check("every budget line carries its limit, spend, remaining, percent and status", not malformed, str(malformed[:1]))
+    malformed = [l for l in s["budgets"]
+                 if not (isinstance(l, dict) and set(line_keys) <= set(l) and isinstance(l.get("budget_id"), int))]
+    checks.check("every budget line carries its id, limit, spend, remaining, percent and status", not malformed, str(malformed[:1]))
     checks.check("the summary and the spending endpoint name the same spending source",
                  s.get("spending_source") == sp.get("spending_source"), f"{s.get('spending_source')} vs {sp.get('spending_source')}")
+    checks.check("the summary lists exactly the period's stored budgets", ids(stored) == ids(s["budgets"]),
+                 f"stored {ids(stored)}, listed {ids(s['budgets'])}")
 
     lines = {l["budget_id"]: l for l in s["budgets"]}
-    if agreed:
-        checks.check("the summary lists exactly the period's stored budgets", ids(stored) == sorted(lines),
-                     f"stored {ids(stored)}, listed {sorted(lines)}")
-    else:
-        checks.note("another run changed the period's budgets during the reads: lines are checked one by one, totals are not")
     for want in expected["budgets"]:
-        got = lines.get(want["budget_id"])
-        if got is None and not agreed:
-            continue
+        got = {k: lines[want["budget_id"]].get(k) for k in line_keys}
         checks.check(f"{want['category']}: the line is the budget logic's answer for its stored limit and its spend",
-                     got is not None and {k: got.get(k) for k in line_keys} == want,
-                     f"got {None if got is None else {k: got.get(k) for k in line_keys}}, expected {want}")
-    if agreed:
-        checks.check("totals, over-budget categories and unbudgeted spending are the budget logic's answer",
-                     {k: s["totals"].get(k) for k in expected["totals"]} == expected["totals"]
-                     and s.get("over_budget_categories") == expected["over_budget_categories"]
-                     and s.get("unbudgeted_spending") == expected["unbudgeted_spending"],
-                     f"totals {s['totals']}, expected {expected['totals']}")
+                     got == want, f"got {got}, expected {want}")
+    checks.check("totals, over-budget categories and unbudgeted spending are the budget logic's answer",
+                 {k: s["totals"].get(k) for k in expected["totals"]} == expected["totals"]
+                 and s.get("over_budget_categories") == expected["over_budget_categories"]
+                 and s.get("unbudgeted_spending") == expected["unbudgeted_spending"],
+                 f"totals {s['totals']}, expected {expected['totals']}")
     for query, word in (({"customer_id": 1, "month": 13, "year": 2026}, "month"),
                         ({"customer_id": "abc"}, "customer_id"),
                         ({"customer_id": 1, "year": 1999}, "year")):
@@ -232,6 +249,9 @@ def test_budget_summary_reports_the_seeded_period(checks):
 
 @pytest.mark.endpoint("POST", "/api/budgets")
 def test_create_budget_then_duplicate_and_invalid_bodies(checks):
+    stale, note = remove_stale_test_budgets()
+    if note:
+        checks.note(note)
     category = f"{TEST_CATEGORY_PREFIX}{uuid.uuid4().hex[:8]}"
     payload = {**PERIOD, "category": category, "monthly_limit": 123.45}
     created: set = set()              # every id a create answered with, even one that should have been refused

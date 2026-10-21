@@ -57,6 +57,40 @@ def test_near_limit_threshold():
     assert line["over_budget"] is False
 
 
+# Customer 1, September 2026, as services/budgeting/database/init_db.py seeds it.
+SEEDED_SEPTEMBER = [
+    (1, "Groceries", 800.0), (2, "Dining Out", 300.0), (3, "Transport", 200.0), (4, "Entertainment", 150.0),
+    (5, "Utilities", 250.0), (6, "Shopping", 400.0), (7, "Subscriptions", 60.0),
+]
+
+
+def test_near_limit_threshold_is_80_percent():
+    """Pinned by value: changing the threshold in budget_logic.py must fail here."""
+    assert NEAR_LIMIT_THRESHOLD == 80.0, NEAR_LIMIT_THRESHOLD
+    for spent, status in ((79.9, "ON_TRACK"), (80.0, "NEAR_LIMIT"), (100.0, "NEAR_LIMIT"), (100.01, "OVER_BUDGET")):
+        assert evaluate_budget(_budget(9, "Health", 100.0), spent)["status"] == status, (spent, status)
+
+
+def test_seeded_period_with_mock_spending_gives_the_known_figures():
+    """The seeded budgets against the mock spending: the figures the demo and the
+    post-commit endpoint tests rest on, pinned here by value."""
+    totals, source, _ = transactions_client.spend_by_category(1, 9, 2026)
+    assert source == "mock", source
+    summary = build_summary([_budget(i, c, limit) for i, c, limit in SEEDED_SEPTEMBER], totals)
+    got = {line["category"]: (line["spent"], line["status"]) for line in summary["budgets"]}
+    assert got == {
+        "Groceries": (645.0, "NEAR_LIMIT"), "Dining Out": (412.0, "OVER_BUDGET"), "Transport": (218.0, "OVER_BUDGET"),
+        "Entertainment": (90.0, "ON_TRACK"), "Utilities": (240.0, "NEAR_LIMIT"), "Shopping": (505.0, "OVER_BUDGET"),
+        "Subscriptions": (59.97, "NEAR_LIMIT"),
+    }, got
+    assert summary["totals"] == {
+        "total_limit": 2160.0, "total_spent": 2169.97, "total_remaining": -9.97, "percent_used": 100.5,
+        "budget_count": 7, "over_budget_count": 3,
+    }, summary["totals"]
+    assert summary["over_budget_categories"] == ["Dining Out", "Transport", "Shopping"], summary["over_budget_categories"]
+    assert summary["unbudgeted_spending"] == [], summary["unbudgeted_spending"]
+
+
 def test_exactly_on_limit_is_not_over():
     line = evaluate_budget(_budget(4, "Transport", 200.0), 200.0)
     assert line["over_budget"] is False, line
