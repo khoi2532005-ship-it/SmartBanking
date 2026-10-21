@@ -20,8 +20,7 @@ API services as host processes (`python app.py` in each service folder) instead 
 version of terminal 4 is in the run sheet. The frontend was not started in this run: the UI side of
 the same flow is in `../../multi-agent/budgeting/` (headless Chrome driving the AI Mode tab).
 
-Still to add: the same run with terminal 4 as `docker compose up --build -d` and `docker compose ps`,
-from a machine with Docker.
+The same run with terminal 4 as `docker compose up --build -d` on a Windows PC with Docker Desktop: [multi-terminal-docker-run-20261022.md](multi-terminal-docker-run-20261022.md).
 
 ## Terminal 1 - shared MCP server
 
