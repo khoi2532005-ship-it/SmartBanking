@@ -222,11 +222,15 @@ def _optional_text(data, field, limit):
 
 
 def validate_review(data):
-    """(decision, note, reviewer) for the analyst's decision. Partially accept
-    releases the answer with a correction attached, so it needs the correction."""
+    """(decision, note, reviewer) for the analyst's decision. The name is
+    required so every decision in the server's audit names a person. Partially
+    accept releases the answer with a correction attached, so it needs the
+    correction."""
     decision = choice(data.get("decision"), "decision", WORKFLOW_DECISIONS)
     note = _optional_text(data, "note", MAX_NOTE_LENGTH)
     reviewer = _optional_text(data, "reviewer", MAX_REVIEWER_LENGTH)
+    if not reviewer:
+        raise ValidationError("reviewer is required: enter your name, it is recorded in the audit")
     if decision == "partially_accept" and not note:
         raise ValidationError("partially_accept needs a note saying what to correct")
     return decision, note, reviewer
