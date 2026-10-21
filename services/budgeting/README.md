@@ -253,7 +253,8 @@ running API with the seeded database and no AI service. They are steps of
 the smoke job in student-4.yml, which runs on pull requests into main and
 pushes to main that touch the watched paths; the job uploads the artifact
 `student-4-endpoint-tests` with `post-commit-endpoint-report-student-4.{json,md}`,
-also when an earlier step failed. The last report is kept under `docs/testing/`.
+also when an earlier step failed. `docs/testing/` keeps a report from a local run of
+the same tests against the same stack; each CI run's own report is in its artifact.
 Without a running API and with `BUDGET_API_URL` unset or empty they skip. Locally,
 with the database and API running:
 

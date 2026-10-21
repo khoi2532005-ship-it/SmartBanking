@@ -5,13 +5,17 @@
 
 They run against a live budgeting API (BUDGET_API_URL, default http://localhost:5004)
 with the seeded database, which is what student-4.yml starts on every pull request into
-main and every push to main. With no API answering and BUDGET_API_URL unset or empty they skip,
-so a local pytest run without the stack is not red; with BUDGET_API_URL set (CI) an API
-that does not answer is a failure. In CI there is no transactions service, so spending
-comes from the deterministic mock and the exact figures are asserted; budgets added
-beyond the seed are tolerated and the totals are then checked arithmetically. No AI
-service is involved; the health answer's MCP, RAG and Multi-Agent flags are recorded and
-must all be off in CI.
+main and every push to main. With no API answering and BUDGET_API_URL unset or empty they
+skip, so a local pytest run without the stack is not red; with BUDGET_API_URL set (CI) an
+API that does not answer is a failure.
+
+Nothing about the data is copied into this file. The expected summary is built from what
+the API itself serves (the period's stored budgets from GET /api/budgets and its spending
+from GET /api/transactions/spending) run through the backend's own budget logic, loaded
+from services/budget_logic.py. The logic's rules (the statuses, the near-limit threshold)
+are pinned with their own expected values by tests/test_budget_logic.py; this test checks
+that the endpoint applies them to the right budgets and spend. No AI service is involved;
+the health answer's MCP, RAG and Multi-Agent flags are recorded and must all be off in CI.
 
 Every check is recorded on the test itself through pytest's record_property, so it lands
 in the JUnit XML and in the report conftest.py writes (ENDPOINT_REPORT_DIR).
@@ -22,9 +26,11 @@ in the JUnit XML and in the report conftest.py writes (ENDPOINT_REPORT_DIR).
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import uuid
+from pathlib import Path
 
 import pytest
 import requests
@@ -33,26 +39,18 @@ DEFAULT_API = "http://localhost:5004"
 API = (os.getenv("BUDGET_API_URL") or DEFAULT_API).rstrip("/")   # an empty value means the default
 TIMEOUT = 10
 PERIOD = {"customer_id": 1, "month": 9, "year": 2026}                 # the seeded demo period
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+TEST_CATEGORY_PREFIX = "CI check "                                    # the create test's own budgets
 
-SEEDED_LIMITS = {"Groceries": 800.0, "Dining Out": 300.0, "Transport": 200.0, "Entertainment": 150.0,
-                 "Utilities": 250.0, "Shopping": 400.0, "Subscriptions": 60.0}
-SEEDED_TOTAL_LIMIT = round(sum(SEEDED_LIMITS.values()), 2)
-# What the mock spending source yields for the seeded budgets (the CI stack has no transactions service).
-MOCK_EXPECTED = {
-    "Groceries": (645.0, "NEAR_LIMIT"), "Dining Out": (412.0, "OVER_BUDGET"), "Transport": (218.0, "OVER_BUDGET"),
-    "Entertainment": (90.0, "ON_TRACK"), "Utilities": (240.0, "NEAR_LIMIT"), "Shopping": (505.0, "OVER_BUDGET"),
-    "Subscriptions": (59.97, "NEAR_LIMIT"),
-}
-MOCK_TOTAL_SPENT = round(sum(spent for spent, _ in MOCK_EXPECTED.values()), 2)
-MOCK_TOTALS = {"total_limit": SEEDED_TOTAL_LIMIT, "total_spent": MOCK_TOTAL_SPENT,
-               "total_remaining": round(SEEDED_TOTAL_LIMIT - MOCK_TOTAL_SPENT, 2),
-               "percent_used": round(MOCK_TOTAL_SPENT / SEEDED_TOTAL_LIMIT * 100, 1),
-               "budget_count": len(SEEDED_LIMITS),
-               "over_budget_count": sum(1 for _, status in MOCK_EXPECTED.values() if status == "OVER_BUDGET")}
-MOCK_OVER = sorted(c for c, (_, status) in MOCK_EXPECTED.items() if status == "OVER_BUDGET")
-LINE_KEYS = ("category", "monthly_limit", "spent", "remaining", "percent_used", "status", "over_budget", "over_by")
-TOTAL_KEYS = ("total_limit", "total_spent", "total_remaining", "percent_used", "budget_count", "over_budget_count")
-NEAR_LIMIT_PERCENT = 80.0
+
+def load_budget_logic():
+    """The backend's budget logic (a pure module with no imports), loaded by path under
+    a name of its own so it never collides with another feature's `services` package."""
+    spec = importlib.util.spec_from_file_location("budgeting_budget_logic_under_test",
+                                                  BACKEND_DIR / "services" / "budget_logic.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 # ---------------------------------------------------------------- helpers
@@ -79,12 +77,28 @@ def post(path: str, payload):
     return requests.post(f"{API}{path}", json=payload, timeout=TIMEOUT)
 
 
-def expected_line(limit: float, spent: float) -> dict:
-    """What services/budget_logic.evaluate_budget derives from a limit and a spend."""
-    percent = round(spent / limit * 100, 1) if limit > 0 else 0.0
-    status = "OVER_BUDGET" if limit > 0 and spent > limit else ("NEAR_LIMIT" if percent >= NEAR_LIMIT_PERCENT else "ON_TRACK")
-    return {"remaining": round(limit - spent, 2), "percent_used": percent, "status": status,
-            "over_budget": status == "OVER_BUDGET", "over_by": round(spent - limit, 2) if spent > limit else 0.0}
+def ids(rows) -> list:
+    return sorted(r.get("budget_id") for r in rows if isinstance(r, dict))
+
+
+def snapshot():
+    """The period's stored budgets, spending and summary, read until the stored budgets are
+    the same before and after the summary: another run on the same stack may be adding or
+    removing its own test budget in between. Returns the responses and whether they agree."""
+    for _ in range(5):
+        before = get("/api/budgets", **PERIOD)
+        summary = get("/api/budgets/summary", **PERIOD)
+        spending = get("/api/transactions/spending", **PERIOD)
+        after = get("/api/budgets", **PERIOD)
+        try:
+            stored_before, stored_after = before.json(), after.json()
+        except ValueError:
+            return before, summary, spending, False
+        lines = body(summary).get("budgets")
+        if (isinstance(stored_before, list) and isinstance(lines, list)
+                and ids(stored_before) == ids(stored_after) == ids(lines)):
+            return before, summary, spending, True
+    return before, summary, spending, False
 
 
 def remove_test_budgets(created_ids: set, category: str) -> tuple[bool, str]:
@@ -161,49 +175,52 @@ def checks(api_is_up, record_property):
 
 @pytest.mark.endpoint("GET", "/api/budgets/summary")
 def test_budget_summary_reports_the_seeded_period(checks):
-    r = get("/api/budgets/summary", **PERIOD)
+    logic = load_budget_logic()
+    before, r, spending, agreed = snapshot()
     checks.check("answers 200 for the seeded period", r.status_code == 200, describe(r))
     s = body(r)
+    sp = body(spending)
     checks.observe(spending_source=str(s.get("spending_source")))
+    try:
+        stored = before.json()
+    except ValueError:
+        stored = None
+    checks.check("the period's stored budgets and its spending can be read",
+                 isinstance(stored, list) and spending.status_code == 200 and isinstance(sp.get("totals_by_category"), dict),
+                 f"GET /api/budgets {describe(before)}; GET /api/transactions/spending {describe(spending)}")
+    checks.check("the seeded period has stored budgets", len(stored) > 0, f"{len(stored)} stored")
+
+    expected = logic.build_summary(stored, sp["totals_by_category"])
+    line_keys = sorted(expected["budgets"][0])
     checks.check("the answer carries a budgets list and a totals object with every total",
                  isinstance(s.get("budgets"), list) and isinstance(s.get("totals"), dict)
-                 and all(k in s["totals"] for k in TOTAL_KEYS), f"keys {sorted(s)}")
+                 and set(expected["totals"]) <= set(s["totals"]), f"keys {sorted(s)}")
     checks.check("echoes customer_id, month and year", (s.get("customer_id"), s.get("month"), s.get("year")) == (1, 9, 2026),
                  str({k: s.get(k) for k in ("customer_id", "month", "year")}))
-    malformed = [l for l in s["budgets"] if not (isinstance(l, dict) and all(k in l for k in LINE_KEYS))]
-    checks.check("every budget line carries its limit, spend, remaining, percent and status",
-                 not malformed, str(malformed[:1]))
-    lines = {line["category"]: line for line in s["budgets"]}
-    checks.check("the seven seeded budgets are present with their limits",
-                 all(c in lines and lines[c]["monthly_limit"] == limit for c, limit in SEEDED_LIMITS.items()), str(sorted(lines)))
-    extra = sorted(set(lines) - set(SEEDED_LIMITS))
-    if extra:
-        checks.note(f"budgets beyond the seed are present ({extra}): totals are checked arithmetically, not against the seed figures")
-    for category, line in lines.items():
-        expected = expected_line(float(line["monthly_limit"]), float(line["spent"]))
-        got = {k: line[k] for k in expected}
-        checks.check(f"{category}: remaining, percent and status follow the limit and the spend", got == expected,
-                     f"limit {line['monthly_limit']} spent {line['spent']} -> got {got}, expected {expected}")
-    totals = s["totals"]
-    total_limit = round(sum(float(l["monthly_limit"]) for l in lines.values()), 2)
-    total_spent = round(sum(float(l["spent"]) for l in lines.values()), 2)
-    over = [line["category"] for line in s["budgets"] if line["over_budget"]]
-    checks.check("totals add up across the lines",
-                 totals["budget_count"] == len(lines) and totals["total_limit"] == total_limit
-                 and totals["total_spent"] == total_spent
-                 and totals["total_remaining"] == round(total_limit - total_spent, 2)
-                 and totals["percent_used"] == (round(total_spent / total_limit * 100, 1) if total_limit > 0 else 0.0)
-                 and totals["over_budget_count"] == len(over) and s.get("over_budget_categories") == over,
-                 str(totals))
-    if s.get("spending_source") == "mock":
-        checks.check("mock spending source: the seeded categories carry the exact figures and statuses",
-                     all((lines[c]["spent"], lines[c]["status"]) == MOCK_EXPECTED[c] for c in MOCK_EXPECTED),
-                     str([(c, lines[c]["spent"], lines[c]["status"]) for c in MOCK_EXPECTED]))
-        if not extra:
-            checks.check("mock spending source: the exact seeded totals and over-budget categories",
-                         totals == MOCK_TOTALS and sorted(s.get("over_budget_categories", [])) == MOCK_OVER, str(totals))
+    malformed = [l for l in s["budgets"] if not (isinstance(l, dict) and set(line_keys) <= set(l))]
+    checks.check("every budget line carries its limit, spend, remaining, percent and status", not malformed, str(malformed[:1]))
+    checks.check("the summary and the spending endpoint name the same spending source",
+                 s.get("spending_source") == sp.get("spending_source"), f"{s.get('spending_source')} vs {sp.get('spending_source')}")
+
+    lines = {l["budget_id"]: l for l in s["budgets"]}
+    if agreed:
+        checks.check("the summary lists exactly the period's stored budgets", ids(stored) == sorted(lines),
+                     f"stored {ids(stored)}, listed {sorted(lines)}")
     else:
-        checks.note(f"spending source is {s.get('spending_source')}: exact mock figures not asserted", str(totals))
+        checks.note("another run changed the period's budgets during the reads: lines are checked one by one, totals are not")
+    for want in expected["budgets"]:
+        got = lines.get(want["budget_id"])
+        if got is None and not agreed:
+            continue
+        checks.check(f"{want['category']}: the line is the budget logic's answer for its stored limit and its spend",
+                     got is not None and {k: got.get(k) for k in line_keys} == want,
+                     f"got {None if got is None else {k: got.get(k) for k in line_keys}}, expected {want}")
+    if agreed:
+        checks.check("totals, over-budget categories and unbudgeted spending are the budget logic's answer",
+                     {k: s["totals"].get(k) for k in expected["totals"]} == expected["totals"]
+                     and s.get("over_budget_categories") == expected["over_budget_categories"]
+                     and s.get("unbudgeted_spending") == expected["unbudgeted_spending"],
+                     f"totals {s['totals']}, expected {expected['totals']}")
     for query, word in (({"customer_id": 1, "month": 13, "year": 2026}, "month"),
                         ({"customer_id": "abc"}, "customer_id"),
                         ({"customer_id": 1, "year": 1999}, "year")):
@@ -215,7 +232,7 @@ def test_budget_summary_reports_the_seeded_period(checks):
 
 @pytest.mark.endpoint("POST", "/api/budgets")
 def test_create_budget_then_duplicate_and_invalid_bodies(checks):
-    category = f"CI check {uuid.uuid4().hex[:8]}"
+    category = f"{TEST_CATEGORY_PREFIX}{uuid.uuid4().hex[:8]}"
     payload = {**PERIOD, "category": category, "monthly_limit": 123.45}
     created: set = set()              # every id a create answered with, even one that should have been refused
     budget_id = None
@@ -223,15 +240,16 @@ def test_create_budget_then_duplicate_and_invalid_bodies(checks):
 
     def create(body_to_send):
         r = post("/api/budgets", body_to_send)
-        if r.status_code == 201 and isinstance(body(r).get("budget_id"), int):
-            created.add(body(r)["budget_id"])
-        return r
+        data = body(r)
+        if r.status_code == 201 and isinstance(data.get("budget_id"), int):
+            created.add(data["budget_id"])
+        return r, data
 
     try:
-        r = create(payload)
+        r, data = create(payload)
         checks.check("creating a new budget answers 201 with its id",
-                     r.status_code == 201 and isinstance(body(r).get("budget_id"), int), describe(r))
-        budget_id = body(r)["budget_id"]
+                     r.status_code == 201 and isinstance(data.get("budget_id"), int), describe(r))
+        budget_id = data["budget_id"]
 
         s = body(get("/api/budgets/summary", **PERIOD))
         line = next((l for l in s.get("budgets", []) if isinstance(l, dict) and l.get("budget_id") == budget_id), None)
@@ -240,16 +258,16 @@ def test_create_budget_then_duplicate_and_invalid_bodies(checks):
                      and line.get("spent") == 0.0 and line.get("remaining") == 123.45 and line.get("status") == "ON_TRACK",
                      str(line))
 
-        r = create(payload)
+        r, data = create(payload)
         checks.check("the same customer, category and period again answers 409",
-                     r.status_code == 409 and "already exists" in str(body(r).get("error", "")), describe(r))
+                     r.status_code == 409 and "already exists" in str(data.get("error", "")), describe(r))
 
         for bad, word in (({**payload, "monthly_limit": 0}, "greater than zero"),
                           ({**payload, "monthly_limit": "lots"}, "Invalid input"),
                           ({k: v for k, v in payload.items() if k != "category"}, "category required"),
                           ({**payload, "month": 13}, "month must be between 1 and 12")):
-            r = create(bad)
-            checks.check(f"400 for {word}", r.status_code == 400 and word in str(body(r).get("error", "")), describe(r))
+            r, data = create(bad)
+            checks.check(f"400 for {word}", r.status_code == 400 and word in str(data.get("error", "")), describe(r))
         r = requests.post(f"{API}/api/budgets", data="[1, 2]", headers={"Content-Type": "application/json"}, timeout=TIMEOUT)
         checks.check("400 for a JSON body that is not an object", r.status_code == 400, describe(r))
     finally:
