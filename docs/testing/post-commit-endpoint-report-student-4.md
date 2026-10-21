@@ -1,14 +1,14 @@
 # Post-commit endpoint test report - Student 4 (Budgeting & Spending Insights)
 
-Workflow `student-4-budgets-ci`, job `local`, a local run, commit `8a1fe42`, 2026-10-21T01:49:34Z.
+Workflow `student-4-budgets-ci`, job `local`, a local run, commit `1d40b32`, 2026-10-21T02:09:00Z.
 Target `http://localhost:5004` with the seeded database; spending source `mock`;
 AI services as the API reported them: mcp disabled, rag disabled, multi_agent disabled. Result: **passed**,
-2/2 endpoint tests passed, 29 checks.
+2/2 endpoint tests passed, 28 checks.
 
 | Endpoint | Test | Outcome | Checks | Seconds |
 |---|---|---|---|---|
-| `GET /api/budgets/summary` | test_budget_summary_reports_the_seeded_period | passed | 18 | 0.011 |
-| `POST /api/budgets` | test_create_budget_then_duplicate_and_invalid_bodies | passed | 11 | 0.024 |
+| `GET /api/budgets/summary` | test_budget_summary_reports_the_seeded_period | passed | 18 | 0.007 |
+| `POST /api/budgets` | test_create_budget_then_duplicate_and_invalid_bodies | passed | 10 | 0.026 |
 
 ## GET /api/budgets/summary
 
@@ -33,14 +33,13 @@ AI services as the API reported them: mcp disabled, rag disabled, multi_agent di
 
 ## POST /api/budgets
 
-- pass: the period's budget count is known before the create (7)
-- pass: creating a new budget answers 201 with its id (HTTP 201 '{"budget_id":25,"message":"Budget created"}\n')
-- pass: the new budget appears in the period summary with no spend, on track ({'budget_id': 25, 'category': 'CI check 24d064c8', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026})
+- pass: creating a new budget answers 201 with its id (HTTP 201 '{"budget_id":33,"message":"Budget created"}\n')
+- pass: the new budget appears in the period summary with no spend, on track ({'budget_id': 33, 'category': 'CI check d4f61439', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026})
 - pass: the same customer, category and period again answers 409 (HTTP 409 '{"error":"A budget for that customer, category, month and year already exists"}\n')
 - pass: 400 for greater than zero (HTTP 400 '{"error":"monthly_limit must be greater than zero"}\n')
 - pass: 400 for Invalid input (HTTP 400 '{"error":"Invalid input: could not convert string to float: \'lots\'"}\n')
 - pass: 400 for category required (HTTP 400 '{"error":"category required"}\n')
 - pass: 400 for month must be between 1 and 12 (HTTP 400 '{"error":"month must be between 1 and 12"}\n')
 - pass: 400 for a JSON body that is not an object (HTTP 400 '{"error":"JSON object body required"}\n')
-- pass: cleanup: the test budget is deleted again (deleted [25]: HTTP [200])
-- pass: the period is back to its previous budget count (7 vs 7)
+- pass: cleanup: every budget the test created is deleted (deleted {33: 200})
+- pass: the created budget is gone again: 404 by id and no longer in the summary (GET by id 404, listed False)

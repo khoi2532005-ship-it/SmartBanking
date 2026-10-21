@@ -4,11 +4,11 @@
   "feature": "budgeting",
   "workflow": "student-4-budgets-ci",
   "job": "local",
-  "commit": "8a1fe42",
+  "commit": "1d40b32",
   "branch": "local",
   "run_id": "local",
   "run_url": "",
-  "ran_at": "2026-10-21T01:49:34Z",
+  "ran_at": "2026-10-21T02:09:00Z",
   "api_url": "http://localhost:5004",
   "spending_source": "mock",
   "ai_services": {
@@ -23,7 +23,7 @@
       "method": "GET",
       "endpoint": "/api/budgets/summary",
       "outcome": "passed",
-      "duration_s": 0.011,
+      "duration_s": 0.007,
       "checks": [
         {
           "check": "answers 200 for the seeded period",
@@ -141,24 +141,18 @@
       "method": "POST",
       "endpoint": "/api/budgets",
       "outcome": "passed",
-      "duration_s": 0.024,
+      "duration_s": 0.026,
       "checks": [
-        {
-          "check": "the period's budget count is known before the create",
-          "ok": true,
-          "detail": "7",
-          "info": false
-        },
         {
           "check": "creating a new budget answers 201 with its id",
           "ok": true,
-          "detail": "HTTP 201 '{\"budget_id\":25,\"message\":\"Budget created\"}\\n'",
+          "detail": "HTTP 201 '{\"budget_id\":33,\"message\":\"Budget created\"}\\n'",
           "info": false
         },
         {
           "check": "the new budget appears in the period summary with no spend, on track",
           "ok": true,
-          "detail": "{'budget_id': 25, 'category': 'CI check 24d064c8', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
+          "detail": "{'budget_id': 33, 'category': 'CI check d4f61439', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
           "info": false
         },
         {
@@ -198,15 +192,15 @@
           "info": false
         },
         {
-          "check": "cleanup: the test budget is deleted again",
+          "check": "cleanup: every budget the test created is deleted",
           "ok": true,
-          "detail": "deleted [25]: HTTP [200]",
+          "detail": "deleted {33: 200}",
           "info": false
         },
         {
-          "check": "the period is back to its previous budget count",
+          "check": "the created budget is gone again: 404 by id and no longer in the summary",
           "ok": true,
-          "detail": "7 vs 7",
+          "detail": "GET by id 404, listed False",
           "info": false
         }
       ],
@@ -218,7 +212,7 @@
     "passed": 2,
     "failed": 0,
     "skipped": 0,
-    "checks": 29,
+    "checks": 28,
     "result": "passed"
   }
 }
