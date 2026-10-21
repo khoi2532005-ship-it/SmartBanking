@@ -1,110 +1,159 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Multi-Agent Tab</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Loans Multi-Agent Mode - SmartBank</title>
     <link rel="stylesheet" href="/css/styles.css">
+    <!-- Vendored locally so the demo does not depend on network access. -->
+    <script src="/js/htmx.min.js"></script>
     <style>
-        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
+        body { background: #fff; }
         .app-shell { max-width: none; padding: 1rem; }
         .card { margin-bottom: 1.5rem; }
-        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
-        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
-        th { background: #f0f3f7; cursor: pointer; }
-        /* Long unbroken names and explanations wrap instead of widening the page. */
-        td { overflow-wrap: anywhere; }
-        .table-wrap { overflow-x: auto; }
-        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .row > div { display: flex; flex-direction: column; }
-        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
-        .is-hidden { display: none; }
-        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
-        .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
-        .sev-high { background: #c0392b; }
-        .sev-medium { background: #d68910; }
-        .sev-low { background: #7f8c8d; }
-        .ma-workflow { display: grid; gap: 0.85rem; }
-        .ma-workflow-header, .ma-stage-list, .ma-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .ma-workflow-header { justify-content: space-between; }
-        .ma-workflow-header h3, .ma-section h4 { margin: 0; }
-        .ma-section { border-top: 1px solid var(--line-soft); padding-top: 0.75rem; }
-        .ma-section p { margin: 0.35rem 0; }
-        .ma-section ul { margin: 0.35rem 0; padding-left: 1.25rem; }
-        .ma-stage { display: inline-flex; gap: 0.35rem; align-items: center; border-radius: 999px; padding: 0.18rem 0.55rem; background: var(--line-soft); color: var(--ink-soft); font-size: 0.78rem; font-weight: 650; }
-        .ma-stage.is-complete { background: var(--ok-tint); color: var(--ok); }
-        .ma-stage.is-current { background: var(--warn-tint); color: var(--warn); }
-        .ma-stage.is-failed { background: var(--over-tint); color: var(--over); }
-        .ma-state { margin-left: 0; }
-        .ma-workflow .badge-ok { background: var(--ok-tint); color: var(--ok); }
-        .ma-workflow .badge-near { background: var(--warn-tint); color: var(--warn); }
-        .ma-workflow .badge-over { background: var(--over-tint); color: var(--over); }
-        .ma-answer { white-space: pre-wrap; overflow-wrap: anywhere; }
-        .ma-workflow table { margin-top: 0.65rem; }
-        .ma-workflow th { cursor: default; }
-        .ma-workflow td { overflow-wrap: anywhere; }
-        .ma-decision-fields { display: grid; gap: 0.6rem; grid-template-columns: minmax(180px, 1fr) minmax(220px, 2fr); }
-        .ma-decision-fields > div { display: flex; flex-direction: column; }
-        .ma-decision-fields textarea { resize: vertical; }
-        .ma-decision-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.65rem; }
-        .ma-decision-message { margin: 0.6rem 0 0; }
-        @media (max-width: 560px) { .ma-decision-fields { grid-template-columns: 1fr; } }
-        .workflow-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.6rem 0; }
-        .workflow-actions form { margin: 0; }
-        button { cursor: pointer; }
-        /* Tab strip linking the Normal and AI Mode views. */
-        .tab-strip { margin: 0 0 1rem; }
-        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
+        .tab-strip {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: #fff;
+            padding: 0.6rem 0;
+            margin: 0 0 1rem;
+        }
+        .grow { flex: 1 1 320px; }
+        .status-line { display: flex; gap: 0.5rem; align-items: center;
+                       flex-wrap: wrap; margin: 0.25rem 0 0.9rem;
+                       font-size: 0.87rem; color: var(--ink-soft); }
+        .status-line .status-text { flex: 1 1 240px; min-width: 0; }
+        .status-line .badge { margin-left: 0; }
+        .status-line .btn-small { margin-left: auto; }
+        .insight-card .history-head { display: flex; gap: 0.5rem; align-items: center;
+                                      margin-bottom: 0.3rem; flex-wrap: wrap; }
+        .ma-section { border-top: 1px solid var(--line-soft); padding-top: 0.5rem; margin-top: 0.6rem; }
+        .ma-section h4 { margin: 0 0 0.25rem; }
+        .ma-section ul { margin: 0.2rem 0 0.4rem; padding-left: 1.2rem; }
+        .ma-final { border-left: 4px solid var(--ok); padding-left: 0.75rem; }
+        .ma-decision .row { align-items: flex-start; }
+        .ma-decision input, .ma-decision textarea { width: 100%; }
+        .ma-decision .form-actions { display: flex; gap: 0.5rem; align-items: center;
+                                     flex-wrap: wrap; margin-top: 0.5rem; }
+        .ma-message:empty { display: none; }
+        .ma-message .alert { margin: 0.4rem 0 0; }
+        .ma-history-title { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
+        .chip-btn { border: 1px solid transparent; cursor: pointer; font: inherit;
+                    font-size: 0.78rem; font-weight: 600; line-height: 1.4; }
+        .chip-btn:hover { background: var(--brand-tint); border-color: var(--brand);
+                          color: var(--brand-dark); }
+        .insight-history { list-style: none; padding: 0; margin: 0.4rem 0; }
+        .insight-history li { border-top: 1px solid var(--line-soft); padding: 0.4rem 0; }
+        .insight-history li:first-child { border-top: 0; }
+        td pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; margin: 0; }
     </style>
 </head>
 <body>
+
 <main class="app-shell">
+
+    <nav class="feature-nav tab-strip" aria-label="Loans views">
+        <a class="nav-item" href="/tabs/loans.html">Normal</a>
+        <a class="nav-item" href="/tabs/ai-mode.html">AI Mode</a>
+        <a class="nav-item" href="/tabs/mcp.html">MCP</a>
+        <a class="nav-item" href="/tabs/rag.html">RAG</a>
+        <a class="nav-item is-active" href="/tabs/multi-agent.html" aria-current="page">Multi-Agent</a>
+    </nav>
+
     <section class="card">
         <h2>Multi-Agent Mode</h2>
-        <p>Run planner, worker, and reviewer agents in a coordinated workflow.</p>
+        <p class="muted">Run planner, worker, and reviewer agents in a coordinated workflow.</p>
 
-        <div class="feature-toggle-row">
-            <label class="toggle-switch" for="multi-agent-toggle">
-                <input id="multi-agent-toggle" type="checkbox" checked>
-                <span class="toggle-label">Multi-Agent Enabled</span>
-            </label>
-            <span id="multi-agent-state" class="feature-state feature-on">ON</span>
-        </div>
+        <p class="status-line">
+            <span id="ma-status" class="status-text"
+                  hx-get="/ui/multi-agent/status" hx-trigger="load" hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/multi-agent/status" hx-target="#ma-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
 
-        <form id="workflow-form" class="stack-form">
-            <label for="workflow-request">User Request</label>
-            <input
-                id="workflow-request"
-                name="user_request"
-                list="workflow-request-samples"
-                required
-                placeholder="Example: Assess eligibility for a personal loan and explain the credit factors."
-            >
-            <datalist id="workflow-request-samples">
-                <option value="Assess my eligibility for a $15,000 personal loan with a 36-month term and $4,200 monthly income. Explain the key factors."></option>
-                <option value="Compare monthly repayments and total interest for a $20,000 loan over 36 versus 60 months at 8% annual interest."></option>
-                <option value="Explain how credit score, income, and existing debt can affect loan approval, and suggest ways to improve my creditworthiness."></option>
-            </datalist>
-            <div class="feature-actions" aria-label="Sample workflow requests">
-                <button type="button" class="rag-action" data-sample-request="Assess my eligibility for a $15,000 personal loan with a 36-month term and $4,200 monthly income. Explain the key factors.">Use Sample 1</button>
-                <button type="button" class="rag-action" data-sample-request="Compare monthly repayments and total interest for a $20,000 loan over 36 versus 60 months at 8% annual interest.">Use Sample 2</button>
-                <button type="button" class="rag-action" data-sample-request="Explain how credit score, income, and existing debt can affect loan approval, and suggest ways to improve my creditworthiness.">Use Sample 3</button>
+        <form class="row" hx-post="/ui/multi-agent/workflows" hx-target="#ma-panel"
+              hx-swap="innerHTML" hx-indicator="#ma-spinner"
+              hx-disabled-elt="find button[type=submit]">
+            <div class="grow">
+                <label for="workflow-request">User Request</label>
+                <input id="workflow-request" name="request" list="workflow-request-samples" required
+                       placeholder="Example: Assess eligibility for a personal loan and explain the credit factors.">
+                <datalist id="workflow-request-samples">
+                    <option value="Assess my eligibility for a $15,000 personal loan with a 36-month term and $4,200 monthly income. Explain the key factors."></option>
+                    <option value="Compare monthly repayments and total interest for a $20,000 loan over 36 versus 60 months at 8% annual interest."></option>
+                    <option value="Explain how credit score, income, and existing debt can affect loan approval, and suggest ways to improve my creditworthiness."></option>
+                </datalist>
             </div>
-            <p class="rag-helper">Hint: use a full task request for planner-worker-reviewer flow.</p>
+            <div><label for="ma_customer_id">Customer</label>
+                <input id="ma_customer_id" name="customer_id" type="number" min="1" value="1"></div>
+            <div><button type="submit" class="btn-ai">Run Workflow</button></div>
+            <div><span id="ma-spinner" class="htmx-indicator spinner">Starting...</span></div>
         </form>
 
-        <div class="workflow-actions">
-            <button type="submit" form="workflow-form" class="rag-action">Run Workflow</button>
-            <form id="status-form">
-                <button type="submit" class="rag-action">Get Workflow Status</button>
-            </form>
+        <div class="chips">
+            Try:
+            <button type="button" class="chip chip-btn"
+                    data-request="Assess my eligibility for a $15,000 personal loan with a 36-month term and $4,200 monthly income. Explain the key factors.">Eligibility</button>
+            <button type="button" class="chip chip-btn"
+                    data-request="Compare monthly repayments and total interest for a $20,000 loan over 36 versus 60 months at 8% annual interest.">Compare terms</button>
+            <button type="button" class="chip chip-btn"
+                    data-request="Explain how credit score, income, and existing debt can affect loan approval, and suggest ways to improve my creditworthiness.">Credit factors</button>
         </div>
 
-        <div id="multi-agent-results" class="panel panel-mcp" aria-live="polite">
+        <div class="row">
+            <div><button type="button" class="btn btn-secondary"
+                         hx-get="/ui/multi-agent/workflows/last" hx-target="#ma-panel"
+                         hx-swap="innerHTML">Get Latest Workflow Status</button></div>
+        </div>
+
+        <div id="ma-panel" class="panel panel-mcp">
             <p class="empty">Multi-agent workflow results will appear here.</p>
         </div>
+
+        <h3 class="ma-history-title">History</h3>
+        <div id="ma-history" class="panel"
+             hx-get="/ui/multi-agent/history"
+             hx-trigger="load, ma-started from:body, ma-updated from:body, ma-decided from:body"
+             hx-swap="innerHTML">
+            <p class="empty">Loading...</p>
+        </div>
     </section>
+
 </main>
-<script src="/loans-js/multi-agent.js"></script>
+
+<script>
+const LOANS_API = window.LOANS_API || `http://${window.location.hostname}:5002`;
+
+document.body.addEventListener("htmx:configRequest", (event) => {
+    if (event.detail.path.startsWith("/ui/")) {
+        event.detail.path = LOANS_API + event.detail.path;
+    }
+});
+
+document.body.addEventListener("click", (event) => {
+    const chip = event.target.closest(".chip-btn");
+    if (!chip) return;
+    document.getElementById("workflow-request").value = chip.dataset.request;
+    document.getElementById("workflow-request").focus();
+});
+
+document.body.addEventListener("htmx:responseError", (event) => {
+    event.detail.target.innerHTML =
+        '<p class="alert alert-error">Request failed (HTTP ' +
+        event.detail.xhr.status + "). Is the loans API running on " +
+        LOANS_API + "?</p>";
+});
+
+document.body.addEventListener("htmx:sendError", (event) => {
+    event.detail.target.innerHTML =
+        '<p class="alert alert-error">Could not reach the loans API at ' +
+        LOANS_API + ". Start loans-service and try again.</p>";
+});
+</script>
 
 </body>
 </html>

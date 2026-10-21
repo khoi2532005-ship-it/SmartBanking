@@ -15,6 +15,7 @@ from routes.mcp_mode import mcp_bp
 from routes.multi_agent import multi_agent_bp
 from routes.rag_mode import rag_bp
 from routes.repayments import repayments_bp
+from routes.ui import ui_bp
 from services import multi_agent_client
 
 
@@ -28,6 +29,7 @@ def create_app():
     app.register_blueprint(mcp_bp)
     app.register_blueprint(rag_bp)
     app.register_blueprint(multi_agent_bp)
+    app.register_blueprint(ui_bp)
 
     @app.get("/api/health")
     def health():
