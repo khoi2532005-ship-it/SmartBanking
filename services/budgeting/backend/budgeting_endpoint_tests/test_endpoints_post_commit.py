@@ -18,8 +18,8 @@ adds, or any figure it gets wrong, fails a check. The seeded figures themselves 
 limits, the totals 2160.00 / 2169.97, the over-budget list) and the 80% threshold are
 pinned by value against the same seed in tests/test_budget_logic.py. Budgets left by a run
 killed before its cleanup are removed before any test reads the period. No AI service is
-involved; the health answer's MCP, RAG and Multi-Agent flags are recorded and must all be
-off in CI.
+involved; the health answer's AI-Mode, MCP, RAG and Multi-Agent flags are recorded and must
+all be off in CI.
 
 Every check is recorded on the test itself through pytest's record_property, so it lands
 in the JUnit XML and in the report conftest.py writes (ENDPOINT_REPORT_DIR).
@@ -202,10 +202,14 @@ def api_is_up():
     if r.status_code != 200:
         pytest.fail(f"{API}/api/health answered {describe(r)}")
     health = body(r)
-    flags = {name: bool((health.get(name) or {}).get("enabled")) for name in ("mcp", "rag", "multi_agent")}
-    if os.getenv("CI") and any(flags.values()):
-        pytest.fail(f"MCP, RAG and the Multi-Agent Server must stay disabled in CI: {flags}")
-    return {"ai_services": {name: ("enabled" if on else "disabled") for name, on in flags.items()}}
+    states = {}
+    for name in ("ai_mode", "mcp", "rag", "multi_agent"):
+        entry = health.get(name)
+        reported = isinstance(entry, dict) and "enabled" in entry
+        states[name] = ("enabled" if entry["enabled"] else "disabled") if reported else "not reported"
+    if os.getenv("CI") and "enabled" in states.values():
+        pytest.fail(f"AI-Mode, MCP, RAG and the Multi-Agent Server must stay disabled in CI: {states}")
+    return {"ai_services": states}
 
 
 @pytest.fixture(scope="session", autouse=True)

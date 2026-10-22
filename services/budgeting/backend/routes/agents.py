@@ -6,7 +6,7 @@ read-only tools can be invoked, inputs are checked before they leave the
 container, and a server that is down or disabled becomes one readable JSON
 error rather than a stack trace.
 
-    GET  /api/agents/status   every integration: enabled? reachable? which tools?
+    GET  /api/agents/status   every integration: enabled? reachable? which tools? (AI-Mode: enabled, provider, model)
     GET  /api/mcp/tools       tools/list relayed from the shared MCP server
     POST /api/mcp/tool        {"tool"?, "arguments"?}  -> structured tool result
     POST /api/rag/query       {"query", "k"?}          -> grounded answer contract
@@ -37,7 +37,7 @@ from datetime import date
 from flask import Blueprint, jsonify, request
 
 from routes import json_object
-from services import mcp_client, multi_agent_client, rag_client
+from services import llm_client, mcp_client, multi_agent_client, rag_client
 
 agents_bp = Blueprint("agents", __name__)
 
@@ -92,7 +92,8 @@ def _integration_error(exc: Exception):
 
 @agents_bp.get("/api/agents/status")
 def agents_status():
-    return jsonify({"mcp": mcp_client.status(), "rag": rag_client.status(), "multi_agent": multi_agent_client.status()})
+    return jsonify({"ai_mode": llm_client.status(), "mcp": mcp_client.status(), "rag": rag_client.status(),
+                    "multi_agent": multi_agent_client.status()})
 
 
 @agents_bp.get("/api/mcp/tools")

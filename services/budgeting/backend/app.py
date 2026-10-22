@@ -76,6 +76,7 @@ def create_app():
             "service": "budgets-service",
             "status": "running",
             "llm": llm_client.provider(),
+            "ai_mode": {"enabled": llm_client.enabled(), "provider": llm_client.provider()},
             "mcp": {"enabled": mcp_client.enabled(), "url": mcp_client.server_url()},
             "rag": {"enabled": rag_client.enabled(), "url": rag_client.server_url()},
             "multi_agent": {"enabled": multi_agent_client.enabled(), "url": multi_agent_client.server_url()},

@@ -64,6 +64,11 @@ compose profile is running.
 When the key is missing or the provider is unreachable the endpoints return
 **503** with an explanatory message; CRUD is unaffected.
 
+`AI_MODE_ENABLED=false` (default `true`) switches AI-Mode off, as CI and the
+cloud baseline do: both insight endpoints answer **503** with `"disabled": true`
+before any database or model call, the AI insight card's status line reads
+Inactive, and `/api/health` reports `ai_mode`.
+
 ## Cross-feature data: the Transactions API
 
 Actual spending is read **only over HTTP** from the Transactions service
@@ -223,7 +228,8 @@ to the tab, backed by `GET /ui/mcp/status`, `GET /ui/mcp/tools`,
 structured MCP tool result, and the grounded answer with citations and a
 confidence badge or the distinct insufficient-context state. Each panel's
 status line says whether its server is reachable, inactive (flag off) or
-down, and the controls stay in place in every state.
+down, and the controls stay in place in every state. The AI insight card's
+line, `GET /ui/ai/status`, only reads the configuration and never calls the model.
 
 ## Budget status
 
@@ -240,8 +246,8 @@ cd services\budgeting\backend
 ..\..\.venv\Scripts\python.exe -m tests.test_budget_logic
 ```
 
-13 checks over the budget maths and the mock transactions client, plus
-`tests.test_agent_clients` (MCP and RAG), `tests.test_multi_agent_client` and
+16 checks over the budget maths, the seed and the mock transactions client, plus
+`tests.test_agent_clients` (AI-Mode, MCP and RAG), `tests.test_multi_agent_client` and
 `tests.test_multi_agent_contract` (Release 2) and `tests.test_budget_routes`.
 All run in CI by `.github/workflows/student-4.yml`.
 

@@ -11,6 +11,10 @@ environment variable; nothing else in the codebase needs to change.
 See .env.example at the project root for the full list of provider settings.
 This mirrors services/accounts/backend/services/llm_client.py so the
 two can be merged into shared/python/smartbank_common later.
+
+AI_MODE_ENABLED=false (Release 2, the same switch fraud reads) turns AI-Mode
+off: no model call is made, the insight endpoints answer 503 and the panels
+say so. CI and the cloud baseline set it; CRUD is unaffected.
 """
 
 import os
@@ -21,9 +25,31 @@ from openai import OpenAI
 _client = None
 _client_provider = None
 
+DISABLED_MESSAGE = "AI-Mode is switched off in this environment (AI_MODE_ENABLED=false)"
+PROVIDER_NAMES = {"gemini": "Gemini", "ollama": "Ollama"}
+
+
+class AIModeDisabled(RuntimeError):
+    """AI_MODE_ENABLED is off (CI, the cloud baseline): no model call is made."""
+
+
+def enabled():
+    """AI-Mode's own switch, read per call like MCP_ENABLED."""
+    return os.getenv("AI_MODE_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
+
 
 def provider():
     return os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+
+
+def provider_name():
+    """The provider as a person reads it, for the insight card."""
+    return PROVIDER_NAMES.get(provider(), provider())
+
+
+def status():
+    """Configuration only, never a model call: what /api/agents/status and the panel show."""
+    return {"enabled": enabled(), "provider": provider(), "model": get_model()}
 
 
 def _provider_config(name):
@@ -81,8 +107,11 @@ def create_chat_completion(messages, max_tokens=4000, temperature=0.2, model=Non
 
     Raises RuntimeError when the provider is unreachable, rejects the request,
     or returns an empty message, so callers can map any failure to one
-    503 response.
+    503 response. With AI-Mode switched off it raises AIModeDisabled (a
+    RuntimeError too) before any client is built.
     """
+    if not enabled():
+        raise AIModeDisabled(DISABLED_MESSAGE)
     config = _provider_config(provider())
     client = _get_client()
 
