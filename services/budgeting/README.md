@@ -64,6 +64,11 @@ compose profile is running.
 When the key is missing or the provider is unreachable the endpoints return
 **503** with an explanatory message; CRUD is unaffected.
 
+`AI_MODE_ENABLED=false` (default `true`) switches AI-Mode off, as CI and the
+cloud baseline do: both insight endpoints answer **503** with `"disabled": true`
+before any database or model call, the AI insight card's status line reads
+Inactive, and `/api/health` reports `ai_mode`.
+
 ## Cross-feature data: the Transactions API
 
 Actual spending is read **only over HTTP** from the Transactions service
@@ -223,7 +228,8 @@ to the tab, backed by `GET /ui/mcp/status`, `GET /ui/mcp/tools`,
 structured MCP tool result, and the grounded answer with citations and a
 confidence badge or the distinct insufficient-context state. Each panel's
 status line says whether its server is reachable, inactive (flag off) or
-down, and the controls stay in place in every state.
+down, and the controls stay in place in every state. The AI insight card's
+line, `GET /ui/ai/status`, only reads the configuration and never calls the model.
 
 ## Budget status
 
@@ -240,10 +246,28 @@ cd services\budgeting\backend
 ..\..\.venv\Scripts\python.exe -m tests.test_budget_logic
 ```
 
-13 checks over the budget maths and the mock transactions client, plus
-`tests.test_agent_clients` (MCP and RAG), `tests.test_multi_agent_client` and
+16 checks over the budget maths, the seed and the mock transactions client, plus
+`tests.test_agent_clients` (AI-Mode, MCP and RAG), `tests.test_multi_agent_client` and
 `tests.test_multi_agent_contract` (Release 2) and `tests.test_budget_routes`.
 All run in CI by `.github/workflows/student-4.yml`.
+
+Release 2 post-commit endpoint tests: `budgeting_endpoint_tests/test_endpoints_post_commit.py`
+tests two endpoint functions, `GET /api/budgets/summary` (the seeded period,
+its totals and statuses, its 400s) and `POST /api/budgets` (create, the new
+line in the summary, then 409 and 400), as black-box HTTP calls against a
+running API with the seeded database and no AI service. They are steps of
+the smoke job in student-4.yml, which runs on pull requests into main and
+pushes to main that touch the watched paths; the job uploads the artifact
+`student-4-endpoint-tests` with `post-commit-endpoint-report-student-4.{json,md}`,
+also when an earlier step failed. `docs/testing/` keeps a report from a local run of
+the same tests against the same stack; each CI run's own report is in its artifact.
+Without a running API and with `BUDGET_API_URL` unset or empty they skip. Locally,
+with the database and API running:
+
+```bash
+BUDGET_API_URL=http://localhost:5004 ENDPOINT_REPORT_DIR=reports \
+  python -m pytest services/budgeting/backend/budgeting_endpoint_tests -q
+```
 
 ## Prompts
 

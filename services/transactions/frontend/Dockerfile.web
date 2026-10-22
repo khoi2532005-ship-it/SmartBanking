@@ -1,0 +1,21 @@
+# Transactions frontend as its own app: the tab served by nginx, with
+# /config.js and the /api/ proxy. Used where the frontend runs apart from the
+# API - the cloud rehearsal (docker-compose.cloud.yml) and Azure Container
+# Apps. Plain Compose keeps serving the tab from frontend/server.py inside the
+# transactions image (run.py), so it serves the same paths: /, /tabs/*, /css/*,
+# /js/*.
+# Build context: repository root
+#   docker build -f services/transactions/frontend/Dockerfile.web -t smartbank-transactions-web:0.1 .
+FROM nginx:alpine
+
+COPY shared/frontend/css/ /usr/share/nginx/html/css/
+COPY shared/frontend/js/ /usr/share/nginx/html/js/
+COPY services/transactions/frontend/tabs/ /usr/share/nginx/html/tabs/
+COPY services/transactions/frontend/tabs/transactions.html /usr/share/nginx/html/index.html
+
+COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
+ENV SMARTBANK_SAME_ORIGIN_API=false \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1 \
+    API_UPSTREAM=http://transactions:5005
+
+EXPOSE 80

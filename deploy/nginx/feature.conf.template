@@ -1,0 +1,44 @@
+# nginx for every feature frontend. The nginx image runs envsubst over this at
+# start-up, replacing only variables set in the environment:
+#   SMARTBANK_SAME_ORIGIN_API  false locally (the tabs call http://<host>:50xx),
+#                              true in the cloud (the tabs call this frontend)
+#   API_UPSTREAM               the feature's backend, no trailing slash
+#   NGINX_LOCAL_RESOLVERS      this container's DNS server, exported by the image
+#                              when NGINX_ENTRYPOINT_LOCAL_RESOLVERS is set
+# Each frontend Dockerfile sets the local defaults, so plain `docker compose up`
+# behaves as before. Pattern: Lab 11 §5 "Frontend Reverse Proxy Configuration".
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # The tabs read this before their own script (tests/test_cloud_frontends.py).
+    location = /config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store";
+        return 200 'window.SMARTBANK_SAME_ORIGIN_API = ${SMARTBANK_SAME_ORIGIN_API};';
+    }
+
+    # The backend is looked up per request, not once at start-up: a restarted
+    # backend (a new container here, a new revision in Azure) must not leave
+    # this frontend forwarding to an old address.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
+    # Same-origin API: the browser calls this frontend and nginx forwards the
+    # whole path - /api/... and the htmx fragments some backends serve under
+    # /ui/... (budgeting, transactions). Host is the backend's own, because
+    # Container Apps routes internal traffic by Host.
+    location ~ ^/(api|ui)/ {
+        set $api_upstream ${API_UPSTREAM};
+        proxy_pass $api_upstream;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri.html $uri/ =404;
+    }
+}

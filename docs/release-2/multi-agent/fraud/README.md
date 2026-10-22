@@ -16,4 +16,4 @@ The screenshots were taken with headless Chromium (Playwright) driving the real 
 
 The CI run link and endpoint-test results are in `docs/release-2/ci/student-3/`.
 
-Still to add: `docs/release-2/security/student-3-precommit.txt`, once the group's `.pre-commit-config.yaml` is on main.
+Pre-commit output: `docs/release-2/security/student-3-precommit.txt`.

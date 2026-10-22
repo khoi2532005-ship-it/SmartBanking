@@ -18,6 +18,8 @@ on:
       - 'docker-compose.yml'
       - '.github/workflows/student-2.yml'
   workflow_dispatch:
+  # cloud-deployment.yml runs this workflow as its CI gate before deploying.
+  workflow_call:
     
 jobs:
   build-images:

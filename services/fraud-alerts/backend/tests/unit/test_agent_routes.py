@@ -100,17 +100,19 @@ def test_review_finalises_and_is_audited(h, decision, note, state, released):
 
 def test_second_decision_is_409_and_changes_nothing(h):
     wid = start(h)
-    assert h.app.post(f"/api/agents/workflow/{wid}/review", json={"decision": "accept"}).status_code == 200
-    r = h.app.post(f"/api/agents/workflow/{wid}/review", json={"decision": "reject", "note": "late"})
+    assert h.app.post(f"/api/agents/workflow/{wid}/review", json={"decision": "accept", "reviewer": "Khoi"}).status_code == 200
+    r = h.app.post(f"/api/agents/workflow/{wid}/review", json={"decision": "reject", "note": "late", "reviewer": "Khoi"})
     assert r.status_code == 409 and r.get_json()["state"] == "accepted"
     assert h.app.get(f"/api/agents/workflow/{wid}").get_json()["state"] == "accepted"
 
 
 @pytest.mark.parametrize("body, message", [
-    ({"decision": "partially_accept", "note": "   "}, "partially_accept needs a note saying what to correct"),
-    ({"decision": "partially_accept", "note": "x" * 1001}, "note must be 1000 characters or fewer"),
-    ({"decision": "approve"}, "decision must be one of accept, partially_accept, reject"),
+    ({"decision": "partially_accept", "note": "   ", "reviewer": "Khoi"}, "partially_accept needs a note saying what to correct"),
+    ({"decision": "partially_accept", "note": "x" * 1001, "reviewer": "Khoi"}, "note must be 1000 characters or fewer"),
+    ({"decision": "approve", "reviewer": "Khoi"}, "decision must be one of accept, partially_accept, reject"),
     ({"decision": "accept", "reviewer": "r" * 61}, "reviewer must be 60 characters or fewer"),
+    ({"decision": "accept"}, "reviewer is required: enter your name, it is recorded in the audit"),
+    ({"decision": "accept", "reviewer": "   "}, "reviewer is required: enter your name, it is recorded in the audit"),
 ])
 def test_bad_review_is_400_before_reaching_the_server(h, body, message):
     wid = start(h)
@@ -143,7 +145,7 @@ def test_other_features_workflows_are_invisible_here(h):
                                              "context": {"customer_id": 1}}).get_json()["workflow_id"]
     state = h.server.get(f"/workflow/{other}/status").get_json()["state"]
     assert h.app.get(f"/api/agents/workflow/{other}").status_code == 404
-    assert h.app.post(f"/api/agents/workflow/{other}/review", json={"decision": "accept"}).status_code == 404
+    assert h.app.post(f"/api/agents/workflow/{other}/review", json={"decision": "accept", "reviewer": "Khoi"}).status_code == 404
     assert h.server.get(f"/workflow/{other}/status").get_json()["state"] == state
     mine = start(h)
     history = h.app.get("/api/agents/workflows").get_json()

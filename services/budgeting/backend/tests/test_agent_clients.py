@@ -1,4 +1,4 @@
-"""Checks for the Release 1 MCP and RAG clients and their routes.
+"""Checks for the Release 1 MCP and RAG clients and their routes, and the AI-Mode switch.
 
 No shared server is needed: the disabled and unreachable paths are exercised
 for real (an env flag, and a port nothing listens on), and the parsing and
@@ -405,6 +405,167 @@ def test_frontend_tab_wires_every_release_1_fragment():
     ui_rules = {r.rule for r in app.url_map.iter_rules() if r.rule.startswith("/ui/")}
     for path in ("/ui/mcp/status", "/ui/mcp/tool", "/ui/mcp/tools", "/ui/rag/status", "/ui/rag/query"):
         assert path in ui_rules, path
+
+
+# ---------------------------------------------------------------------------
+# AI-Mode switch (Release 2): AI_MODE_ENABLED=false stops every model call
+# ---------------------------------------------------------------------------
+
+class _no_backing_calls:
+    """Record any database, Transactions or model call, so a check can prove none was made."""
+
+    def __enter__(self):
+        from services import database_api, insight_service, transactions_client
+        self.calls = []
+        self.targets = [(database_api, "search_budgets"), (database_api, "get_budget_response"),
+                        (transactions_client, "spend_by_category"), (insight_service, "create_chat_completion")]
+        self.originals = [getattr(module, name) for module, name in self.targets]
+        for module, name in self.targets:
+            setattr(module, name, self._recorder(name))
+        return self
+
+    def _recorder(self, name):
+        def called(*args, **kwargs):
+            self.calls.append(name)
+            raise AssertionError(f"{name} was called")
+        return called
+
+    def __exit__(self, *exc):
+        for (module, name), original in zip(self.targets, self.originals):
+            setattr(module, name, original)
+
+
+def test_ai_mode_is_on_unless_switched_off():
+    from services import llm_client
+    saved = os.environ.pop("AI_MODE_ENABLED", None)
+    try:
+        assert llm_client.enabled(), "unset means on, as for MCP_ENABLED"
+    finally:
+        if saved is not None:
+            os.environ["AI_MODE_ENABLED"] = saved
+    for off in ("false", "False", "0", "off", "no"):
+        with _env(AI_MODE_ENABLED=off):
+            assert not llm_client.enabled(), off
+
+
+def test_ai_mode_off_refuses_the_model_call_itself():
+    from services import llm_client
+    # No key is set up on purpose: the switch must refuse before any client or key is touched.
+    with _env(AI_MODE_ENABLED="false", LLM_PROVIDER="gemini"):
+        exc = _raises(lambda: llm_client.create_chat_completion([{"role": "user", "content": "hi"}]),
+                      llm_client.AIModeDisabled)
+        assert "AI_MODE_ENABLED=false" in str(exc)
+
+
+def test_ai_mode_off_answers_503_before_any_database_or_model_call():
+    with _env(AI_MODE_ENABLED="false"), _no_backing_calls() as stub:
+        c = _client()
+        r = c.post("/api/budgets/insight", json={"customer_id": 1, "month": 9, "year": 2026})
+        assert r.status_code == 503, r.status_code
+        assert r.get_json()["disabled"] is True and "AI_MODE_ENABLED=false" in r.get_json()["error"]
+        r = c.post("/api/budgets/1/explain")
+        assert r.status_code == 503 and r.get_json()["disabled"] is True
+        assert stub.calls == [], stub.calls
+
+
+def test_ai_mode_off_fragments_warn_and_the_status_line_says_inactive():
+    with _env(AI_MODE_ENABLED="false"), _no_backing_calls() as stub:
+        c = _client()
+        for path in ("/ui/insight", "/ui/budgets/1/explain"):
+            r = c.post(path, data={"customer_id": "1", "month": "9", "year": "2026"})
+            assert r.status_code == 200 and b"alert-warn" in r.data, (path, r.data[:200])
+            assert b"AI_MODE_ENABLED=false" in r.data, path
+        r = c.get("/ui/ai/status")
+        assert r.status_code == 200 and b"Inactive" in r.data and b"AI_MODE_ENABLED=false" in r.data
+        assert stub.calls == [], stub.calls
+
+
+def test_ai_mode_on_status_line_names_the_model_without_calling_it():
+    with _env(AI_MODE_ENABLED="true", LLM_PROVIDER="gemini", GEMINI_MODEL="gemini-flash-lite-latest"), \
+            _no_backing_calls() as stub:
+        r = _client().get("/ui/ai/status")
+        assert r.status_code == 200 and b"Enabled" in r.data, r.data
+        assert b"gemini / gemini-flash-lite-latest" in r.data
+        assert stub.calls == [], stub.calls
+
+
+def test_health_and_agents_status_report_ai_mode():
+    with _env(AI_MODE_ENABLED="false", LLM_PROVIDER="gemini", MCP_ENABLED="false", RAG_ENABLED="false",
+              MULTI_AGENT_ENABLED="false"):
+        c = _client()
+        assert c.get("/api/health").get_json()["ai_mode"] == {"enabled": False, "provider": "gemini"}
+        status = c.get("/api/agents/status").get_json()["ai_mode"]
+        assert status["enabled"] is False and status["provider"] == "gemini" and status["model"], status
+    with _env(AI_MODE_ENABLED="true", LLM_PROVIDER="gemini"):
+        assert _client().get("/api/health").get_json()["ai_mode"]["enabled"] is True
+
+
+def test_insight_card_names_the_provider_in_use():
+    """The card used to say "Generated by Ollama" whichever provider answered."""
+    from routes import ui
+    for name, shown in (("gemini", "Gemini"), ("ollama", "Ollama")):
+        with _env(LLM_PROVIDER=name):
+            html = ui._insight_card("Title", "Body", "some-model", "mock")
+            assert f"Generated by {shown} running" in html, html
+
+
+def test_every_target_of_a_budget_row_exists_on_the_normal_tab():
+    """Since the tab split the rows' Explain button targeted a panel only the AI Mode tab had,
+    so Explain did nothing on the Normal tab, where the rows are."""
+    from routes import ui
+    row = ui._budget_row({"budget_id": 1, "category": "Groceries", "monthly_limit": 800.0, "spent": 645.0,
+                          "remaining": 155.0, "percent_used": 80.6, "status": "NEAR_LIMIT", "over_budget": False,
+                          "over_by": 0.0})
+    normal_tab = (BASE_DIR.parent / "frontend" / "tabs" / "budgets.html").read_text(encoding="utf-8")
+    import re
+    targets = set(re.findall(r'hx-(?:target|indicator)="#([\w-]+)"', row))
+    assert targets >= {"insight-panel", "insight-spinner", "budget-list"}, targets
+    for target in targets:
+        assert f'id="{target}"' in normal_tab, f"#{target} is not on the Normal tab"
+
+
+def _borrowed_targets(html):
+    """Each htmx request element with no hx-target of its own inside one that has an
+    hx-target: htmx swaps its answer into that enclosing target instead of itself."""
+    from html.parser import HTMLParser
+
+    void = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+    open_elements, borrowed = [], []
+
+    class Walker(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if not {"hx-get", "hx-post", "hx-put", "hx-delete"}.isdisjoint(attrs) and "hx-target" not in attrs:
+                enclosing = next((a["hx-target"] for _, a in reversed(open_elements) if "hx-target" in a), None)
+                if enclosing:
+                    borrowed.append(f'<{tag} id="{attrs.get("id", "")}"> -> {enclosing}')
+            if tag not in void:
+                open_elements.append((tag, attrs))
+
+        def handle_endtag(self, tag):
+            names = [name for name, _ in open_elements]
+            if tag in names:
+                del open_elements[len(names) - 1 - names[::-1].index(tag):]
+
+    Walker().feed(html)
+    return borrowed
+
+
+def test_no_htmx_request_on_a_tab_takes_its_target_from_an_enclosing_element():
+    """The create form's category select took the form's hx-target, #budget-list: its options
+    went into the budget list, the select stayed on "Loading categories..." and no budget could
+    be created from the page."""
+    assert _borrowed_targets('<form hx-target="#x"><select hx-get="/a"></select></form>') == ['<select id=""> -> #x']
+    for tab in ("budgets.html", "ai-mode.html"):
+        borrowed = _borrowed_targets((BASE_DIR.parent / "frontend" / "tabs" / tab).read_text(encoding="utf-8"))
+        assert borrowed == [], f"{tab}: {borrowed}"
+
+
+def test_ai_insight_card_has_its_status_line():
+    html = FRONTEND_TAB.read_text(encoding="utf-8")
+    assert 'id="ai-status"' in html and html.count('hx-get="/ui/ai/status"') == 2, "status line and Re-check"
+    from app import app
+    assert "/ui/ai/status" in {r.rule for r in app.url_map.iter_rules()}
 
 
 def _run():

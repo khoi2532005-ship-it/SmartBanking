@@ -2,7 +2,8 @@
 // Mirrors the enrolment-app RAG tab: an on/off toggle persisted in
 // localStorage plus retrieve / answer forms that proxy to the
 // shared RAG server through the loans backend with the X-RAG-Mode header.
-const RAG_BASE = `http://${window.location.hostname}:5002`;
+// Cloud mode (config.js): call this page's own frontend, which forwards /api/.
+const RAG_BASE = window.SMARTBANK_SAME_ORIGIN_API ? window.location.origin : `http://${window.location.hostname}:5002`;
 const RAG_STORAGE_KEY = "loans_rag_mode_enabled";
 
 const ragToggle = document.getElementById("rag-mode-toggle");

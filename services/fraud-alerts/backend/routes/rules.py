@@ -1,17 +1,18 @@
 from flask import Blueprint, jsonify, request
 
 from services import database_api
-from services.validation import RULE_FIELDS, ValidationError, validate_rule
+from services.validation import RULE_FIELDS, ValidationError, validate_rule, validate_rule_filters
 
 rules_bp = Blueprint("rules", __name__)
 
 
 @rules_bp.get("/api/rules")
 def list_rules():
-    filters = {
-        "rule_type": request.args.get("rule_type"),
-        "enabled": request.args.get("enabled"),
-    }
+    try:
+        filters = validate_rule_filters(request.args)
+    except ValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+
     try:
         rules = database_api.search_rules(filters)
     except Exception as exc:

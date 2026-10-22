@@ -177,6 +177,18 @@ def validate_alert_filters(args):
     return filters
 
 
+def validate_rule_filters(args):
+    """GET /api/rules query parameters. The database reads any enabled value
+    other than 1/true as 0, so enabled=yes used to list the disabled rules,
+    and a misspelt rule_type quietly matched nothing."""
+    filters = {}
+    if args.get("rule_type"):
+        filters["rule_type"] = choice(args["rule_type"], "rule_type", RULE_TYPES)
+    if args.get("enabled"):
+        filters["enabled"] = enabled_flag(args["enabled"])
+    return filters
+
+
 def workflow_id(value):
     """A Multi-Agent workflow id: the only thing this service puts in a server URL.
     fullmatch, because "$" would also accept a trailing newline."""
@@ -210,11 +222,15 @@ def _optional_text(data, field, limit):
 
 
 def validate_review(data):
-    """(decision, note, reviewer) for the analyst's decision. Partially accept
-    releases the answer with a correction attached, so it needs the correction."""
+    """(decision, note, reviewer) for the analyst's decision. The name is
+    required so every decision in the server's audit names a person. Partially
+    accept releases the answer with a correction attached, so it needs the
+    correction."""
     decision = choice(data.get("decision"), "decision", WORKFLOW_DECISIONS)
     note = _optional_text(data, "note", MAX_NOTE_LENGTH)
     reviewer = _optional_text(data, "reviewer", MAX_REVIEWER_LENGTH)
+    if not reviewer:
+        raise ValidationError("reviewer is required: enter your name, it is recorded in the audit")
     if decision == "partially_accept" and not note:
         raise ValidationError("partially_accept needs a note saying what to correct")
     return decision, note, reviewer

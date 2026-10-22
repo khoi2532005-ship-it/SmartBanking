@@ -11,15 +11,19 @@ import os
 import pytest
 import requests
 
+from tests.post_commit.helpers import sweep_leftovers
+
 FRAUD_API_URL = os.getenv("FRAUD_API_URL", "http://localhost:5003").rstrip("/")
 START = "docker compose up -d --build --no-deps fraud-database-service fraud-service"
 
 
 @pytest.fixture(scope="session")
 def api():
-    """fraud-service's base URL. Every test fails at once, with the fix, if it is not up."""
+    """fraud-service's base URL. Every test fails at once, with the fix, if it is not up.
+    Test records an interrupted run left behind are removed before any test reads."""
     try:
         requests.get(f"{FRAUD_API_URL}/api/health", timeout=5).raise_for_status()
     except requests.RequestException as exc:
         pytest.fail(f"fraud-service is not answering at {FRAUD_API_URL} ({type(exc).__name__}). Start it with: {START}")
+    sweep_leftovers(FRAUD_API_URL)
     return FRAUD_API_URL

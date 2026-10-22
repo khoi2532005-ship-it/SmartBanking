@@ -1,0 +1,243 @@
+{
+  "student": "student-4",
+  "name": "Cong Bao Nguyen",
+  "feature": "budgeting",
+  "workflow": "student-4-budgets-ci",
+  "job": "smoke-check",
+  "commit": "fa227e0",
+  "branch": "main",
+  "run_id": "39725293520",
+  "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/39725293520",
+  "ran_at": "2026-10-22T05:20:21Z",
+  "api_url": "http://localhost:5004",
+  "spending_source": "mock",
+  "ai_services": {
+    "ai_mode": "disabled",
+    "mcp": "disabled",
+    "rag": "disabled",
+    "multi_agent": "disabled"
+  },
+  "leftovers": {
+    "found": [],
+    "removed": [],
+    "failed": {},
+    "error": ""
+  },
+  "pytest_exit_status": 0,
+  "tests": [
+    {
+      "test": "test_budget_summary_reports_the_seeded_period",
+      "method": "GET",
+      "endpoint": "/api/budgets/summary",
+      "outcome": "passed",
+      "duration_s": 0.111,
+      "checks": [
+        {
+          "check": "budgets left by an interrupted run were removed before the period was read",
+          "ok": true,
+          "detail": "found [], removed [], failed {}",
+          "info": false
+        },
+        {
+          "check": "answers 200 for the seeded period",
+          "ok": true,
+          "detail": "HTTP 200 '{\"budgets\":[{\"budget_id\":2,\"category\":\"Dining Out\",\"customer_id\":1,\"month\":9,\"monthly_limit\":300.0,\"over_budget\":true,\"o'",
+          "info": false
+        },
+        {
+          "check": "the period's stored budgets and its spending can be read",
+          "ok": true,
+          "detail": "GET /api/budgets HTTP 200 '[{\"budget_id\":2,\"category\":\"Dining Out\",\"created_at\":\"2026-09-01 08:16:00\",\"customer_id\":1,\"month\":9,\"monthly_limit\":300'; GET /api/transactions/spending HTTP 200 '{\"customer_id\":1,\"month\":9,\"spending_source\":\"mock\",\"totals_by_category\":{\"Dining Out\":412.0,\"Entertainment\":90.0,\"Groce'",
+          "info": false
+        },
+        {
+          "check": "the seeded period has stored budgets, each with an id",
+          "ok": true,
+          "detail": "7 stored; first [{'budget_id': 2, 'category': 'Dining Out', 'created_at': '2026-09-01 08:16:00', 'customer_id': 1, 'month': 9, 'monthly_limit': 300.0, 'year': 2026}]",
+          "info": false
+        },
+        {
+          "check": "the answer carries a budgets list and a totals object with every total",
+          "ok": true,
+          "detail": "keys ['budgets', 'customer_id', 'month', 'over_budget_categories', 'spending_source', 'totals', 'unbudgeted_spending', 'year']",
+          "info": false
+        },
+        {
+          "check": "echoes customer_id, month and year",
+          "ok": true,
+          "detail": "{'customer_id': 1, 'month': 9, 'year': 2026}",
+          "info": false
+        },
+        {
+          "check": "every budget line carries its id, limit, spend, remaining, percent and status",
+          "ok": true,
+          "detail": "[]",
+          "info": false
+        },
+        {
+          "check": "the summary and the spending endpoint name the same spending source",
+          "ok": true,
+          "detail": "mock vs mock",
+          "info": false
+        },
+        {
+          "check": "the period's stored budgets are exactly the seeded ones (init_db.py)",
+          "ok": true,
+          "detail": "stored [(2, 'Dining Out', 300.0), (4, 'Entertainment', 150.0), (1, 'Groceries', 800.0), (6, 'Shopping', 400.0), (7, 'Subscriptions', 60.0), (3, 'Transport', 200.0), (5, 'Utilities', 250.0)], seeded [(1, 'Groceries', 800.0), (2, 'Dining Out', 300.0), (3, 'Transport', 200.0), (4, 'Entertainment', 150.0), (5, 'Utilities', 250.0), (6, 'Shopping', 400.0), (7, 'Subscriptions', 60.0)]",
+          "info": false
+        },
+        {
+          "check": "the summary lists exactly the period's stored budgets",
+          "ok": true,
+          "detail": "stored [1, 2, 3, 4, 5, 6, 7], listed [1, 2, 3, 4, 5, 6, 7]",
+          "info": false
+        },
+        {
+          "check": "Dining Out: the line is the budget logic's answer for its stored limit and its spend",
+          "ok": true,
+          "detail": "got {'budget_id': 2, 'category': 'Dining Out', 'customer_id': 1, 'month': 9, 'monthly_limit': 300.0, 'over_budget': True, 'over_by': 112.0, 'percent_used': 137.3, 'remaining': -112.0, 'spent': 412.0, 'status': 'OVER_BUDGET', 'year': 2026}, expected {'budget_id': 2, 'customer_id': 1, 'category': 'Dining Out', 'month': 9, 'year': 2026, 'monthly_limit': 300.0, 'spent': 412.0, 'remaining': -112.0, 'percent_used': 137.3, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 112.0}",
+          "info": false
+        },
+        {
+          "check": "Entertainment: the line is the budget logic's answer for its stored limit and its spend",
+          "ok": true,
+          "detail": "got {'budget_id': 4, 'category': 'Entertainment', 'customer_id': 1, 'month': 9, 'monthly_limit': 150.0, 'over_budget': False, 'over_by': 0.0, 'percent_used': 60.0, 'remaining': 60.0, 'spent': 90.0, 'status': 'ON_TRACK', 'year': 2026}, expected {'budget_id': 4, 'customer_id': 1, 'category': 'Entertainment', 'month': 9, 'year': 2026, 'monthly_limit': 150.0, 'spent': 90.0, 'remaining': 60.0, 'percent_used': 60.0, 'status': 'ON_TRACK', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
+        },
+        {
+          "check": "Groceries: the line is the budget logic's answer for its stored limit and its spend",
+          "ok": true,
+          "detail": "got {'budget_id': 1, 'category': 'Groceries', 'customer_id': 1, 'month': 9, 'monthly_limit': 800.0, 'over_budget': False, 'over_by': 0.0, 'percent_used': 80.6, 'remaining': 155.0, 'spent': 645.0, 'status': 'NEAR_LIMIT', 'year': 2026}, expected {'budget_id': 1, 'customer_id': 1, 'category': 'Groceries', 'month': 9, 'year': 2026, 'monthly_limit': 800.0, 'spent': 645.0, 'remaining': 155.0, 'percent_used': 80.6, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
+        },
+        {
+          "check": "Shopping: the line is the budget logic's answer for its stored limit and its spend",
+          "ok": true,
+          "detail": "got {'budget_id': 6, 'category': 'Shopping', 'customer_id': 1, 'month': 9, 'monthly_limit': 400.0, 'over_budget': True, 'over_by': 105.0, 'percent_used': 126.2, 'remaining': -105.0, 'spent': 505.0, 'status': 'OVER_BUDGET', 'year': 2026}, expected {'budget_id': 6, 'customer_id': 1, 'category': 'Shopping', 'month': 9, 'year': 2026, 'monthly_limit': 400.0, 'spent': 505.0, 'remaining': -105.0, 'percent_used': 126.2, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 105.0}",
+          "info": false
+        },
+        {
+          "check": "Subscriptions: the line is the budget logic's answer for its stored limit and its spend",
+          "ok": true,
+          "detail": "got {'budget_id': 7, 'category': 'Subscriptions', 'customer_id': 1, 'month': 9, 'monthly_limit': 60.0, 'over_budget': False, 'over_by': 0.0, 'percent_used': 99.9, 'remaining': 0.03, 'spent': 59.97, 'status': 'NEAR_LIMIT', 'year': 2026}, expected {'budget_id': 7, 'customer_id': 1, 'category': 'Subscriptions', 'month': 9, 'year': 2026, 'monthly_limit': 60.0, 'spent': 59.97, 'remaining': 0.03, 'percent_used': 99.9, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
+        },
+        {
+          "check": "Transport: the line is the budget logic's answer for its stored limit and its spend",
+          "ok": true,
+          "detail": "got {'budget_id': 3, 'category': 'Transport', 'customer_id': 1, 'month': 9, 'monthly_limit': 200.0, 'over_budget': True, 'over_by': 18.0, 'percent_used': 109.0, 'remaining': -18.0, 'spent': 218.0, 'status': 'OVER_BUDGET', 'year': 2026}, expected {'budget_id': 3, 'customer_id': 1, 'category': 'Transport', 'month': 9, 'year': 2026, 'monthly_limit': 200.0, 'spent': 218.0, 'remaining': -18.0, 'percent_used': 109.0, 'status': 'OVER_BUDGET', 'over_budget': True, 'over_by': 18.0}",
+          "info": false
+        },
+        {
+          "check": "Utilities: the line is the budget logic's answer for its stored limit and its spend",
+          "ok": true,
+          "detail": "got {'budget_id': 5, 'category': 'Utilities', 'customer_id': 1, 'month': 9, 'monthly_limit': 250.0, 'over_budget': False, 'over_by': 0.0, 'percent_used': 96.0, 'remaining': 10.0, 'spent': 240.0, 'status': 'NEAR_LIMIT', 'year': 2026}, expected {'budget_id': 5, 'customer_id': 1, 'category': 'Utilities', 'month': 9, 'year': 2026, 'monthly_limit': 250.0, 'spent': 240.0, 'remaining': 10.0, 'percent_used': 96.0, 'status': 'NEAR_LIMIT', 'over_budget': False, 'over_by': 0.0}",
+          "info": false
+        },
+        {
+          "check": "totals, over-budget categories and unbudgeted spending are the budget logic's answer",
+          "ok": true,
+          "detail": "totals {'budget_count': 7, 'over_budget_count': 3, 'percent_used': 100.5, 'total_limit': 2160.0, 'total_remaining': -9.97, 'total_spent': 2169.97}, expected {'total_limit': 2160.0, 'total_spent': 2169.97, 'total_remaining': -9.97, 'percent_used': 100.5, 'budget_count': 7, 'over_budget_count': 3}",
+          "info": false
+        },
+        {
+          "check": "400 for {'customer_id': 1, 'month': 13, 'year': 2026}",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "400 for {'customer_id': 'abc'}",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"customer_id must be an integer\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "400 for {'customer_id': 1, 'year': 1999}",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"year must be between 2000 and 2100\"}\\n'",
+          "info": false
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_create_budget_then_duplicate_and_invalid_bodies",
+      "method": "POST",
+      "endpoint": "/api/budgets",
+      "outcome": "passed",
+      "duration_s": 0.132,
+      "checks": [
+        {
+          "check": "creating a new budget answers 201 with its id",
+          "ok": true,
+          "detail": "HTTP 201 '{\"budget_id\":15,\"message\":\"Budget created\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "the new budget appears in the period summary with no spend, on track",
+          "ok": true,
+          "detail": "{'budget_id': 15, 'category': 'CI check b293d54f', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
+          "info": false
+        },
+        {
+          "check": "the same customer, category and period again answers 409",
+          "ok": true,
+          "detail": "HTTP 409 '{\"error\":\"A budget for that customer, category, month and year already exists\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "400 for greater than zero",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"monthly_limit must be greater than zero\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "400 for Invalid input",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"Invalid input: could not convert string to float: \\'lots\\'\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "400 for category required",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"category required\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "400 for month must be between 1 and 12",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"month must be between 1 and 12\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "400 for a JSON body that is not an object",
+          "ok": true,
+          "detail": "HTTP 400 '{\"error\":\"JSON object body required\"}\\n'",
+          "info": false
+        },
+        {
+          "check": "cleanup: every budget the test created is deleted",
+          "ok": true,
+          "detail": "deleted {15: 200}",
+          "info": false
+        },
+        {
+          "check": "the created budget is gone again: 404 by id and no longer in the summary",
+          "ok": true,
+          "detail": "GET by id 404, listed False",
+          "info": false
+        }
+      ],
+      "error": ""
+    }
+  ],
+  "summary": {
+    "endpoints": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "checks": 31,
+    "result": "passed"
+  }
+}

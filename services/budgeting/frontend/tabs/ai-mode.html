@@ -125,6 +125,18 @@
 
     <section class="card">
         <h2>AI insight</h2>
+        <p class="status-line">
+            <span id="ai-status" class="status-text"
+                  hx-get="/ui/ai/status"
+                  hx-trigger="load"
+                  hx-swap="innerHTML">
+                <span class="spinner">Checking...</span>
+            </span>
+            <button type="button" class="btn btn-secondary btn-small"
+                    hx-get="/ui/ai/status"
+                    hx-target="#ai-status"
+                    hx-swap="innerHTML">Re-check</button>
+        </p>
         <p class="muted">
             Sends your budget-versus-actual summary to Gemini and returns advice
             in plain English.
@@ -320,10 +332,12 @@
 
 </main>
 
+<script src="/config.js"></script>
 <script>
 // The frontend is a separate microservice, so HTMX requests must be sent to
 // the budgets backend/API service rather than to this static host.
-const BUDGETS_API = window.BUDGETS_API || `http://${window.location.hostname}:5004`;
+// Cloud mode (config.js): call this page's own frontend, which forwards /api/.
+const BUDGETS_API = window.BUDGETS_API || (window.SMARTBANK_SAME_ORIGIN_API ? window.location.origin : `http://${window.location.hostname}:5004`);
 
 document.body.addEventListener("htmx:configRequest", (event) => {
     if (event.detail.path.startsWith("/ui/")) {

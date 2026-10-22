@@ -1,0 +1,26 @@
+﻿2026-10-22T05:20:20.5500018Z ##[group]Run python -m pytest services/budgeting/backend/budgeting_endpoint_tests \
+2026-10-22T05:20:20.5500361Z [36;1mpython -m pytest services/budgeting/backend/budgeting_endpoint_tests \[0m
+2026-10-22T05:20:20.5500681Z [36;1m  -q -p no:cacheprovider -o junit_family=xunit1 --junitxml=reports/endpoint-tests-junit.xml[0m
+2026-10-22T05:20:20.5541088Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:20.5541356Z env:
+2026-10-22T05:20:20.5541475Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:20.5541704Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:20.5541927Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:20.5542052Z   MCP_ENABLED: false
+2026-10-22T05:20:20.5542168Z   RAG_ENABLED: false
+2026-10-22T05:20:20.5542285Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:20.5542451Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5542678Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:20:20.5542927Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5543130Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5543333Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5543536Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:20:20.5543730Z   BUDGET_API_URL: http://localhost:5004
+2026-10-22T05:20:20.5543887Z   ENDPOINT_REPORT_DIR: reports
+2026-10-22T05:20:20.5544056Z   ENDPOINT_COMMIT: fa227e0b61887327b2edce92a6160bbdd81dd929
+2026-10-22T05:20:20.5544223Z   ENDPOINT_BRANCH: main
+2026-10-22T05:20:20.5544341Z ##[endgroup]
+2026-10-22T05:20:21.0444132Z ..                                                                       [100%]
+2026-10-22T05:20:21.0444645Z endpoint report written to reports/post-commit-endpoint-report-student-4.{json,md}: passed
+2026-10-22T05:20:21.0444954Z 
+2026-10-22T05:20:21.0445037Z 2 passed in 0.31s

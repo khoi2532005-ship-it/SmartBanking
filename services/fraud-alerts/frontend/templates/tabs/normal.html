@@ -98,8 +98,10 @@
     </section>
 </main>
 
+<script src="/config.js"></script>
 <script>
-const API = `http://${window.location.hostname}:5003`;
+// Cloud mode (config.js): call this page's own frontend, which forwards /api/.
+const API = window.SMARTBANK_SAME_ORIGIN_API ? window.location.origin : `http://${window.location.hostname}:5003`;
 let currentAlerts = [];
 
 async function api(path, options = {}) {

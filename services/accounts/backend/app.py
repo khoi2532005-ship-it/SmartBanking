@@ -11,10 +11,11 @@ if str(BASE_DIR) not in sys.path:
 
 from routes.ai import ai_bp
 from routes.accounts import accounts_bp
+from routes.agents import agents_bp
 from routes.customers import customers_bp
 from routes.mcp import mcp_bp
 from routes.rag import rag_bp
-from services import mcp_client, rag_client
+from services import mcp_client, multi_agent_client, rag_client
 
 
 def create_app():
@@ -26,6 +27,7 @@ def create_app():
     app.register_blueprint(ai_bp)
     app.register_blueprint(mcp_bp)
     app.register_blueprint(rag_bp)
+    app.register_blueprint(agents_bp)
 
     @app.get("/api/health")
     def health():
@@ -34,6 +36,7 @@ def create_app():
             "status": "running",
             "mcp": {"enabled": mcp_client.enabled(), "url": mcp_client.server_url()},
             "rag": {"enabled": rag_client.enabled(), "url": rag_client.server_url()},
+            "multi_agent": {"enabled": multi_agent_client.enabled(), "url": multi_agent_client.server_url()},
         })
 
     return app

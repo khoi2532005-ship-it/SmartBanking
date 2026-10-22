@@ -15,6 +15,7 @@ review, then the decision block inside the same card, then the final response.
 | `ui-2-released.png` | the same card after a partial accept: human completed, the final response released with the correction, decided by `budgeting-ui:Bao` |
 | `ui-3-history.png` | the history list after the decision, with Open buttons that reload a card |
 | `ui-4-rejected.png` | a second workflow rejected with a note: the final response is withheld, nothing is released |
+| `workflow_history.jsonl`, `coordination_audit.jsonl` | the server's audit files after the multi-terminal run of 2026-10-21 (`../../deployment/local/multi-terminal-run-20261021.md`): three budgeting workflows, `wf_2fc78a04` accepted and `wf_192378fa` rejected by the validation record, and `wf_ce57b3dd` partially accepted from the terminal by `terminal:Bao` with a correction note. The loop's `multi_agent_review` mode reviewed exactly these records |
 
 The browser run (22 checks) also confirms that a double click on Start
 creates one workflow, that Enter in the reviewer name box decides nothing,

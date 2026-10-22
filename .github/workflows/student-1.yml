@@ -18,6 +18,8 @@ on:
       - 'docker-compose.yml'
       - '.github/workflows/student-1.yml'
   workflow_dispatch:
+  # cloud-deployment.yml runs this workflow as its CI gate before deploying.
+  workflow_call:
 
 env:
   COMPOSE_FILE: docker-compose.yml
@@ -52,6 +54,14 @@ jobs:
         working-directory: services/accounts/backend
         run: python -m tests.test_account_logic -v
 
+      - name: Install this service's own backend dependencies
+        working-directory: services/accounts/backend
+        run: pip install flask flask-cors requests openai
+
+      - name: Run the two Multi-Agent endpoint function checks (Release 2)
+        working-directory: services/accounts/backend
+        run: python -m tests.test_agents_endpoints -v
+
       - name: Install shared MCP/RAG test dependencies
         run: pip install -r requirements-agentic.txt -r requirements-mcp.txt
 
@@ -66,6 +76,7 @@ jobs:
     env:
       MCP_ENABLED: "false"
       RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -129,16 +140,18 @@ jobs:
           fi
           echo "PASS NFR: $pass/$total requests were <=500ms"
 
-      - name: Verify MCP and RAG are configured but disabled in CI
+      - name: Verify MCP, RAG and Multi-Agent are configured but disabled in CI
         run: |
           curl -s http://localhost:5001/api/health | python3 -c '
           import json, sys
           h = json.load(sys.stdin)
           assert h["mcp"]["enabled"] is False, h["mcp"]
           assert h["rag"]["enabled"] is False, h["rag"]
+          assert h["multi_agent"]["enabled"] is False, h["multi_agent"]
           assert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"]
           assert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"]
-          print("mcp:", h["mcp"]); print("rag:", h["rag"])'
+          assert h["multi_agent"]["url"].startswith("http://host.docker.internal:8300"), h["multi_agent"]
+          print("mcp:", h["mcp"]); print("rag:", h["rag"]); print("multi_agent:", h["multi_agent"])'
 
       - name: Container status
         if: always()
@@ -177,9 +190,10 @@ jobs:
             "gates": {
               "build": "passed",
               "unit": "passed",
+              "endpoint_functions": "passed (tests.test_agents_endpoints: start_workflow, get_workflow)",
               "smoke": "passed",
               "nfr": "passed (>=19/20 requests to /api/customers <=500ms)",
-              "mcp_rag": "integration retained but switched off (MCP_ENABLED=false, RAG_ENABLED=false); /api/mcp/tools, /api/mcp/tool and /api/rag/query are checked manually against the live shared servers"
+              "mcp_rag_multi_agent": "integration retained but switched off (MCP_ENABLED=false, RAG_ENABLED=false, MULTI_AGENT_ENABLED=false); /api/mcp/tools, /api/mcp/tool, /api/rag/query and /api/agents/* are checked manually against the live shared servers"
             }
           }
           JSON
@@ -199,6 +213,8 @@ jobs:
 
           - Build: the accounts service image built successfully
           - Unit: services/account_logic.py risk/summary checks verified (10 checks, no Docker or API key required)
+          - Endpoint functions (Release 2): \`routes/agents.py\` \`start_workflow\` and \`get_workflow\` verified
+            against a Flask test client with \`services.multi_agent_client\` stubbed - no server, key or network
           - Smoke: ports 5011, 5001 and 3001 returned HTTP 200; at least 8 customers and 11 accounts were seeded
           - NFR: >=19/20 requests to /api/customers responded within 500ms
           - Teardown: \`docker compose down -v\` ran
@@ -213,8 +229,10 @@ jobs:
           | backend/API | \`GET http://localhost:5001/api/accounts\` |
           | frontend-static | \`GET http://localhost:3001/\` |
 
-          AI-Mode endpoints (\`/api/ai/customers/<id>/summary\`, \`/risk-profile\`, \`/history\`) are out of
-          scope for this pipeline - they require a live LLM_PROVIDER and are checked manually during the demo.
+          AI-Mode endpoints (\`/api/ai/customers/<id>/summary\`, \`/risk-profile\`, \`/history\`) and the
+          Multi-Agent endpoints (\`/api/agents/*\`) are out of scope for the live smoke check - they require a
+          live LLM_PROVIDER / running Multi-Agent Server and are checked manually during the demo. The two
+          \`/api/agents/*\` endpoint functions are unit-tested with the integration stubbed out (see above).
           MD
 
           echo "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \

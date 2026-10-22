@@ -1,0 +1,134 @@
+name: cloud-deployment
+
+# Deploys the integrated SmartBanking application to Azure Container Apps, with
+# images in Azure Container Registry tagged by commit - but only after all five
+# students' CI workflows pass on that commit: they run here, first, as the gate.
+# The required cloud baseline keeps AI-Mode, MCP, RAG and Multi-Agent switched
+# off (deploy/azure/apps.json). Runbook: docs/deployment/container-apps.md.
+#
+# One-time setup by the subscription owner: deploy/azure/oidc-setup.sh. It
+# stores the secrets AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID
+# and the variables ACR_NAME, AZ_RG, AZ_LOCATION and AZURE_DEPLOY_ENABLED, and creates the `azure`
+# environment this job runs in.
+# Manual: Actions -> cloud-deployment -> Run workflow.
+# Automatic: every push to main that touches the app, once AZURE_DEPLOY_ENABLED
+# is set to true.
+
+on:
+  workflow_dispatch:
+  push:
+    # acr-conversion: workflow_dispatch only finds workflows on the default
+    # branch, so until this is merged the branch's own pushes run it (the
+    # deploy itself still needs AZURE_DEPLOY_ENABLED=true). Drop it after merging.
+    branches: [main, acr-conversion]
+    paths:
+      - 'services/**'
+      - 'shared/**'
+      - 'deploy/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/cloud-deployment.yml'
+
+concurrency:
+  group: cloud-deployment
+  cancel-in-progress: false
+
+jobs:
+
+  # =====================================================================
+  # 1. CI gate - each student's workflow, unchanged, on this commit
+  # =====================================================================
+  student-1:
+    uses: ./.github/workflows/student-1.yml
+    secrets: inherit  # pragma: allowlist secret
+
+  student-2:
+    uses: ./.github/workflows/student-2.yml
+    secrets: inherit  # pragma: allowlist secret
+
+  student-3:
+    uses: ./.github/workflows/student-3.yml
+    secrets: inherit  # pragma: allowlist secret
+
+  student-4:
+    uses: ./.github/workflows/student-4.yml
+    secrets: inherit  # pragma: allowlist secret
+
+  student-5:
+    uses: ./.github/workflows/student-5.yml
+    secrets: inherit  # pragma: allowlist secret
+
+  # =====================================================================
+  # 2. Deploy - build in ACR, deploy with Bicep, check through the frontends
+  # =====================================================================
+  deploy:
+    name: Deploy to Azure Container Apps
+    needs: [student-1, student-2, student-3, student-4, student-5]
+    if: github.event_name == 'workflow_dispatch' || vars.AZURE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: azure
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AZ_RG: ${{ vars.AZ_RG || 'rg-smartbank' }}
+      # Bonus profile: set the variable AI_MODE_ENABLED to true (and the secret
+      # GEMINI_API_KEY) to turn AI-Mode on; unset, the baseline keeps it off.
+      AI_MODE_ENABLED: ${{ vars.AI_MODE_ENABLED || 'false' }}
+      AZ_LOCATION: ${{ vars.AZ_LOCATION || 'australiaeast' }}
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the check dependencies
+        run: pip install pytest requests
+
+      - name: Check the deployment definition (apps.json, Bicep compiles)
+        run: python -m pytest tests/test_cloud_infra.py -q
+
+      - name: Log in to Azure (OIDC - no stored password)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resource group and registry
+        run: bash deploy/azure/setup.sh
+
+      - name: Build the images in ACR, tagged with this commit
+        run: bash deploy/azure/build-images.sh
+
+      # The image builds can outlast the first login's token (Lab 11, "Why two
+      # refreshes"), so log in again before the deployment.
+      - name: Log in to Azure again
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy the Container Apps environment and apps
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  # pragma: allowlist secret
+        run: bash deploy/azure/deploy.sh
+
+      - name: Check every frontend, API and CRUD path, and write the report
+        run: >-
+          python deploy/azure/checks.py
+          --outputs reports/cloud/outputs.json
+          --out reports/cloud/cloud-deployment-report.json
+
+      - name: Upload the deployment report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-deployment-report
+          path: reports/cloud/
+          if-no-files-found: ignore
+          retention-days: 30
