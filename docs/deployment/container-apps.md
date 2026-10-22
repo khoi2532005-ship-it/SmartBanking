@@ -54,10 +54,12 @@ script sets.
 
 This registers the resource providers the deployment uses (Container Apps, Log
 Analytics, Container Registry, Managed Identity) and creates `rg-smartbank`. It then
-creates the `smartbank-github-oidc` app registration, which trusts this
-repository's `azure` GitHub environment, so no Azure password is stored. That
-app gets Contributor and User Access Administrator on **that resource group
-only**. Finally, the script stores `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
+creates `smartbank-github-oidc` in that group: a user-assigned managed identity
+that trusts this repository's `azure` GitHub environment, so no Azure password is
+stored. It's a managed identity rather than an app registration because
+university tenants usually stop students registering applications ("Directory
+permission is needed"). The identity gets Contributor and User Access
+Administrator on **that resource group only**. Finally, the script stores `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
 `AZURE_SUBSCRIPTION_ID` as secrets, and `ACR_NAME` and
 `AZURE_DEPLOY_ENABLED=false` as variables.
 

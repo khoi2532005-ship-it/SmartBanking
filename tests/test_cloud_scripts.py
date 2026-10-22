@@ -29,6 +29,14 @@ def run_script(tmp_path):
                          'case "$*" in\n'
                          '  "provider show"*) echo NotRegistered ;;\n'
                          '  "group show"*|"acr show"*) exit 1 ;;\n'
+                         '  "identity show"*clientId*) echo client-1 ;;\n'
+                         '  "identity show"*principalId*) echo principal-1 ;;\n'
+                         'esac\n')
+    # oidc-setup.sh writes repository secrets: never let it reach the real gh.
+    stub(tmp_path, "gh", f'echo "gh $*" >> "{log}"\n'
+                         'case "$*" in\n'
+                         '  "repo view"*) echo owner/repo ;;\n'
+                         '  "api repos/"*) echo 7 ;;\n'
                          'esac\n')
     env = {**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "ACR_NAME": "smartbanktest",
            "IMAGE_TAG": "abc123"}
@@ -61,6 +69,22 @@ def test_setup_registers_every_provider_the_deployment_uses(run_script):
     registered = {re.search(r"--namespace (\S+)", c).group(1) for c in calls if c.startswith("az provider register")}
     assert registered == PROVIDERS
     assert any(c.startswith("az group create") for c in calls) and any(c.startswith("az acr create") for c in calls)
+
+
+def test_oidc_setup_needs_no_directory_permission(run_script):
+    # University tenants stop students registering applications ("Directory
+    # permission is needed for the current user to register the application"),
+    # so GitHub logs in as a managed identity, an ordinary resource in the group.
+    calls = run_script("oidc-setup.sh")
+    assert not [c for c in calls if c.startswith("az ad ")]
+    assert any(c.startswith("az identity create") and "--resource-group rg-smartbank" in c for c in calls)
+    subjects = {re.search(r"--subject (\S+)", c).group(1) for c in calls
+                if c.startswith("az identity federated-credential create")}
+    assert subjects == {"repo:owner@7/repo@7:environment:azure", "repo:owner/repo:environment:azure"}
+    grants = [c for c in calls if c.startswith("az role assignment create")]
+    assert len(grants) == 2
+    assert all("--assignee-object-id principal-1 --assignee-principal-type ServicePrincipal" in g for g in grants)
+    assert "gh secret set AZURE_CLIENT_ID --body client-1" in calls
 
 
 def test_oidc_setup_registers_the_same_providers():
