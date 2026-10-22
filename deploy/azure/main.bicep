@@ -17,9 +17,17 @@ param imageTag string
 @description('Name of the Container Apps environment.')
 param envName string = 'smartbank-env'
 
+@description('AI-Mode (Gemini) in every backend. Off by default: the brief\'s cloud baseline. On is the bonus profile.')
+param aiModeEnabled bool = false
+
+@secure()
+@description('Gemini API key (the GEMINI_API_KEY repository secret). The backends get it, as a Container Apps secret, only when aiModeEnabled is true.')
+param geminiApiKey string = ''
+
 var apps = loadJsonContent('apps.json').apps
 var features = ['accounts', 'loans', 'fraud', 'budgeting', 'transactions']
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+var aiModeFlag = aiModeEnabled ? 'true' : 'false'
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
@@ -101,6 +109,12 @@ resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for app in ap
           identity: pullIdentity.id
         }
       ]
+      secrets: aiModeEnabled && app.role == 'backend' ? [
+        {
+          name: 'gemini-api-key'
+          value: geminiApiKey
+        }
+      ] : []
     }
     template: {
       containers: [
@@ -108,9 +122,14 @@ resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for app in ap
           name: app.name
           image: replace(replace(app.image, '{acr}', acrName), '{tag}', imageTag)
           command: app.?command
-          env: [for item in items(app.env): {
+          // apps.json keeps AI_MODE_ENABLED "false"; the switch overrides it, and
+          // with AI-Mode on each backend also reads GEMINI_API_KEY from the secret.
+          env: [for item in items(union(app.env, aiModeEnabled && app.role == 'backend' ? { GEMINI_API_KEY: '' } : {})): item.key == 'GEMINI_API_KEY' ? {
             name: item.key
-            value: replace(item.value, '{defaultDomain}', managedEnv.properties.defaultDomain)
+            secretRef: 'gemini-api-key'  // pragma: allowlist secret (the secret's name, not its value)
+          } : {
+            name: item.key
+            value: item.key == 'AI_MODE_ENABLED' ? aiModeFlag : replace(item.value, '{defaultDomain}', managedEnv.properties.defaultDomain)
           }]
           resources: {
             cpu: json('0.25')

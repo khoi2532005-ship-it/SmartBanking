@@ -51,3 +51,12 @@ def test_the_resource_group_comes_from_a_repository_variable():
     # The registry may be made in the portal, in a group with another name.
     deploy = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]
     assert deploy["env"]["AZ_RG"] == "${{ vars.AZ_RG || 'rg-smartbank' }}"
+
+
+def test_ai_mode_follows_a_repository_variable_and_the_key_a_secret():
+    deploy = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]
+    assert deploy["env"]["AI_MODE_ENABLED"] == "${{ vars.AI_MODE_ENABLED || 'false' }}"
+    holders = [s["name"] for s in deploy["steps"] if "GEMINI_API_KEY" in (s.get("env") or {})]
+    assert holders == ["Deploy the Container Apps environment and apps"]
+    step = next(s for s in deploy["steps"] if s.get("name") == holders[0])
+    assert step["env"]["GEMINI_API_KEY"] == "${{ secrets.GEMINI_API_KEY }}"  # pragma: allowlist secret

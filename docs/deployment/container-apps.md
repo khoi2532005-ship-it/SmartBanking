@@ -109,6 +109,30 @@ Then run `python deploy/azure/checks.py --outputs reports/cloud/outputs.json --o
    `CLOUD_DEPLOYMENT_REPORT=docs/deployment/cloud-deployment-report.json python agentic_loop.py --mode cloud_deployment_review`.
    Then record the human release decision in the report's `release_decision`.
 
+## 5. AI-Mode in the cloud (bonus profile)
+
+The required deployment is the baseline, with every AI service off. To turn on
+AI-Mode (Gemini) for a bonus run:
+
+```bash
+gh secret set GEMINI_API_KEY                   # paste the key; it never enters the repository
+gh variable set AI_MODE_ENABLED --body true
+```
+
+Then deploy as in section 3. `deploy.sh` passes the key to `main.bicep` as a
+secure parameter. Each backend stores it as a Container Apps secret and reads
+it as `GEMINI_API_KEY`, and `AI_MODE_ENABLED` turns on in every backend. The
+report then says `"profile": "bonus"`, and `checks.py` expects AI-Mode on with
+MCP, RAG and Multi-Agent still off. With the variable on and no secret,
+`deploy.sh` stops before deploying.
+
+To go back to the baseline, run `gh variable set AI_MODE_ENABLED --body false`
+and deploy again. The key leaves the apps on that deployment.
+
+MCP, RAG and the Multi-Agent Server are separate servers that this deployment
+doesn't run in the cloud. Turning them on means deploying each as its own
+container app.
+
 ## Things to know
 
 - **Data resets.** Each database is SQLite inside its container (one replica),
@@ -123,8 +147,9 @@ Then run `python deploy/azure/checks.py --outputs reports/cloud/outputs.json --o
   first deployment, image pulls can fail for a minute until the AcrPull
   permission propagates; re-run the workflow.
 - **Transactions calls the AI model on every create** to pick a category,
-  whatever the AI flags say. No model key is passed in the cloud, so it falls
-  back at once.
+  whatever the AI flags say. In the baseline no model key is passed, so it
+  falls back at once. With AI-Mode on, every create calls Gemini, so creates are
+  slower and count against the key's quota.
 
 ## Cost and cleanup
 

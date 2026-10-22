@@ -108,3 +108,30 @@ def test_every_app_replaces_the_compose_addresses_baked_into_its_image():
         baked = dict(re.findall(r"([A-Z_]+)=(\S+)", " ".join(re.findall(r"^ENV (?:.*\\\n)*.*$", dockerfile, re.M))))
         compose = {k for k, v in baked.items() if re.fullmatch(r"http://[a-z-]+:\d+/?", v)}
         assert compose <= set(a["env"]), (a["name"], sorted(compose - set(a["env"])))
+
+
+def compiled_template():
+    az, bicep = shutil.which("az"), shutil.which("bicep")
+    template = str(ROOT / "deploy/azure/main.bicep")
+    command = [az, "bicep", "build", "--file", template, "--stdout"] if az else [bicep, "build", template, "--stdout"]
+    return json.loads(subprocess.run(command, capture_output=True, text=True, check=True).stdout)  # noqa: S603  # the az/bicep CLI on PATH compiling a file in this repo
+
+
+def test_ai_mode_is_a_switch_that_starts_off():
+    params = compiled_template()["parameters"]
+    assert (params["aiModeEnabled"]["type"], params["aiModeEnabled"]["defaultValue"]) == ("bool", False)
+    assert (params["geminiApiKey"]["type"], params["geminiApiKey"]["defaultValue"]) == ("securestring", "")
+
+
+def test_the_gemini_key_reaches_the_apps_only_as_a_container_apps_secret():
+    resources = compiled_template()["resources"]
+    resources = resources.values() if isinstance(resources, dict) else resources
+    apps = next(r for r in resources if r["type"] == "Microsoft.App/containerApps")
+    assert "geminiApiKey" in json.dumps(apps["properties"]["configuration"]["secrets"])
+    assert "geminiApiKey" not in json.dumps(apps["properties"]["template"])
+    assert "gemini-api-key" in json.dumps(apps["properties"]["template"])
+
+
+def test_no_model_key_is_written_into_apps_json():
+    text = (ROOT / "deploy/azure/apps.json").read_text()
+    assert "API_KEY" not in text and "AIza" not in text

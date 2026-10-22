@@ -3,32 +3,43 @@
 # images build-images.sh pushed (Lecture 11, slide 14 "deploy.sh"), then writes
 # the frontend addresses for deploy/azure/checks.py to reports/cloud/outputs.json.
 #   ACR_NAME=<registry> [IMAGE_TAG=<sha>] bash deploy/azure/deploy.sh
+# AI-Mode (Gemini) stays off, the brief's cloud baseline, unless
+# AI_MODE_ENABLED=true; then GEMINI_API_KEY must be set, and only then is it
+# passed, as a secure parameter that becomes a Container Apps secret.
 set -euo pipefail
 
 AZ_RG="${AZ_RG:-rg-smartbank}"
 : "${ACR_NAME:?set ACR_NAME to the registry deploy/azure/setup.sh created}"
 cd "$(git rev-parse --show-toplevel)"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse HEAD)}"
-mkdir -p reports/cloud
+REPORT_DIR="${REPORT_DIR:-reports/cloud}"
+mkdir -p "$REPORT_DIR"
+
+ai_params=(aiModeEnabled=false)
+if [ "${AI_MODE_ENABLED:-false}" = true ]; then
+  : "${GEMINI_API_KEY:?AI_MODE_ENABLED=true needs GEMINI_API_KEY (the repository secret of that name)}"
+  ai_params=(aiModeEnabled=true "geminiApiKey=$GEMINI_API_KEY")
+fi
 
 az deployment group create \
   --resource-group "$AZ_RG" \
   --name "smartbank-${IMAGE_TAG:0:12}" \
   --template-file deploy/azure/main.bicep \
-  --parameters acrName="$ACR_NAME" imageTag="$IMAGE_TAG" \
-  --query properties.outputs --output json > reports/cloud/deployment-outputs.json
+  --parameters acrName="$ACR_NAME" imageTag="$IMAGE_TAG" "${ai_params[@]}" \
+  --query properties.outputs --output json > "$REPORT_DIR/deployment-outputs.json"
 
 az containerapp list --resource-group "$AZ_RG" \
   --query "[].{name: name, type: 'container-app', status: properties.runningStatus}" \
-  --output json > reports/cloud/resources.json
+  --output json > "$REPORT_DIR/resources.json"
 
 # {"frontends": {...}, "homeUrl": "...", "resources": [...]} for checks.py.
-python3 - <<'PY'
-import json
-outputs = json.load(open("reports/cloud/deployment-outputs.json"))
+REPORT_DIR="$REPORT_DIR" python3 - <<'PY'
+import json, os
+d = os.environ["REPORT_DIR"]
+outputs = json.load(open(f"{d}/deployment-outputs.json"))
 flat = {name: value["value"] for name, value in outputs.items()}
-flat["resources"] = json.load(open("reports/cloud/resources.json"))
-json.dump(flat, open("reports/cloud/outputs.json", "w"), indent=2)
+flat["resources"] = json.load(open(f"{d}/resources.json"))
+json.dump(flat, open(f"{d}/outputs.json", "w"), indent=2)
 print("home:", flat["homeUrl"])
 for feature, url in flat["frontends"].items():
     print(f"{feature}: {url}")

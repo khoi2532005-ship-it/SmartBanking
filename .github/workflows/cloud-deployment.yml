@@ -72,6 +72,9 @@ jobs:
       contents: read
     env:
       AZ_RG: ${{ vars.AZ_RG || 'rg-smartbank' }}
+      # Bonus profile: set the variable AI_MODE_ENABLED to true (and the secret
+      # GEMINI_API_KEY) to turn AI-Mode on; unset, the baseline keeps it off.
+      AI_MODE_ENABLED: ${{ vars.AI_MODE_ENABLED || 'false' }}
       AZ_LOCATION: ${{ vars.AZ_LOCATION || 'australiaeast' }}
       ACR_NAME: ${{ vars.ACR_NAME }}
       IMAGE_TAG: ${{ github.sha }}
@@ -111,6 +114,8 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy the Container Apps environment and apps
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  # pragma: allowlist secret
         run: bash deploy/azure/deploy.sh
 
       - name: Check every frontend, API and CRUD path, and write the report
