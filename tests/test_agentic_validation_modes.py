@@ -183,7 +183,17 @@ def test_transactions_mode_prefers_approved_workflow_evidence(monkeypatch):
                                    "context": {"customer_id": 1} }]}
         raise AssertionError(f"unexpected URL: {url}")
 
+    def fake_ask(system_prompt, user_prompt, **kwargs):
+        if kwargs.get("review"):
+            return "Risk: none.\nCorrection: none.\nRetest: repeat."
+        return (
+            "Groceries were the dominant spending category at $500.00; transport was the next largest "
+            "at $250.00 and the pattern was mostly essentials and lifestyle spending."
+        )
+
     monkeypatch.setattr("agentic.modes.transactions.net.get_json", fake_get_json)
+    monkeypatch.setattr(llm, "ask", fake_ask)
+    monkeypatch.setattr(llm, "describe", lambda **kw: "stub/stub")
     monkeypatch.setenv("TRANSACTIONS_LOOP_WORKFLOW_ID", "wf_12345678")
     monkeypatch.setenv("MULTI_AGENT_SERVER_URL", "http://localhost:8300")
 
