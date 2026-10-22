@@ -95,3 +95,16 @@ def test_the_environment_is_a_workload_profiles_environment():
     assert env["properties"]["workloadProfiles"] == [{"name": "Consumption", "workloadProfileType": "Consumption"}]
     apps = next(r for r in resources if r["type"] == "Microsoft.App/containerApps")
     assert apps["properties"]["workloadProfileName"] == "Consumption"
+
+
+def test_every_app_replaces_the_compose_addresses_baked_into_its_image():
+    # Images bake in Compose addresses such as http://accounts:5001. Container
+    # Apps reach an app by name on port 80, so each app must override them: the
+    # transactions database app kept the image's address and timed out (503).
+    script = (ROOT / "deploy/azure/build-images.sh").read_text()
+    dockerfiles = dict(line.split() for line in script.split("<<'LIST'\n", 1)[1].split("\nLIST", 1)[0].splitlines())
+    for a in APPS.values():
+        dockerfile = (ROOT / dockerfiles[a["image"].split("/", 1)[1].split(":")[0]]).read_text()
+        baked = dict(re.findall(r"([A-Z_]+)=(\S+)", " ".join(re.findall(r"^ENV (?:.*\\\n)*.*$", dockerfile, re.M))))
+        compose = {k for k, v in baked.items() if re.fullmatch(r"http://[a-z-]+:\d+/?", v)}
+        assert compose <= set(a["env"]), (a["name"], sorted(compose - set(a["env"])))

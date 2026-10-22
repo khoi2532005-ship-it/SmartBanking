@@ -200,6 +200,7 @@
       "targetPort": 5015,
       "external": false,
       "env": {
+        "ACCOUNTS_SERVICE_URL": "http://accounts",
         "FLASK_OPEN_CHROME": "0"
       },
       "minReplicas": 1,
