@@ -34,10 +34,21 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   }
 }
 
-resource managedEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
+// Explicitly a workload profiles environment on the free Consumption profile.
+// Left unset, Azure now creates an "Express" environment, which refuses
+// allowInsecure and has no internal service discovery, so the apps below could
+// not call each other by name.
+resource managedEnv 'Microsoft.App/managedEnvironments@2026-07-01' = {
   name: envName
   location: location
   properties: {
+    environmentMode: 'WorkloadProfiles'
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
@@ -74,6 +85,7 @@ resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for app in ap
   }
   properties: {
     managedEnvironmentId: managedEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         // Only frontends are public. Internal apps also answer plain http,

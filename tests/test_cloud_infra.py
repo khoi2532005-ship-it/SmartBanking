@@ -78,3 +78,20 @@ def test_bicep_takes_the_region_from_the_resource_group():
     command = [az, "bicep", "build", "--file", template, "--stdout"] if az else [bicep, "build", template, "--stdout"]
     compiled = json.loads(subprocess.run(command, capture_output=True, text=True, check=True).stdout)  # noqa: S603  # the az/bicep CLI on PATH compiling a file in this repo
     assert compiled["parameters"]["location"]["defaultValue"] == "[resourceGroup().location]"
+
+
+def test_the_environment_is_a_workload_profiles_environment():
+    # Left unset, Azure made the environment "Express" (seen 2026-10-22), which
+    # refuses allowInsecure and has no internal service discovery: the apps
+    # could not reach each other. Ask for the standard mode explicitly.
+    az, bicep = shutil.which("az"), shutil.which("bicep")
+    template = str(ROOT / "deploy/azure/main.bicep")
+    command = [az, "bicep", "build", "--file", template, "--stdout"] if az else [bicep, "build", template, "--stdout"]
+    compiled = json.loads(subprocess.run(command, capture_output=True, text=True, check=True).stdout)  # noqa: S603  # the az/bicep CLI on PATH compiling a file in this repo
+    resources = compiled["resources"].values() if isinstance(compiled["resources"], dict) else compiled["resources"]
+    env = next(r for r in resources if r["type"] == "Microsoft.App/managedEnvironments")
+    assert env["apiVersion"] >= "2026-07-01"
+    assert env["properties"]["environmentMode"] == "WorkloadProfiles"
+    assert env["properties"]["workloadProfiles"] == [{"name": "Consumption", "workloadProfileType": "Consumption"}]
+    apps = next(r for r in resources if r["type"] == "Microsoft.App/containerApps")
+    assert apps["properties"]["workloadProfileName"] == "Consumption"
