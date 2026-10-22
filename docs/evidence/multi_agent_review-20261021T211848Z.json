@@ -1,0 +1,456 @@
+{
+  "mode": "multi_agent_review",
+  "timestamp": "20261021T211848Z",
+  "plan": {
+    "goal": "Review the Multi-Agent workflow evidence (workflow_history.jsonl and coordination_audit.jsonl) and produce review recommendations grounded in those records",
+    "checks": [
+      "both audit files exist and hold records (the running server, a validation snapshot or committed evidence)",
+      "every reviewed workflow is rebuilt from its records: stages, reviewer verdict, revisions, the human decision, the release",
+      "the coordination metrics (plan acceptance, worker completion, handoff success, human acceptance) come from the same records",
+      "the entry names only workflow ids in the records, every one of the four stages, and quotes each decision and metric exactly",
+      "a workflow that failed, a fallback stage or a handoff anomaly makes the verdict ATTENTION, never PASS"
+    ],
+    "stop_condition": "An entry passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "8 workflow(s) from the running server's audit folder (multi_agent_server\\data\\audit): wf_7a3ca267 accepted (accept by budgeting-ui), wf_80ebb1b9 rejected (reject by terminal:Bao), wf_1c3b05d8 accepted (accept by validate), wf_29ea9179 rejected (reject by validate), wf_763e8ada rejected (reject by terminal:Bao), wf_5c90e33e accepted (accept by validate), wf_06af6121 rejected (reject by validate), wf_2df0254b accepted (accept by terminal:Bao). Stages planner 8/8, worker 8/8, reviewer 8/8, human 8/8; fallbacks 0; revisions 0. Decisions accept 4, partially_accept 0, reject 4, pending 0, failed 0. plan acceptance 1.00, worker completion 1.00, handoff success 1.00, human acceptance 0.50",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "source": "multi_agent_server\\data\\audit",
+      "source_kind": "the running server's audit folder",
+      "history_records": 144,
+      "coordination_records": 88,
+      "count": 8,
+      "ids": [
+        "wf_7a3ca267",
+        "wf_80ebb1b9",
+        "wf_1c3b05d8",
+        "wf_29ea9179",
+        "wf_763e8ada",
+        "wf_5c90e33e",
+        "wf_06af6121",
+        "wf_2df0254b"
+      ],
+      "workflows": [
+        {
+          "workflow_id": "wf_7a3ca267",
+          "feature": "budgeting",
+          "request": "Which budgets are close to their limit, and how much is left in each?",
+          "created_at": "2026-10-19T11:26:23+00:00",
+          "final_state": "accepted",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "accept",
+          "decided_by": "budgeting-ui",
+          "released": true,
+          "failed": false,
+          "error": ""
+        },
+        {
+          "workflow_id": "wf_80ebb1b9",
+          "feature": "budgeting",
+          "request": "Which budget categories went over the limit this period, and by how much each?",
+          "created_at": "2026-10-19T12:25:32+00:00",
+          "final_state": "rejected",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "reject",
+          "decided_by": "terminal:Bao",
+          "released": false,
+          "failed": false,
+          "error": ""
+        },
+        {
+          "workflow_id": "wf_1c3b05d8",
+          "feature": "budgeting",
+          "request": "Which budget categories went over the limit in September 2026 and by how much?",
+          "created_at": "2026-10-21T20:59:32+00:00",
+          "final_state": "accepted",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "accept",
+          "decided_by": "validate",
+          "released": true,
+          "failed": false,
+          "error": ""
+        },
+        {
+          "workflow_id": "wf_29ea9179",
+          "feature": "budgeting",
+          "request": "What did I spend most on in September 2026, and is my overall budget on track?",
+          "created_at": "2026-10-21T20:59:49+00:00",
+          "final_state": "rejected",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "reject",
+          "decided_by": "validate",
+          "released": false,
+          "failed": false,
+          "error": ""
+        },
+        {
+          "workflow_id": "wf_763e8ada",
+          "feature": "budgeting",
+          "request": "How is my September 2026 budget tracking, and which categories are over?",
+          "created_at": "2026-10-21T21:00:21+00:00",
+          "final_state": "rejected",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "reject",
+          "decided_by": "terminal:Bao",
+          "released": false,
+          "failed": false,
+          "error": ""
+        },
+        {
+          "workflow_id": "wf_5c90e33e",
+          "feature": "budgeting",
+          "request": "Which budget categories went over the limit in September 2026 and by how much?",
+          "created_at": "2026-10-21T21:14:07+00:00",
+          "final_state": "accepted",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "accept",
+          "decided_by": "validate",
+          "released": true,
+          "failed": false,
+          "error": ""
+        },
+        {
+          "workflow_id": "wf_06af6121",
+          "feature": "budgeting",
+          "request": "What did I spend most on in September 2026, and is my overall budget on track?",
+          "created_at": "2026-10-21T21:14:24+00:00",
+          "final_state": "rejected",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "reject",
+          "decided_by": "validate",
+          "released": false,
+          "failed": false,
+          "error": ""
+        },
+        {
+          "workflow_id": "wf_2df0254b",
+          "feature": "budgeting",
+          "request": "How is my September 2026 budget tracking, and which categories are over?",
+          "created_at": "2026-10-21T21:14:44+00:00",
+          "final_state": "accepted",
+          "stages": {
+            "planner": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "worker": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "reviewer": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            },
+            "human": {
+              "started": 1,
+              "completed": 1,
+              "fallback": false
+            }
+          },
+          "fallbacks": 0,
+          "revisions": 0,
+          "verdict": "accept",
+          "escalated": false,
+          "decision": "accept",
+          "decided_by": "terminal:Bao",
+          "released": true,
+          "failed": false,
+          "error": ""
+        }
+      ],
+      "stage_totals": {
+        "planner": {
+          "started": 8,
+          "completed": 8
+        },
+        "worker": {
+          "started": 8,
+          "completed": 8
+        },
+        "reviewer": {
+          "started": 8,
+          "completed": 8
+        },
+        "human": {
+          "started": 8,
+          "completed": 8
+        }
+      },
+      "decisions": {
+        "accept": 4,
+        "reject": 4
+      },
+      "pending": 0,
+      "failed": 0,
+      "fallbacks": 0,
+      "revisions": 0,
+      "handoff_anomalies": 0,
+      "left_out": 0,
+      "metrics_error": "",
+      "rolled_back": 0,
+      "rates": {
+        "plan_acceptance_rate": 1.0,
+        "worker_completion_rate": 1.0,
+        "handoff_success_rate": 1.0,
+        "human_acceptance_rate": 0.5
+      },
+      "metrics": {
+        "workflows": {
+          "total": 8,
+          "by_final_state": {
+            "accepted": 4,
+            "rejected": 4
+          },
+          "decided": 8,
+          "failed": 0
+        },
+        "plan_acceptance_rate": 1.0,
+        "worker_completion_rate": 1.0,
+        "handoff_success_rate": 1.0,
+        "reviewer_defect_yield": 0.0,
+        "rework_ratio": 0.0,
+        "escalation_rate": 0.0,
+        "fallback_rate": 0.0,
+        "human_acceptance_rate": 0.5,
+        "human_decisions": {
+          "accept": 4,
+          "reject": 4
+        },
+        "stage_seconds": {
+          "planner": 1.824,
+          "worker": 1.367,
+          "reviewer": 1.349,
+          "human": 25657.25
+        },
+        "end_to_end_seconds": {
+          "to_human_gate": 4.375,
+          "to_decision": 25661.625
+        },
+        "counts": {
+          "history_records": 144,
+          "coordination_records": 88,
+          "stages_started": {
+            "planner": 8,
+            "worker": 8,
+            "reviewer": 8,
+            "human": 8
+          },
+          "stages_finished": {
+            "planner": 8,
+            "worker": 8,
+            "reviewer": 8,
+            "human": 8
+          },
+          "handoffs": 24,
+          "handoff_anomalies": 0,
+          "contract_rejections": 0,
+          "revisions_requested": 0,
+          "fallbacks": 0,
+          "escalations": 0,
+          "timeouts": 0,
+          "rolled_back_decisions": 0
+        }
+      },
+      "attention": false,
+      "attention_reasons": []
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Workflows: 8 reviewed - wf_7a3ca267, wf_80ebb1b9, wf_1c3b05d8, wf_29ea9179, wf_763e8ada, wf_5c90e33e, wf_06af6121, wf_2df0254b\nStages: planner 8/8, worker 8/8, reviewer 8/8, human 8/8; fallbacks 0; revisions 0\nDecisions: accept 4, partially_accept 0, reject 4; wf_7a3ca267 accept, wf_80ebb1b9 reject, wf_1c3b05d8 accept, wf_29ea9179 reject, wf_763e8ada reject, wf_5c90e33e accept, wf_06af6121 reject, wf_2df0254b accept\nMetrics: plan acceptance 1.00, worker completion 1.00, handoff success 1.00, human acceptance 0.50\nRecommendation: Keep the workflow stages and review process as they are since all stages completed successfully with zero fallbacks, zero revisions, and perfect completion and handoff metrics.\nVerdict: PASS - All 8 workflows completed their stages successfully with perfect plan acceptance, worker completion, and handoff success metrics.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: No evidence-backed risk identified.\nCorrection: No correction required.\nRetest: Repeat validation after future changes.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}

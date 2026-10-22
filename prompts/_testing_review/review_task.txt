@@ -1,0 +1,11 @@
+Write the Testing Review entry from the evidence below.
+
+Reply in exactly five lines, in this order and format, with nothing before or after:
+
+Pre-commit: <for each student, student-N followed by its scans as "<scan> <findings>/<fixed>/<accepted> <passed or failed>", comma-separated; a student with no pre-commit report as "student-N none"; students separated by semicolons>
+Post-commit: <for each student, student-N followed by its endpoint tests as "<METHOD> <path> <outcome>", comma-separated, then "(<passed>/<endpoints> endpoints, <checks> checks)"; a student with JUnit evidence only as "student-N <tests> tests <failures> failures <errors> errors (junit)"; a student with no post-commit report as "student-N none"; students separated by semicolons>
+Coverage: <count> of <total> students have a pre-commit report, <count> of <total> have a post-commit report; missing: <student ids missing one or both, comma-separated, or none>
+Recommendation: <one or two sentences on what the team should do next, grounded in the reports: which reports are missing, which findings to fix, or that the evidence is complete>
+Verdict: <PASS or ATTENTION> - <one sentence saying why>
+
+Copy every scan name, count, endpoint and outcome from the evidence verbatim. The Verdict word is the "Required verdict word" in the evidence.

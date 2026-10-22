@@ -113,7 +113,7 @@ jobs:
       # running server, no ChromaDB and no API key: MCP and RAG stay disabled
       # in CI, only their maths and contracts are checked.
       - name: Run shared MCP and RAG unit tests
-        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py tests/test_multi_agent_server.py -q
+        run: python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py tests/test_multi_agent_server.py tests/test_release2_review_modes.py -q
 
   # =====================================================================
   # 3. Runtime gate - the stack starts and every endpoint returns HTTP 200

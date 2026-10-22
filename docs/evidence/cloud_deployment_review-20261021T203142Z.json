@@ -1,0 +1,144 @@
+{
+  "mode": "cloud_deployment_review",
+  "timestamp": "20261021T203142Z",
+  "plan": {
+    "goal": "Review the cloud deployment report and write the entry that supports the final human release decision",
+    "checks": [
+      "the report names the provider, region, commit and the cloud-deployment.yml run",
+      "every endpoint and CRUD check in the report returned its expected status",
+      "AI-Mode, MCP, RAG and the Multi-Agent Server are all disabled in the baseline (the bonus profile may enable some)",
+      "the entry quotes the provider, commit, counts, statuses and AI states exactly and records the human decision",
+      "the release recommendation is approve only for a real deployment whose run succeeded, whose checks all passed, whose AI services match the profile and that has no open issue"
+    ],
+    "stop_condition": "An entry passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "azure australiaeast, commit 0000000, no cloud-deployment.yml run: 3 resources; endpoints 3/3 passed (home page 200, budgeting api health 200, budgets list 200); CRUD 3/3 passed (budget create 201, budget read 200, budget delete 200); baseline profile, AI services ai-mode disabled, mcp disabled, rag disabled, multi-agent disabled; issues 0; recommendation hold (this is the sample report, not a real deployment; the report names no cloud-deployment.yml run); human decision pending",
+    "degraded": true,
+    "note": "this is the sample report (docs/deployment/cloud-deployment-report.sample.json); the cloud owner's real report is not in the repo yet, so nothing here describes a real deployment and the release is held",
+    "facts": {
+      "report": "docs/deployment/cloud-deployment-report.sample.json",
+      "is_sample": true,
+      "profile": "baseline",
+      "provider": "azure",
+      "region": "australiaeast",
+      "environment": "release-2-baseline",
+      "commit": "0000000",
+      "deployed_at": "2026-10-24T00:00:00Z",
+      "deployed_by": "cloud owner",
+      "workflow_name": "cloud-deployment.yml",
+      "run_id": "",
+      "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/0",
+      "workflow_conclusion": "success",
+      "scripts": [
+        "deploy/azure/deploy.sh",
+        "deploy/azure/main.bicep"
+      ],
+      "resources": [
+        {
+          "name": "smartbank-vm",
+          "type": "virtual-machine",
+          "status": "running"
+        },
+        {
+          "name": "smartbank-nsg",
+          "type": "network-security-group",
+          "status": "applied"
+        },
+        {
+          "name": "smartbank-ip",
+          "type": "public-ip",
+          "status": "assigned"
+        }
+      ],
+      "endpoints": [
+        {
+          "name": "home page",
+          "method": "GET",
+          "url": "http://smartbank.example:3000/",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting api health",
+          "method": "GET",
+          "url": "http://smartbank.example:5004/api/health",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgets list",
+          "method": "GET",
+          "url": "http://smartbank.example:5004/api/budgets",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        }
+      ],
+      "crud": [
+        {
+          "name": "budget create",
+          "method": "POST",
+          "url": "http://smartbank.example:5004/api/budgets",
+          "status": "201",
+          "expected_status": 201,
+          "ok": true
+        },
+        {
+          "name": "budget read",
+          "method": "GET",
+          "url": "http://smartbank.example:5004/api/budgets/15",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budget delete",
+          "method": "DELETE",
+          "url": "http://smartbank.example:5004/api/budgets/15",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        }
+      ],
+      "ai_services": {
+        "ai-mode": "disabled",
+        "mcp": "disabled",
+        "rag": "disabled",
+        "multi-agent": "disabled"
+      },
+      "issues": [],
+      "endpoints_passed": 3,
+      "crud_passed": 3,
+      "recommendation": "hold",
+      "hold_reasons": [
+        "this is the sample report, not a real deployment",
+        "the report names no cloud-deployment.yml run"
+      ],
+      "human_decision": "pending",
+      "decided_by": "",
+      "decision_note": "",
+      "attention": true
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Deployment: azure australiaeast, commit 0000000, workflow run none, 3 resources\nEndpoints: 3/3 passed - home page 200, budgeting api health 200, budgets list 200\nAI services: ai-mode disabled, mcp disabled, rag disabled, multi-agent disabled\nCRUD: 3/3 passed - budget create 201, budget read 200, budget delete 200\nRelease recommendation: hold - Hold because this is the sample report, not a real deployment; the report names no cloud-deployment.yml run.\nHuman decision: pending\nVerdict: ATTENTION - It is the sample report.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: No evidence-backed risk identified.\nCorrection: No correction required.\nRetest: Repeat validation after future changes.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}

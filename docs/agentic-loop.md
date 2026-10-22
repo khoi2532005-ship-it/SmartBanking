@@ -170,6 +170,28 @@ on the same menu, `mcp_validation` and `rag_validation`, which validate the
 shared MCP and RAG servers: ACT reuses the terminal check suites
 (`mcp_server/validate.py`, `rag_server/validate.py`), the model writes the
 test-record entry, and OBSERVE rejects an entry that names a tool, chunk id,
-metric or pass count the record does not support. Release 2 adds
-Planner/Worker/Reviewer agents. Those extend the same engine - a new mode, or a
-second model role inside `build_prompt`/`validate` - rather than replacing it.
+metric or pass count the record does not support.
+
+Release 2 adds three review modes on the same menu. Each reads evidence files
+rather than a live service, has the model write the review entry, and rejects
+an entry that misquotes the evidence:
+
+| Mode | Reads | OBSERVE rejects an entry that |
+|---|---|---|
+| `multi_agent_review` | the Multi-Agent Server's `workflow_history.jsonl` and `coordination_audit.jsonl` (the running server, the newest validation snapshot, or a feature's committed evidence; `MULTI_AGENT_AUDIT_DIR` overrides) | invents a workflow id, drops one of the four stages, misquotes a decision or a coordination metric |
+| `testing_review` | `docs/testing/pre-commit-security-report-student-<N>.json`, `docs/testing/post-commit-endpoint-report-student-<N>.json`, or JUnit files under `docs/release-2/ci/student-<N>/` | invents a scan or a student, misquotes a scan's counts, a test outcome, an endpoint count or the coverage |
+| `cloud_deployment_review` | `docs/deployment/cloud-deployment-report.json` (schema in `docs/deployment/cloud-deployment-report-format.md`; the sample is reviewed, degraded, until it exists) | misquotes the provider, commit, a count, a status code or an AI service's state, or approves a deployment a check failed |
+
+The Multi-Agent Server's Planner, Worker and Reviewer agents live in
+`multi_agent_server/`, with the human decision inside that workflow; the loop
+reviews their records afterwards, which keeps the loop's verdicts
+reproducible. Each review entry ends with a verdict word the evidence
+dictates, PASS or ATTENTION, so the model cannot talk a failed run into a
+pass.
+
+```bash
+python agentic_loop.py --mode multi_agent_review
+python agentic_loop.py --mode testing_review
+python agentic_loop.py --mode cloud_deployment_review
+python -m pytest tests/test_release2_review_modes.py -q
+```

@@ -1,0 +1,12 @@
+Write the Multi-Agent Workflow Review entry from the evidence below.
+
+Reply in exactly six lines, in this order and format, with nothing before or after:
+
+Workflows: <count> reviewed - <every workflow id, comma-separated, exactly as listed>
+Stages: planner <completed>/<started>, worker <completed>/<started>, reviewer <completed>/<started>, human <completed>/<started>; fallbacks <count>; revisions <count>
+Decisions: accept <count>, partially_accept <count>, reject <count>; <each workflow id followed by its decision word: accept, partially_accept, reject, pending or failed, comma-separated>
+Metrics: plan acceptance <value>, worker completion <value>, handoff success <value>, human acceptance <value>
+Recommendation: <one or two sentences on what to keep or change in the workflow or its review, grounded in the records: a revision, a fallback, a rejection, a slow stage, or that nothing needs changing>
+Verdict: <PASS or ATTENTION> - <one sentence saying why>
+
+Copy the stage counts from the Totals line, the decision counts from the Decisions line and the four values from the Metrics line, verbatim. The Verdict word is the "Required verdict word" in the evidence.

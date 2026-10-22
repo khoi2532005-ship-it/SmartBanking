@@ -1,0 +1,13 @@
+Write the Cloud Deployment Review entry from the evidence below.
+
+Reply in exactly seven lines, in this order and format, with nothing before or after:
+
+Deployment: <provider> <region>, commit <commit>, workflow run <run id> <conclusion> (or just "workflow run none" when the report names no run), <count> resources
+Endpoints: <passed>/<total> checks passed - <each check's name and its status code, or "no response" when it has none, comma-separated>
+AI services: ai-mode <state>, mcp <state>, rag <state>, multi-agent <state>
+CRUD: <passed>/<total> checks passed - <each check's name and its status code, or "no response" when it has none, comma-separated>
+Release recommendation: <approve or hold> - <one sentence saying why>
+Human decision: <the decision and who made it, or pending>
+Verdict: <PASS or ATTENTION> - <one sentence saying why; if the evidence says the report is a SAMPLE, say it is the sample report>
+
+Copy the provider, commit, run, counts, names, status codes and states from the evidence verbatim. The recommendation is the "Required release recommendation" and the Verdict word is the "Required verdict word" in the evidence.
