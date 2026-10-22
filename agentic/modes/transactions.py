@@ -23,6 +23,36 @@ def _money(value) -> str:
     return f"${float(value):,.2f}"
 
 
+def _multi_agent_server_url() -> str:
+    return (os.getenv("MULTI_AGENT_SERVER_URL", "http://localhost:8300").strip() or "http://localhost:8300").rstrip("/")
+
+
+def _configured_workflow_id() -> str:
+    return os.getenv("TRANSACTIONS_LOOP_WORKFLOW_ID", "").strip()
+
+
+def _workflow_response_url(workflow_id: str) -> str:
+    return f"{_multi_agent_server_url()}/workflow/{workflow_id}/response"
+
+
+def _latest_transactions_workflow_id() -> str:
+    workflow_id = _configured_workflow_id()
+    if workflow_id:
+        return workflow_id
+    try:
+        listing = net.get_json(f"{_multi_agent_server_url()}/workflows?feature=transactions&limit=1")
+    except net.ServiceUnreachable:
+        return ""
+    if not isinstance(listing, list):
+        return ""
+    for row in listing:
+        if isinstance(row, dict) and row.get("feature") == "transactions":
+            workflow_id = str(row.get("workflow_id") or "").strip()
+            if workflow_id:
+                return workflow_id
+    return ""
+
+
 class TransactionsMode(Mode):
     key = "transactions"
     label = "Transactions"
@@ -44,6 +74,42 @@ class TransactionsMode(Mode):
         )
 
     def collect(self) -> Evidence:
+        workflow_id = _latest_transactions_workflow_id()
+        if workflow_id:
+            try:
+                final = net.get_json(_workflow_response_url(workflow_id))
+            except net.ServiceUnreachable:
+                workflow_id = ""
+            else:
+                if isinstance(final, dict) and final.get("released"):
+                    findings = final.get("findings") or []
+                    sources = final.get("evidence_sources") or []
+                    answer = str(final.get("answer") or "").strip()
+                    if answer or findings:
+                        top_claims = [
+                            str(item.get("statement", "")).strip()
+                            for item in findings if isinstance(item, dict) and item.get("statement")
+                        ]
+                        summary = (
+                            f"Approved multi-agent workflow {workflow_id} for customer {CUSTOMER_ID}; "
+                            f"{len(findings)} findings from {len(sources)} evidence sources"
+                        )
+                        if top_claims:
+                            summary += f"; {', '.join(top_claims[:2])[:180]}"
+                        return Evidence(
+                            ok=True,
+                            summary=summary,
+                            facts={
+                                "customer_id": CUSTOMER_ID,
+                                "workflow_id": workflow_id,
+                                "answer": answer,
+                                "findings": findings,
+                                "evidence_sources": sources,
+                            },
+                            degraded=False,
+                            note="evidence came from the approved multi-agent workflow",
+                        )
+
         url = f"{TRANSACTIONS_SERVICE_URL}/api/transactions?customer_id={CUSTOMER_ID}"
         try:
             records = net.get_json(url)
@@ -100,23 +166,41 @@ class TransactionsMode(Mode):
             "implementation/task_prompt.txt",
         )
 
-        records = evidence.facts["records"]
-        top_categories = evidence.facts["top_categories"]
-        recent_lines = [
-            f"- {r.get('date')}: {r.get('type')} {r.get('category')} {_money(r.get('amount', 0))} "
-            f"({r.get('description') or 'no description'})"
-            for r in records
-        ]
+        workflow_id = evidence.facts.get("workflow_id")
+        if workflow_id:
+            findings = evidence.facts.get("findings") or []
+            finding_lines = [
+                f"- {item.get('statement', '')}" if isinstance(item, dict) else str(item)
+                for item in findings
+            ]
+            if not finding_lines:
+                finding_lines = ["- (none)"]
+            evidence_block = "\n".join([
+                f"Customer ID: {evidence.facts['customer_id']}",
+                f"Workflow ID: {workflow_id}",
+                "Approved workflow answer:",
+                str(evidence.facts.get("answer") or "(no approved answer available)"),
+                "Workflow findings:",
+                *finding_lines,
+            ])
+        else:
+            records = evidence.facts["records"]
+            top_categories = evidence.facts["top_categories"]
+            recent_lines = [
+                f"- {r.get('date')}: {r.get('type')} {r.get('category')} {_money(r.get('amount', 0))} "
+                f"({r.get('description') or 'no description'})"
+                for r in records
+            ]
 
-        evidence_block = "\n".join([
-            f"Customer ID: {evidence.facts['customer_id']}",
-            f"Recent transaction count: {len(records)}",
-            f"Top categories: {', '.join(f'{name} ({_money(value)})' for name, value in top_categories)}",
-            f"Total outgoing: {_money(evidence.facts['total_out'])}",
-            f"Total incoming: {_money(evidence.facts['total_in'])}",
-            "Recent transactions:",
-            *recent_lines,
-        ])
+            evidence_block = "\n".join([
+                f"Customer ID: {evidence.facts['customer_id']}",
+                f"Recent transaction count: {len(records)}",
+                f"Top categories: {', '.join(f'{name} ({_money(value)})' for name, value in top_categories)}",
+                f"Total outgoing: {_money(evidence.facts['total_out'])}",
+                f"Total incoming: {_money(evidence.facts['total_in'])}",
+                "Recent transactions:",
+                *recent_lines,
+            ])
 
         correction = ""
         if feedback:
@@ -137,8 +221,15 @@ class TransactionsMode(Mode):
 
         text = output.lower()
         reasons: list[str] = []
-        categories = [name.lower() for name, _ in evidence.facts["top_categories"]]
+        categories = [name.lower() for name, _ in evidence.facts.get("top_categories", [])]
+        if evidence.facts.get("findings"):
+            for item in evidence.facts["findings"]:
+                if isinstance(item, dict):
+                    statement = str(item.get("statement", "")).lower()
+                    text_words = {word for word in statement.replace("$", " ").replace(",", " ").split() if len(word) > 2}
+                    categories.extend(word for word in text_words if word not in {"the", "with", "from", "into", "main"})
 
+        categories = [category for category in categories if category.strip()]
         if not any(category in text for category in categories):
             reasons.append("it did not name the main spending category or categories from the evidence")
 

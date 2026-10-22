@@ -21,6 +21,7 @@ pytest.importorskip("mcp")  # mcp_server.validate drives the server through the 
 from agentic import llm, loop, modes, prompts  # noqa: E402
 from agentic.modes.mcp_validation import MCPValidationMode  # noqa: E402
 from agentic.modes.rag_validation import RAGValidationMode  # noqa: E402
+from agentic.modes.transactions import TransactionsMode  # noqa: E402
 from mcp_server import validate as mcp_validate  # noqa: E402
 from rag_server import validate as rag_validate  # noqa: E402
 
@@ -157,6 +158,41 @@ def test_both_modes_are_on_the_menu():
     for key in ("mcp_validation", "rag_validation"):
         assert key in modes.MODES, key
         assert modes.MODES[key].label and modes.MODES[key].owner == "Bao"
+
+
+def test_transactions_mode_prefers_approved_workflow_evidence(monkeypatch):
+    calls = []
+
+    def fake_get_json(url, *, timeout=10):
+        calls.append(url)
+        if url.startswith("http://localhost:8300/workflow/wf_12345678/response"):
+            return {
+                "workflow_id": "wf_12345678",
+                "decision": "accept",
+                "released": True,
+                "answer": "The highest spend was groceries at $500.00, with transport next at $250.00.",
+                "findings": [
+                    {"statement": "Groceries were the main spend at $500.00."},
+                    {"statement": "Transport was the second-biggest category at $250.00."},
+                ],
+                "gaps": [],
+                "evidence_sources": [{"endpoint": "/api/transactions/spending"}],
+            }
+        if "workflows?feature=transactions" in url:
+            return {"workflows": [{"workflow_id": "wf_12345678", "feature": "transactions", "state": "accepted",
+                                   "context": {"customer_id": 1} }]}
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr("agentic.modes.transactions.net.get_json", fake_get_json)
+    monkeypatch.setenv("TRANSACTIONS_LOOP_WORKFLOW_ID", "wf_12345678")
+    monkeypatch.setenv("MULTI_AGENT_SERVER_URL", "http://localhost:8300")
+
+    result = loop.run(TransactionsMode())
+
+    assert result.ok
+    assert "wf_12345678" in result.evidence.summary
+    assert any(url.endswith("/workflow/wf_12345678/response") for url in calls)
+    assert not any(url.startswith("http://localhost:5005/api/transactions") for url in calls)
 
 
 def test_prompt_files_exist_and_are_not_inline():
