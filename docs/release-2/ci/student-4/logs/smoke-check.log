@@ -1,0 +1,800 @@
+﻿2026-10-22T05:19:57.5673180Z Current runner version: '2.338.0'
+2026-10-22T05:19:57.5687946Z ##[group]Runner Image Provisioner
+2026-10-22T05:19:57.5688534Z Hosted Compute Agent
+2026-10-22T05:19:57.5688895Z Version: 20261015.610
+2026-10-22T05:19:57.5689296Z Commit: 267fdb4e8bbec4ab5ea31367f3a00d5c480c7656
+2026-10-22T05:19:57.5689752Z Build Date: 2026-10-14T17:06:54Z
+2026-10-22T05:19:57.5690153Z Worker ID: {71d80be7-58f3-4fe3-b8f1-eef02702ea26}
+2026-10-22T05:19:57.5690543Z Region: westus2
+2026-10-22T05:19:57.5691170Z Cloud: Azure
+2026-10-22T05:19:57.5691526Z ##[endgroup]
+2026-10-22T05:19:57.5692317Z ##[group]Operating System
+2026-10-22T05:19:57.5692688Z Ubuntu
+2026-10-22T05:19:57.5693017Z 24.04.5
+2026-10-22T05:19:57.5693365Z LTS
+2026-10-22T05:19:57.5693703Z ##[endgroup]
+2026-10-22T05:19:57.5694048Z ##[group]Runner Image
+2026-10-22T05:19:57.5694420Z Image: ubuntu-24.04
+2026-10-22T05:19:57.5694756Z Version: 20261018.339.1
+2026-10-22T05:19:57.5695541Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261018.339/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-22T05:19:57.5696399Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261018.339
+2026-10-22T05:19:57.5696953Z ##[endgroup]
+2026-10-22T05:19:57.5697667Z ##[group]GITHUB_TOKEN Permissions
+2026-10-22T05:19:57.5698980Z Contents: read
+2026-10-22T05:19:57.5699323Z Metadata: read
+2026-10-22T05:19:57.5699701Z Packages: read
+2026-10-22T05:19:57.5700029Z ##[endgroup]
+2026-10-22T05:19:57.5701581Z Secret source: Actions
+2026-10-22T05:19:57.5702146Z Cache mode: write
+2026-10-22T05:19:57.5702730Z Prepare workflow directory
+2026-10-22T05:19:57.5926659Z Prepare all required actions
+2026-10-22T05:19:57.5956093Z Getting action download info
+2026-10-22T05:19:57.9093877Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-22T05:19:57.9858645Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-10-22T05:19:58.0726870Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-22T05:19:58.2805712Z Complete job name: Smoke check
+2026-10-22T05:19:58.3255834Z ##[group]Run actions/checkout@v4
+2026-10-22T05:19:58.3256215Z with:
+2026-10-22T05:19:58.3256462Z   repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:58.3258364Z   token: ***
+2026-10-22T05:19:58.3258579Z   ssh-strict: true
+2026-10-22T05:19:58.3258803Z   ssh-user: git
+2026-10-22T05:19:58.3259033Z   persist-credentials: true
+2026-10-22T05:19:58.3259277Z   clean: true
+2026-10-22T05:19:58.3259503Z   sparse-checkout-cone-mode: true
+2026-10-22T05:19:58.3259768Z   fetch-depth: 1
+2026-10-22T05:19:58.3259987Z   fetch-tags: false
+2026-10-22T05:19:58.3260214Z   show-progress: true
+2026-10-22T05:19:58.3260443Z   lfs: false
+2026-10-22T05:19:58.3260654Z   submodules: false
+2026-10-22T05:19:58.3261014Z   set-safe-directory: true
+2026-10-22T05:19:58.3261273Z   allow-unsafe-pr-checkout: false
+2026-10-22T05:19:58.3261612Z env:
+2026-10-22T05:19:58.3261831Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:58.3262271Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:58.3262687Z   AI_MODE_ENABLED: false
+2026-10-22T05:19:58.3262929Z   MCP_ENABLED: false
+2026-10-22T05:19:58.3263156Z   RAG_ENABLED: false
+2026-10-22T05:19:58.3263389Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:19:58.3263637Z ##[endgroup]
+2026-10-22T05:19:58.3908625Z Syncing repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:58.3910060Z ##[group]Getting Git version info
+2026-10-22T05:19:58.3910662Z Working directory is '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:19:58.3911705Z [command]/usr/bin/git version
+2026-10-22T05:19:58.3983640Z git version 2.55.0
+2026-10-22T05:19:58.3994836Z ##[endgroup]
+2026-10-22T05:19:58.4013766Z Temporarily overriding HOME='/home/runner/work/_temp/23314105-dfc9-4f69-acec-9ee4144effa3' before making global git config changes
+2026-10-22T05:19:58.4019929Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:19:58.4021264Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:58.4059994Z Deleting the contents of '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:19:58.4064807Z ##[group]Initializing the repository
+2026-10-22T05:19:58.4065553Z [command]/usr/bin/git init /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:58.4208921Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-22T05:19:58.4209903Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-22T05:19:58.4210493Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-22T05:19:58.4211023Z hint: call:
+2026-10-22T05:19:58.4211266Z hint:
+2026-10-22T05:19:58.4211708Z hint: 	git config --global init.defaultBranch <name>
+2026-10-22T05:19:58.4212210Z hint:
+2026-10-22T05:19:58.4212676Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-22T05:19:58.4213502Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-22T05:19:58.4214104Z hint:
+2026-10-22T05:19:58.4214440Z hint: 	git branch -m <name>
+2026-10-22T05:19:58.4214818Z hint:
+2026-10-22T05:19:58.4215303Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-22T05:19:58.4215974Z Initialized empty Git repository in /home/runner/work/SmartBanking/SmartBanking/.git/
+2026-10-22T05:19:58.4223798Z [command]/usr/bin/git remote add origin https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:58.4269838Z ##[endgroup]
+2026-10-22T05:19:58.4270481Z ##[group]Disabling automatic garbage collection
+2026-10-22T05:19:58.4272576Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-22T05:19:58.4300653Z ##[endgroup]
+2026-10-22T05:19:58.4301344Z ##[group]Setting up auth
+2026-10-22T05:19:58.4305791Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:19:58.4342529Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:19:58.4638122Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:19:58.4673000Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:19:58.4853265Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:19:58.4886682Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:19:58.5066677Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-22T05:19:58.5105853Z ##[endgroup]
+2026-10-22T05:19:58.5106543Z ##[group]Fetching the repository
+2026-10-22T05:19:58.5112806Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fa227e0b61887327b2edce92a6160bbdd81dd929:refs/remotes/origin/main
+2026-10-22T05:19:59.1557568Z From https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:59.1558351Z  * [new ref]         fa227e0b61887327b2edce92a6160bbdd81dd929 -> origin/main
+2026-10-22T05:19:59.1562337Z ##[endgroup]
+2026-10-22T05:19:59.1562944Z ##[group]Determining the checkout info
+2026-10-22T05:19:59.1564601Z ##[endgroup]
+2026-10-22T05:19:59.1570150Z [command]/usr/bin/git sparse-checkout disable
+2026-10-22T05:19:59.1620483Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-22T05:19:59.1653475Z ##[group]Checking out the ref
+2026-10-22T05:19:59.1656980Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-10-22T05:19:59.2098948Z Switched to a new branch 'main'
+2026-10-22T05:19:59.2103915Z branch 'main' set up to track 'origin/main'.
+2026-10-22T05:19:59.2108955Z ##[endgroup]
+2026-10-22T05:19:59.2182361Z [command]/usr/bin/git log -1 --format=%H
+2026-10-22T05:19:59.2195997Z fa227e0b61887327b2edce92a6160bbdd81dd929
+2026-10-22T05:19:59.2416679Z ##[group]Run docker compose -f "$COMPOSE_FILE" up -d --no-deps $SERVICES
+2026-10-22T05:19:59.2417366Z [36;1mdocker compose -f "$COMPOSE_FILE" up -d --no-deps $SERVICES[0m
+2026-10-22T05:19:59.2569121Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:59.2569446Z env:
+2026-10-22T05:19:59.2569692Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:59.2570246Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:59.2570915Z   AI_MODE_ENABLED: false
+2026-10-22T05:19:59.2571191Z   MCP_ENABLED: false
+2026-10-22T05:19:59.2571435Z   RAG_ENABLED: false
+2026-10-22T05:19:59.2571691Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:19:59.2571973Z ##[endgroup]
+2026-10-22T05:19:59.5521350Z  budgeting-database-service Pulling 
+2026-10-22T05:19:59.5522452Z  budgeting-service Pulling 
+2026-10-22T05:19:59.5523415Z  budgeting-frontend-service Pulling 
+2026-10-22T05:20:00.3060042Z  budgeting-database-service Warning pull access denied for smartbank-budgeting-db, repository does not exist or may require 'docker login': denied: requested access to the resource is denied
+2026-10-22T05:20:00.3109693Z  budgeting-frontend-service Warning pull access denied for smartbank-budgeting-web, repository does not exist or may require 'docker login': denied: requested access to the resource is denied
+2026-10-22T05:20:00.3144114Z  budgeting-service Warning pull access denied for smartbank-budgeting-api, repository does not exist or may require 'docker login': denied: requested access to the resource is denied
+2026-10-22T05:20:00.5156249Z #1 [internal] load local bake definitions
+2026-10-22T05:20:00.7468769Z #1 reading from stdin 1.22kB done
+2026-10-22T05:20:00.7469166Z #1 DONE 0.0s
+2026-10-22T05:20:00.7469316Z 
+2026-10-22T05:20:00.7469621Z #2 [budgeting-database-service internal] load build definition from Dockerfile
+2026-10-22T05:20:00.7469991Z #2 transferring dockerfile: 630B done
+2026-10-22T05:20:00.7470177Z #2 DONE 0.0s
+2026-10-22T05:20:00.7470258Z 
+2026-10-22T05:20:00.7470401Z #3 [budgeting-service internal] load build definition from Dockerfile
+2026-10-22T05:20:00.7470687Z #3 transferring dockerfile: 1.32kB done
+2026-10-22T05:20:00.7471038Z #3 DONE 0.0s
+2026-10-22T05:20:00.7471147Z 
+2026-10-22T05:20:00.7471315Z #4 [budgeting-frontend-service internal] load build definition from Dockerfile
+2026-10-22T05:20:00.7471572Z #4 transferring dockerfile: 940B done
+2026-10-22T05:20:00.7471795Z #4 DONE 0.0s
+2026-10-22T05:20:00.7471877Z 
+2026-10-22T05:20:00.7472068Z #5 [budgeting-service internal] load metadata for docker.io/library/python:3.12-slim
+2026-10-22T05:20:00.9377425Z #5 ...
+2026-10-22T05:20:00.9377621Z 
+2026-10-22T05:20:00.9377822Z #6 [auth] library/python:pull token for registry-1.docker.io
+2026-10-22T05:20:00.9378098Z #6 DONE 0.0s
+2026-10-22T05:20:00.9378224Z 
+2026-10-22T05:20:00.9378346Z #7 [auth] library/nginx:pull token for registry-1.docker.io
+2026-10-22T05:20:00.9378596Z #7 DONE 0.0s
+2026-10-22T05:20:01.0879110Z 
+2026-10-22T05:20:01.0879606Z #8 [budgeting-frontend-service internal] load metadata for docker.io/library/nginx:alpine
+2026-10-22T05:20:01.4311697Z #8 DONE 0.8s
+2026-10-22T05:20:01.4311897Z 
+2026-10-22T05:20:01.4312134Z #5 [budgeting-service internal] load metadata for docker.io/library/python:3.12-slim
+2026-10-22T05:20:01.5503069Z #5 DONE 0.8s
+2026-10-22T05:20:01.5503248Z 
+2026-10-22T05:20:01.5503453Z #9 [budgeting-database-service internal] load .dockerignore
+2026-10-22T05:20:01.5503759Z #9 transferring context: 414B done
+2026-10-22T05:20:01.5504001Z #9 DONE 0.0s
+2026-10-22T05:20:01.5504105Z 
+2026-10-22T05:20:01.5504241Z #10 [budgeting-frontend-service internal] load build context
+2026-10-22T05:20:01.5504519Z #10 transferring context: 103.27kB done
+2026-10-22T05:20:01.5504670Z #10 DONE 0.0s
+2026-10-22T05:20:01.5504737Z 
+2026-10-22T05:20:01.5505155Z #11 [budgeting-service internal] load build context
+2026-10-22T05:20:01.5505325Z #11 transferring context: 282.27kB 0.0s done
+2026-10-22T05:20:01.5505466Z #11 DONE 0.0s
+2026-10-22T05:20:01.5505530Z 
+2026-10-22T05:20:01.5505800Z #12 [budgeting-database-service internal] load build context
+2026-10-22T05:20:01.5505992Z #12 transferring context: 19.15kB done
+2026-10-22T05:20:01.5506122Z #12 DONE 0.0s
+2026-10-22T05:20:01.5506227Z 
+2026-10-22T05:20:01.5506646Z #13 [budgeting-frontend-service 1/4] FROM docker.io/library/nginx:alpine@sha256:060849a174666c53439dc7cecbf8f67e225c7cbfb1a44ca97915d9a172a81e6d
+2026-10-22T05:20:01.5507381Z #13 resolve docker.io/library/nginx:alpine@sha256:060849a174666c53439dc7cecbf8f67e225c7cbfb1a44ca97915d9a172a81e6d done
+2026-10-22T05:20:01.5507968Z #13 sha256:7b229517ed222597277036d94892173207d01a731ab3a88eeb1de2e963a2c788 0B / 3.85MB 0.1s
+2026-10-22T05:20:01.5508491Z #13 sha256:060849a174666c53439dc7cecbf8f67e225c7cbfb1a44ca97915d9a172a81e6d 10.33kB / 10.33kB done
+2026-10-22T05:20:01.5509055Z #13 sha256:3d6cab9c2941df2441024a2f02a65ebe1b8916c3cbe7b9527f62627accea8004 12.31kB / 12.31kB done
+2026-10-22T05:20:01.5509510Z #13 sha256:12b85cff06fd7d383d36a9c96503fe049c9d4bf3dfda5cbb9ffa6ae99b9c07a6 0B / 1.94MB 0.1s
+2026-10-22T05:20:01.5510103Z #13 sha256:657023555a2a19dc6036468198bb350d2c7feaac7f2d0a3901b4dd3cb25e40c5 0B / 629B 0.1s
+2026-10-22T05:20:01.5510562Z #13 sha256:2db7d28517d1fba17c2da3210395f7be11a11b419246ad0da2edf782af72f367 2.50kB / 2.50kB done
+2026-10-22T05:20:01.6609658Z #13 sha256:7b229517ed222597277036d94892173207d01a731ab3a88eeb1de2e963a2c788 3.85MB / 3.85MB 0.1s done
+2026-10-22T05:20:01.6610622Z #13 sha256:12b85cff06fd7d383d36a9c96503fe049c9d4bf3dfda5cbb9ffa6ae99b9c07a6 1.94MB / 1.94MB 0.2s done
+2026-10-22T05:20:01.6611578Z #13 extracting sha256:7b229517ed222597277036d94892173207d01a731ab3a88eeb1de2e963a2c788 0.1s done
+2026-10-22T05:20:01.6612450Z #13 sha256:7cc330898115ce55acccb0cc1e7dd091df4410c8c5f3c540710ee0ac689f5fcb 0B / 964B 0.2s
+2026-10-22T05:20:01.6613243Z #13 sha256:26185d08a3ec318dd85a6c9f2172e714ec13cececd7f33c533b40b1689f9fedb 0B / 404B 0.2s
+2026-10-22T05:20:01.8499546Z #13 sha256:657023555a2a19dc6036468198bb350d2c7feaac7f2d0a3901b4dd3cb25e40c5 629B / 629B 0.2s done
+2026-10-22T05:20:01.8500054Z #13 sha256:7cc330898115ce55acccb0cc1e7dd091df4410c8c5f3c540710ee0ac689f5fcb 964B / 964B 0.2s done
+2026-10-22T05:20:01.8500387Z #13 sha256:26185d08a3ec318dd85a6c9f2172e714ec13cececd7f33c533b40b1689f9fedb 404B / 404B 0.2s done
+2026-10-22T05:20:01.8501074Z #13 extracting sha256:12b85cff06fd7d383d36a9c96503fe049c9d4bf3dfda5cbb9ffa6ae99b9c07a6 0.0s done
+2026-10-22T05:20:01.8501478Z #13 sha256:9b0f7dfe35b2711a17f60dadd6d4035dc0cdee152538cc5c0987029e94679548 1.40kB / 1.40kB 0.3s done
+2026-10-22T05:20:01.8501902Z #13 sha256:2ec5fb117ffa9a78b15fb6a78745ffc569c8da0aee9f36ace4cd67a44b1fef79 1.21kB / 1.21kB 0.3s done
+2026-10-22T05:20:01.8502240Z #13 sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919 20.53MB / 20.53MB 0.4s
+2026-10-22T05:20:02.2496895Z #13 sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919 20.53MB / 20.53MB 0.7s done
+2026-10-22T05:20:02.3511740Z #13 extracting sha256:657023555a2a19dc6036468198bb350d2c7feaac7f2d0a3901b4dd3cb25e40c5 done
+2026-10-22T05:20:02.3512521Z #13 extracting sha256:7cc330898115ce55acccb0cc1e7dd091df4410c8c5f3c540710ee0ac689f5fcb done
+2026-10-22T05:20:02.3513205Z #13 extracting sha256:26185d08a3ec318dd85a6c9f2172e714ec13cececd7f33c533b40b1689f9fedb done
+2026-10-22T05:20:02.3513803Z #13 extracting sha256:2ec5fb117ffa9a78b15fb6a78745ffc569c8da0aee9f36ace4cd67a44b1fef79 done
+2026-10-22T05:20:02.3514308Z #13 extracting sha256:9b0f7dfe35b2711a17f60dadd6d4035dc0cdee152538cc5c0987029e94679548 done
+2026-10-22T05:20:02.4544322Z #13 extracting sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919 0.1s
+2026-10-22T05:20:02.7299486Z #13 extracting sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919 0.3s done
+2026-10-22T05:20:03.6604419Z #13 DONE 2.1s
+2026-10-22T05:20:03.6605253Z 
+2026-10-22T05:20:03.6606194Z #14 [budgeting-frontend-service 2/4] COPY shared/frontend/ /usr/share/nginx/html/
+2026-10-22T05:20:03.6606744Z #14 DONE 0.0s
+2026-10-22T05:20:03.6606842Z 
+2026-10-22T05:20:03.6607424Z #15 [budgeting-frontend-service 3/4] COPY services/budgeting/frontend/tabs/ /usr/share/nginx/html/tabs/
+2026-10-22T05:20:03.6607786Z #15 DONE 0.0s
+2026-10-22T05:20:03.6607880Z 
+2026-10-22T05:20:03.6608161Z #16 [budgeting-frontend-service 4/4] COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
+2026-10-22T05:20:03.6608576Z #16 DONE 0.0s
+2026-10-22T05:20:03.6608667Z 
+2026-10-22T05:20:03.6608772Z #17 [budgeting-frontend-service] exporting to image
+2026-10-22T05:20:03.6609006Z #17 exporting layers
+2026-10-22T05:20:04.2793799Z #17 exporting layers 0.4s done
+2026-10-22T05:20:04.2796553Z #17 writing image sha256:8f250a7ec03d807221e6d4cd5c873b6c8ba2221910db974d52114a1a192052a0 done
+2026-10-22T05:20:04.2797222Z #17 naming to docker.io/library/smartbank-budgeting-web:0.1 done
+2026-10-22T05:20:04.2797739Z #17 DONE 0.4s
+2026-10-22T05:20:04.2798027Z 
+2026-10-22T05:20:04.2798547Z #18 [budgeting-service 1/6] FROM docker.io/library/python:3.12-slim@sha256:cb33f7f771ecec2ef1225cf39b159591a040391bd73e4c01f00fdfc4c47611d2
+2026-10-22T05:20:04.2799513Z #18 resolve docker.io/library/python:3.12-slim@sha256:cb33f7f771ecec2ef1225cf39b159591a040391bd73e4c01f00fdfc4c47611d2 done
+2026-10-22T05:20:04.2800318Z #18 sha256:cb33f7f771ecec2ef1225cf39b159591a040391bd73e4c01f00fdfc4c47611d2 10.37kB / 10.37kB done
+2026-10-22T05:20:04.2801196Z #18 sha256:e8a38829209aea82774882e5157e1f7c3e8c8393ff53a697b3580896e57f345c 1.75kB / 1.75kB done
+2026-10-22T05:20:04.2801888Z #18 sha256:a33c10a97f11005523814c6eee013986119fe41f3122f444518117536675c8e1 5.66kB / 5.66kB done
+2026-10-22T05:20:04.2802627Z #18 sha256:f2be67225471500c788ce88c597eb5ea8336e912ad1ca4815650e0281afe2034 29.84MB / 29.84MB 0.8s done
+2026-10-22T05:20:04.2803463Z #18 sha256:be6443c06d3c9914acdca3ffb368adad23d4f282b55e71e730878ad3e3c3f75c 1.29MB / 1.29MB 0.8s done
+2026-10-22T05:20:04.2804208Z #18 extracting sha256:f2be67225471500c788ce88c597eb5ea8336e912ad1ca4815650e0281afe2034 0.6s done
+2026-10-22T05:20:04.2804944Z #18 sha256:b524bb3aba7394d85233f3a0a742b8f1b56179e8f61492f73d42a1ff118623b7 12.12MB / 12.12MB 1.0s done
+2026-10-22T05:20:04.2805691Z #18 sha256:5c397e4307db7bd392eff1d36de88b04da2a137a4b906b7e0e4657bada560645 249B / 249B 1.0s done
+2026-10-22T05:20:04.2806436Z #18 extracting sha256:be6443c06d3c9914acdca3ffb368adad23d4f282b55e71e730878ad3e3c3f75c 0.1s done
+2026-10-22T05:20:04.2807182Z #18 extracting sha256:b524bb3aba7394d85233f3a0a742b8f1b56179e8f61492f73d42a1ff118623b7 0.4s done
+2026-10-22T05:20:04.2807887Z #18 extracting sha256:5c397e4307db7bd392eff1d36de88b04da2a137a4b906b7e0e4657bada560645 done
+2026-10-22T05:20:04.2808437Z #18 DONE 2.7s
+2026-10-22T05:20:04.2808729Z 
+2026-10-22T05:20:04.2809028Z #19 [budgeting-frontend-service] resolving provenance for metadata file
+2026-10-22T05:20:04.2809501Z #19 DONE 0.0s
+2026-10-22T05:20:04.2809721Z 
+2026-10-22T05:20:04.2809954Z #20 [budgeting-database-service 2/6] WORKDIR /app
+2026-10-22T05:20:04.2810360Z #20 DONE 0.0s
+2026-10-22T05:20:04.2810580Z 
+2026-10-22T05:20:04.2811107Z #21 [budgeting-database-service 3/6] COPY services/budgeting/database/requirements.txt requirements.txt
+2026-10-22T05:20:04.2811933Z #21 DONE 0.0s
+2026-10-22T05:20:04.2812154Z 
+2026-10-22T05:20:04.2812517Z #22 [budgeting-service 3/6] COPY services/budgeting/backend/requirements.txt requirements.txt
+2026-10-22T05:20:04.2813069Z #22 DONE 0.0s
+2026-10-22T05:20:04.2813276Z 
+2026-10-22T05:20:04.2813610Z #23 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:20:05.1899656Z #23 0.983 Collecting flask==3.1.3 (from -r requirements.txt (line 1))
+2026-10-22T05:20:05.1900138Z #23 1.018   Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+2026-10-22T05:20:05.1900532Z #23 1.033 Collecting flask-cors==6.0.0 (from -r requirements.txt (line 2))
+2026-10-22T05:20:05.1901113Z #23 1.043   Downloading flask_cors-6.0.0-py3-none-any.whl.metadata (961 bytes)
+2026-10-22T05:20:05.1901792Z #23 1.061 Collecting requests==2.33.0 (from -r requirements.txt (line 3))
+2026-10-22T05:20:05.2959945Z #23 1.068   Downloading requests-2.33.0-py3-none-any.whl.metadata (5.1 kB)
+2026-10-22T05:20:05.2960256Z #23 1.111 Collecting openai==3.8.0 (from -r requirements.txt (line 4))
+2026-10-22T05:20:05.2960503Z #23 1.117   Downloading openai-3.8.0-py3-none-any.whl.metadata (41 kB)
+2026-10-22T05:20:05.2960978Z #23 1.134 Collecting blinker>=1.9.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:05.2961248Z #23 1.141   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+2026-10-22T05:20:05.2961503Z #23 1.154 Collecting click>=8.1.3 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:05.2961744Z #23 1.161   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:20:05.4654424Z #23 1.170 Collecting itsdangerous>=2.2.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:05.4655019Z #23 1.177   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+2026-10-22T05:20:05.4655493Z #23 1.189 Collecting jinja2>=3.1.2 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:05.4655952Z #23 1.195   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-10-22T05:20:05.4656396Z #23 1.226 Collecting markupsafe>=2.1.1 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:05.4657051Z #23 1.232   Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-10-22T05:20:05.4657732Z #23 1.247 Collecting werkzeug>=3.1.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:05.4658182Z #23 1.253   Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+2026-10-22T05:20:05.4658848Z #23 1.336 Collecting charset_normalizer<4,>=2 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:20:05.5727672Z #23 1.343   Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+2026-10-22T05:20:05.5728703Z #23 1.362 Collecting idna<4,>=2.5 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:20:05.5729358Z #23 1.369   Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-10-22T05:20:05.5729817Z #23 1.385 Collecting urllib3<3,>=1.26 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:20:05.5730244Z #23 1.393   Downloading urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+2026-10-22T05:20:05.5730669Z #23 1.406 Collecting certifi>=2023.5.7 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:20:05.5731228Z #23 1.413   Downloading certifi-2026.10.19-py3-none-any.whl.metadata (2.5 kB)
+2026-10-22T05:20:05.5731638Z #23 1.427 Collecting anyio<5,>=4.10.0 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:05.5732058Z #23 1.433   Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+2026-10-22T05:20:05.5732465Z #23 1.444 Collecting httpx2<3,>=2.7.0 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:05.7529055Z #23 1.453   Downloading httpx2-2.16.0-py3-none-any.whl.metadata (10 kB)
+2026-10-22T05:20:05.7529733Z #23 1.499 Collecting jiter<1,>=0.16.0 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:05.7530248Z #23 1.531   Downloading jiter-0.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.2 kB)
+2026-10-22T05:20:05.7530967Z #23 1.623 Collecting pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:05.8572687Z #23 1.630   Downloading pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+2026-10-22T05:20:05.8573188Z #23 1.648 Collecting sniffio (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:05.8573583Z #23 1.656   Downloading sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+2026-10-22T05:20:05.8574024Z #23 1.671 Collecting typing-extensions<5,>=4.14 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:05.8574739Z #23 1.682   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-10-22T05:20:05.8575317Z #23 1.699 Collecting httpcore2==2.16.0 (from httpx2<3,>=2.7.0->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:05.8575615Z #23 1.706   Downloading httpcore2-2.16.0-py3-none-any.whl.metadata (27 kB)
+2026-10-22T05:20:05.8575903Z #23 1.728 Collecting truststore>=0.10 (from httpx2<3,>=2.7.0->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:06.0202731Z #23 ...
+2026-10-22T05:20:06.0202906Z 
+2026-10-22T05:20:06.0203166Z #24 [budgeting-database-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:20:06.0203623Z #24 0.958 Collecting flask==3.1.3 (from -r requirements.txt (line 1))
+2026-10-22T05:20:06.0203983Z #24 0.996   Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+2026-10-22T05:20:06.0204365Z #24 1.007 Collecting blinker>=1.9.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:06.0204780Z #24 1.016   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+2026-10-22T05:20:06.0205159Z #24 1.029 Collecting click>=8.1.3 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:06.0205554Z #24 1.036   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:20:06.0205931Z #24 1.045 Collecting itsdangerous>=2.2.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:06.0206359Z #24 1.052   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+2026-10-22T05:20:06.0206759Z #24 1.065 Collecting jinja2>=3.1.2 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:06.0207155Z #24 1.072   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-10-22T05:20:06.0207547Z #24 1.108 Collecting markupsafe>=2.1.1 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:06.0208139Z #24 1.115   Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-10-22T05:20:06.0208724Z #24 1.130 Collecting werkzeug>=3.1.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:20:06.0209123Z #24 1.137   Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+2026-10-22T05:20:06.0209483Z #24 1.147 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+2026-10-22T05:20:06.0209789Z #24 1.161 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+2026-10-22T05:20:06.0210106Z #24 1.168 Downloading click-8.5.0-py3-none-any.whl (125 kB)
+2026-10-22T05:20:06.0210422Z #24 1.176 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+2026-10-22T05:20:06.0210740Z #24 1.183 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-10-22T05:20:06.0211313Z #24 1.191 Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+2026-10-22T05:20:06.0211813Z #24 1.197 Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+2026-10-22T05:20:06.0212250Z #24 1.210 Installing collected packages: markupsafe, itsdangerous, click, blinker, werkzeug, jinja2, flask
+2026-10-22T05:20:06.0212837Z #24 1.445 Successfully installed blinker-1.9.0 click-8.5.0 flask-3.1.3 itsdangerous-2.2.0 jinja2-3.1.6 markupsafe-3.0.4 werkzeug-3.1.9
+2026-10-22T05:20:06.0213799Z #24 1.446 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+2026-10-22T05:20:06.0214916Z #24 1.521 
+2026-10-22T05:20:06.0215130Z #24 1.521 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+2026-10-22T05:20:06.0215434Z #24 1.521 [notice] To update, run: pip install --upgrade pip
+2026-10-22T05:20:06.0215675Z #24 DONE 1.8s
+2026-10-22T05:20:06.0215778Z 
+2026-10-22T05:20:06.0215937Z #25 [budgeting-database-service 5/6] COPY services/budgeting/database/ ./
+2026-10-22T05:20:06.0216543Z #25 DONE 0.0s
+2026-10-22T05:20:06.0216632Z 
+2026-10-22T05:20:06.0216797Z #23 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:20:06.0217355Z #23 1.735   Downloading truststore-0.10.5-py3-none-any.whl.metadata (4.5 kB)
+2026-10-22T05:20:06.0217804Z #23 1.746 Collecting h11>=0.16 (from httpcore2==2.16.0->httpx2<3,>=2.7.0->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:06.0218250Z #23 1.762   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-10-22T05:20:06.0218579Z #23 1.779 Collecting annotated-types>=0.6.0 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:06.0219012Z #23 1.786   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+2026-10-22T05:20:06.1911976Z #23 ...
+2026-10-22T05:20:06.1912307Z 
+2026-10-22T05:20:06.1912576Z #26 [budgeting-database-service 6/6] RUN python init_db.py
+2026-10-22T05:20:06.1913057Z #26 0.124 Database created successfully: /app/data/budgeting_and_insights.db
+2026-10-22T05:20:06.1913594Z #26 0.124   categories: 10
+2026-10-22T05:20:06.1913775Z #26 0.124   budgets: 14
+2026-10-22T05:20:06.1913952Z #26 0.124   budget_insights: 10
+2026-10-22T05:20:06.1914144Z #26 DONE 0.1s
+2026-10-22T05:20:06.3412904Z 
+2026-10-22T05:20:06.3414183Z #27 [budgeting-database-service] exporting to image
+2026-10-22T05:20:07.0110110Z #27 exporting layers 1.0s done
+2026-10-22T05:20:07.1771320Z #27 writing image sha256:586cf879883404857d902821559b88768579255a3c7796e6c5d12c8bafeb93c5 done
+2026-10-22T05:20:07.1771935Z #27 naming to docker.io/library/smartbank-budgeting-db:0.1 done
+2026-10-22T05:20:07.1772673Z #27 DONE 1.0s
+2026-10-22T05:20:07.1772849Z 
+2026-10-22T05:20:07.1773069Z #28 [budgeting-database-service] resolving provenance for metadata file
+2026-10-22T05:20:07.1773413Z #28 DONE 0.0s
+2026-10-22T05:20:07.1773594Z 
+2026-10-22T05:20:07.1773822Z #23 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:20:07.1774349Z #23 2.261 Collecting pydantic-core==2.50.1 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:07.1775018Z #23 2.270   Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.5 kB)
+2026-10-22T05:20:07.1775577Z #23 2.279 Collecting typing-inspection>=0.4.4 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:20:07.1776145Z #23 2.294   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:20:07.1776570Z #23 2.309 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+2026-10-22T05:20:07.1776959Z #23 2.316 Downloading flask_cors-6.0.0-py3-none-any.whl (11 kB)
+2026-10-22T05:20:07.1777319Z #23 2.323 Downloading requests-2.33.0-py3-none-any.whl (65 kB)
+2026-10-22T05:20:07.1777645Z #23 2.433 Downloading openai-3.8.0-py3-none-any.whl (1.7 MB)
+2026-10-22T05:20:07.1778315Z #23 2.450    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.7/1.7 MB 150.0 MB/s eta 0:00:00
+2026-10-22T05:20:07.1778740Z #23 2.457 Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+2026-10-22T05:20:07.1779040Z #23 2.463 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+2026-10-22T05:20:07.1779359Z #23 2.470 Downloading certifi-2026.10.19-py3-none-any.whl (136 kB)
+2026-10-22T05:20:07.1779797Z #23 2.479 Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (257 kB)
+2026-10-22T05:20:07.1780259Z #23 2.487 Downloading click-8.5.0-py3-none-any.whl (125 kB)
+2026-10-22T05:20:07.1780555Z #23 2.495 Downloading httpx2-2.16.0-py3-none-any.whl (97 kB)
+2026-10-22T05:20:07.1781038Z #23 2.519 Downloading httpcore2-2.16.0-py3-none-any.whl (85 kB)
+2026-10-22T05:20:07.1781422Z #23 2.528 Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-10-22T05:20:07.1781724Z #23 2.536 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+2026-10-22T05:20:07.1782035Z #23 2.543 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-10-22T05:20:07.1782559Z #23 2.550 Downloading jiter-0.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (345 kB)
+2026-10-22T05:20:07.1783053Z #23 2.558 Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+2026-10-22T05:20:07.1783363Z #23 2.564 Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+2026-10-22T05:20:07.1783646Z #23 2.572 Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+2026-10-22T05:20:07.1784062Z #23 2.579    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 381.3 MB/s eta 0:00:00
+2026-10-22T05:20:07.1784347Z #23 2.585 Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-10-22T05:20:07.1784563Z #23 2.592 Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
+2026-10-22T05:20:07.1784761Z #23 2.599 Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+2026-10-22T05:20:07.1784957Z #23 2.605 Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+2026-10-22T05:20:07.1785166Z #23 2.612 Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+2026-10-22T05:20:07.1785381Z #23 2.619 Downloading truststore-0.10.5-py3-none-any.whl (19 kB)
+2026-10-22T05:20:07.1785607Z #23 2.625 Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+2026-10-22T05:20:07.1785812Z #23 2.632 Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-10-22T05:20:07.1786450Z #23 2.675 Installing collected packages: urllib3, typing-extensions, truststore, sniffio, markupsafe, jiter, itsdangerous, idna, h11, click, charset_normalizer, certifi, blinker, annotated-types, werkzeug, typing-inspection, requests, pydantic-core, jinja2, httpcore2, anyio, pydantic, httpx2, flask, openai, flask-cors
+2026-10-22T05:20:08.2415461Z #23 4.112 Successfully installed annotated-types-0.8.0 anyio-4.15.1 blinker-1.9.0 certifi-2026.10.19 charset_normalizer-3.5.2 click-8.5.0 flask-3.1.3 flask-cors-6.0.0 h11-0.16.0 httpcore2-2.16.0 httpx2-2.16.0 idna-3.20 itsdangerous-2.2.0 jinja2-3.1.6 jiter-0.17.0 markupsafe-3.0.4 openai-3.8.0 pydantic-2.14.1 pydantic-core-2.50.1 requests-2.33.0 sniffio-1.3.1 truststore-0.10.5 typing-extensions-4.16.0 typing-inspection-0.4.4 urllib3-2.8.0 werkzeug-3.1.9
+2026-10-22T05:20:08.4477902Z #23 4.112 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+2026-10-22T05:20:08.4478721Z #23 4.168 
+2026-10-22T05:20:08.4478889Z #23 4.168 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+2026-10-22T05:20:08.4479120Z #23 4.168 [notice] To update, run: pip install --upgrade pip
+2026-10-22T05:20:08.6213366Z #23 DONE 4.5s
+2026-10-22T05:20:08.7916274Z 
+2026-10-22T05:20:08.7917187Z #29 [budgeting-service 5/6] COPY services/budgeting/backend/ ./
+2026-10-22T05:20:08.7917533Z #29 DONE 0.0s
+2026-10-22T05:20:08.7917663Z 
+2026-10-22T05:20:08.7917781Z #30 [budgeting-service 6/6] COPY prompts/ ./prompts/
+2026-10-22T05:20:08.7918031Z #30 DONE 0.0s
+2026-10-22T05:20:08.7918120Z 
+2026-10-22T05:20:08.7918225Z #31 [budgeting-service] exporting to image
+2026-10-22T05:20:09.2002271Z #31 exporting layers 0.6s done
+2026-10-22T05:20:09.2157733Z #31 writing image sha256:1f701f491d652284a86002ffdb57179eb3eb3985e78a116cba9407124286a170 done
+2026-10-22T05:20:09.2158241Z #31 naming to docker.io/library/smartbank-budgeting-api:0.1 done
+2026-10-22T05:20:09.2158527Z #31 DONE 0.6s
+2026-10-22T05:20:09.2158627Z 
+2026-10-22T05:20:09.2158765Z #32 [budgeting-service] resolving provenance for metadata file
+2026-10-22T05:20:09.2159031Z #32 DONE 0.0s
+2026-10-22T05:20:09.2159204Z  budgeting-service  Built
+2026-10-22T05:20:09.2159414Z  budgeting-frontend-service  Built
+2026-10-22T05:20:09.2159642Z  budgeting-database-service  Built
+2026-10-22T05:20:09.2171250Z  Network smartbank-network  Creating
+2026-10-22T05:20:09.2421310Z  Network smartbank-network  Created
+2026-10-22T05:20:09.2478172Z  Volume "smartbanking_budgets-data"  Creating
+2026-10-22T05:20:09.2487430Z  Volume "smartbanking_budgets-data"  Created
+2026-10-22T05:20:09.2491103Z  Container budgeting-database-service  Creating
+2026-10-22T05:20:09.2629107Z  Container budgeting-database-service  Created
+2026-10-22T05:20:09.2629472Z  Container budgeting-service  Creating
+2026-10-22T05:20:09.2711510Z  Container budgeting-service  Created
+2026-10-22T05:20:09.2711821Z  Container budgeting-frontend-service  Creating
+2026-10-22T05:20:09.2771726Z  Container budgeting-frontend-service  Created
+2026-10-22T05:20:09.2778683Z  Container budgeting-database-service  Starting
+2026-10-22T05:20:09.4182986Z  Container budgeting-database-service  Started
+2026-10-22T05:20:09.4183236Z  Container budgeting-database-service  Waiting
+2026-10-22T05:20:14.9192407Z  Container budgeting-database-service  Healthy
+2026-10-22T05:20:14.9192746Z  Container budgeting-service  Starting
+2026-10-22T05:20:15.0101831Z  Container budgeting-service  Started
+2026-10-22T05:20:15.0102318Z  Container budgeting-frontend-service  Starting
+2026-10-22T05:20:15.1325916Z  Container budgeting-frontend-service  Started
+2026-10-22T05:20:15.1413824Z ##[group]Run probe() {
+2026-10-22T05:20:15.1414012Z [36;1mprobe() {[0m
+2026-10-22T05:20:15.1414177Z [36;1m  local name="$1" url="$2"[0m
+2026-10-22T05:20:15.1414327Z [36;1m  for attempt in $(seq 1 8); do[0m
+2026-10-22T05:20:15.1414505Z [36;1m    code=$(curl -s -o /dev/null -w '%{http_code}' \[0m
+2026-10-22T05:20:15.1414811Z [36;1m           --connect-timeout 5 --max-time 20 "$url" || echo 000)[0m
+2026-10-22T05:20:15.1415095Z [36;1m    if [ "$code" = "200" ]; then[0m
+2026-10-22T05:20:15.1415370Z [36;1m      echo "PASS $name -> $url ($code) on attempt $attempt"[0m
+2026-10-22T05:20:15.1415636Z [36;1m      return 0[0m
+2026-10-22T05:20:15.1415817Z [36;1m    fi[0m
+2026-10-22T05:20:15.1415967Z [36;1m    echo "  ... $name attempt $attempt/8 got $code"[0m
+2026-10-22T05:20:15.1416136Z [36;1m    sleep 2[0m
+2026-10-22T05:20:15.1416242Z [36;1m  done[0m
+2026-10-22T05:20:15.1416371Z [36;1m  echo "FAIL $name -> $url after 8 attempts"[0m
+2026-10-22T05:20:15.1416547Z [36;1m  return 1[0m
+2026-10-22T05:20:15.1416653Z [36;1m}[0m
+2026-10-22T05:20:15.1416750Z [36;1m[0m
+2026-10-22T05:20:15.1416934Z [36;1mprobe "database-service" "http://localhost:5014/"[0m
+2026-10-22T05:20:15.1417288Z [36;1mprobe "backend-api"      "http://localhost:5004/api/health"[0m
+2026-10-22T05:20:15.1417652Z [36;1mprobe "frontend"         "http://localhost:3004/tabs/budgets.html"[0m
+2026-10-22T05:20:15.1418034Z [36;1mprobe "frontend-ai-mode" "http://localhost:3004/tabs/ai-mode.html"[0m
+2026-10-22T05:20:15.1418408Z [36;1mprobe "budget-crud"      "http://localhost:5004/api/budgets"[0m
+2026-10-22T05:20:15.1418794Z [36;1m# The seed is a fixed demo period (September 2026); the current month may[0m
+2026-10-22T05:20:15.1419198Z [36;1m# legitimately have no budgets, so the summary checks name the period.[0m
+2026-10-22T05:20:15.1419715Z [36;1mprobe "budget-summary"   "http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026"[0m
+2026-10-22T05:20:15.1420255Z [36;1mprobe "budget-summary-now" "http://localhost:5004/api/budgets/summary?customer_id=1"[0m
+2026-10-22T05:20:15.1420714Z [36;1mprobe "htmx-fragment"    "http://localhost:5004/ui/budgets?customer_id=1"[0m
+2026-10-22T05:20:15.1422248Z [36;1m# The AI insight status line answers 200 with AI-Mode switched off[0m
+2026-10-22T05:20:15.1422628Z [36;1mprobe "htmx-ai-status"   "http://localhost:5004/ui/ai/status"[0m
+2026-10-22T05:20:15.1422977Z [36;1m# Release 1 panel fragments answer 200 even with MCP/RAG disabled[0m
+2026-10-22T05:20:15.1423217Z [36;1mprobe "htmx-mcp-status"  "http://localhost:5004/ui/mcp/status"[0m
+2026-10-22T05:20:15.1423452Z [36;1mprobe "htmx-mcp-tools"   "http://localhost:5004/ui/mcp/tools"[0m
+2026-10-22T05:20:15.1423686Z [36;1mprobe "htmx-rag-status"  "http://localhost:5004/ui/rag/status"[0m
+2026-10-22T05:20:15.1424107Z [36;1m# Release 2 panel fragment answers 200 with the Multi-Agent Server disabled[0m
+2026-10-22T05:20:15.1424393Z [36;1mprobe "htmx-multi-agent-status" "http://localhost:5004/ui/multi-agent/status"[0m
+2026-10-22T05:20:15.1424694Z [36;1mprobe "htmx-multi-agent-history" "http://localhost:5004/ui/multi-agent/history"[0m
+2026-10-22T05:20:15.1476202Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:15.1476408Z env:
+2026-10-22T05:20:15.1476584Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:15.1476938Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:15.1477296Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:15.1477480Z   MCP_ENABLED: false
+2026-10-22T05:20:15.1477651Z   RAG_ENABLED: false
+2026-10-22T05:20:15.1477826Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:15.1478016Z ##[endgroup]
+2026-10-22T05:20:15.1627784Z PASS database-service -> http://localhost:5014/ (200) on attempt 1
+2026-10-22T05:20:15.1688866Z   ... backend-api attempt 1/8 got 000000
+2026-10-22T05:20:17.1774703Z PASS backend-api -> http://localhost:5004/api/health (200) on attempt 2
+2026-10-22T05:20:17.1834422Z PASS frontend -> http://localhost:3004/tabs/budgets.html (200) on attempt 1
+2026-10-22T05:20:17.1889878Z PASS frontend-ai-mode -> http://localhost:3004/tabs/ai-mode.html (200) on attempt 1
+2026-10-22T05:20:17.2074490Z PASS budget-crud -> http://localhost:5004/api/budgets (200) on attempt 1
+2026-10-22T05:20:17.3346109Z PASS budget-summary -> http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026 (200) on attempt 1
+2026-10-22T05:20:17.3701128Z PASS budget-summary-now -> http://localhost:5004/api/budgets/summary?customer_id=1 (200) on attempt 1
+2026-10-22T05:20:17.4878720Z PASS htmx-fragment -> http://localhost:5004/ui/budgets?customer_id=1 (200) on attempt 1
+2026-10-22T05:20:17.4937013Z PASS htmx-ai-status -> http://localhost:5004/ui/ai/status (200) on attempt 1
+2026-10-22T05:20:17.4996120Z PASS htmx-mcp-status -> http://localhost:5004/ui/mcp/status (200) on attempt 1
+2026-10-22T05:20:17.5053857Z PASS htmx-mcp-tools -> http://localhost:5004/ui/mcp/tools (200) on attempt 1
+2026-10-22T05:20:17.5110593Z PASS htmx-rag-status -> http://localhost:5004/ui/rag/status (200) on attempt 1
+2026-10-22T05:20:17.5167653Z PASS htmx-multi-agent-status -> http://localhost:5004/ui/multi-agent/status (200) on attempt 1
+2026-10-22T05:20:17.5224613Z PASS htmx-multi-agent-history -> http://localhost:5004/ui/multi-agent/history (200) on attempt 1
+2026-10-22T05:20:17.5249213Z ##[group]Run budgets=$(curl -s http://localhost:5004/api/budgets | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
+2026-10-22T05:20:17.5249680Z [36;1mbudgets=$(curl -s http://localhost:5004/api/budgets | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')[0m
+2026-10-22T05:20:17.5249974Z [36;1mecho "budgets in database: $budgets"[0m
+2026-10-22T05:20:17.5250131Z [36;1mif [ "$budgets" -lt 10 ]; then[0m
+2026-10-22T05:20:17.5250322Z [36;1m  echo "FAIL expected at least 10 seeded budgets, found $budgets"[0m
+2026-10-22T05:20:17.5250516Z [36;1m  exit 1[0m
+2026-10-22T05:20:17.5250617Z [36;1mfi[0m
+2026-10-22T05:20:17.5293009Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:17.5293145Z env:
+2026-10-22T05:20:17.5293259Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:17.5293487Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:17.5293712Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:17.5293860Z   MCP_ENABLED: false
+2026-10-22T05:20:17.5293971Z   RAG_ENABLED: false
+2026-10-22T05:20:17.5294083Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:17.5294210Z ##[endgroup]
+2026-10-22T05:20:17.5492686Z budgets in database: 14
+2026-10-22T05:20:17.5513547Z ##[group]Run curl -s http://localhost:5004/api/health | python3 -c '
+2026-10-22T05:20:17.5513832Z [36;1mcurl -s http://localhost:5004/api/health | python3 -c '[0m
+2026-10-22T05:20:17.5514013Z [36;1mimport json, sys[0m
+2026-10-22T05:20:17.5514145Z [36;1mh = json.load(sys.stdin)[0m
+2026-10-22T05:20:17.5514314Z [36;1massert h["ai_mode"]["enabled"] is False, h["ai_mode"][0m
+2026-10-22T05:20:17.5514622Z [36;1massert h["mcp"]["enabled"] is False, h["mcp"][0m
+2026-10-22T05:20:17.5514799Z [36;1massert h["rag"]["enabled"] is False, h["rag"][0m
+2026-10-22T05:20:17.5515026Z [36;1massert h["mcp"]["url"].startswith("http://host.docker.internal:8100"), h["mcp"][0m
+2026-10-22T05:20:17.5515305Z [36;1massert h["rag"]["url"].startswith("http://host.docker.internal:8200"), h["rag"][0m
+2026-10-22T05:20:17.5515555Z [36;1massert h["multi_agent"]["enabled"] is False, h["multi_agent"][0m
+2026-10-22T05:20:17.5515852Z [36;1massert h["multi_agent"]["url"].startswith("http://host.docker.internal:8300"), h["multi_agent"][0m
+2026-10-22T05:20:17.5516157Z [36;1mprint("ai_mode:", h["ai_mode"]); print("mcp:", h["mcp"]); print("rag:", h["rag"])'[0m
+2026-10-22T05:20:17.5516360Z [36;1m[0m
+2026-10-22T05:20:17.5516531Z [36;1m# Switched-off AI-Mode answers 503 with disabled true, before any model call[0m
+2026-10-22T05:20:17.5516864Z [36;1mcode=$(curl -s -o "$RUNNER_TEMP/insight.json" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \[0m
+2026-10-22T05:20:17.5517219Z [36;1m       -d '{"customer_id": 1, "month": 9, "year": 2026}' http://localhost:5004/api/budgets/insight)[0m
+2026-10-22T05:20:17.5517637Z [36;1m[ "$code" = "503" ] && python3 -c 'import json, os; b = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "insight.json"))); assert b.get("disabled") is True, b' \[0m
+2026-10-22T05:20:17.5518067Z [36;1m  || { echo "FAIL /api/budgets/insight answered $code: $(cat "$RUNNER_TEMP/insight.json")"; exit 1; }[0m
+2026-10-22T05:20:17.5518299Z [36;1m[0m
+2026-10-22T05:20:17.5518561Z [36;1m# The panel status lines render the inactive state, never a broken swap[0m
+2026-10-22T05:20:17.5518942Z [36;1mcurl -s http://localhost:5004/ui/ai/status | grep -q "Inactive" \[0m
+2026-10-22T05:20:17.5519309Z [36;1m  || { echo "FAIL /ui/ai/status did not report the inactive state"; exit 1; }[0m
+2026-10-22T05:20:17.5533852Z [36;1mcurl -s http://localhost:5004/ui/mcp/status | grep -q "Inactive" \[0m
+2026-10-22T05:20:17.5534243Z [36;1m  || { echo "FAIL /ui/mcp/status did not report the inactive state"; exit 1; }[0m
+2026-10-22T05:20:17.5534502Z [36;1mcurl -s http://localhost:5004/ui/rag/status | grep -q "Inactive" \[0m
+2026-10-22T05:20:17.5534753Z [36;1m  || { echo "FAIL /ui/rag/status did not report the inactive state"; exit 1; }[0m
+2026-10-22T05:20:17.5535017Z [36;1mcurl -s http://localhost:5004/ui/multi-agent/status | grep -q "Inactive" \[0m
+2026-10-22T05:20:17.5535300Z [36;1m  || { echo "FAIL /ui/multi-agent/status did not report the inactive state"; exit 1; }[0m
+2026-10-22T05:20:17.5535512Z [36;1m[0m
+2026-10-22T05:20:17.5535701Z [36;1m# The AI Mode tab carries the Release 1 and Release 2 panels; the Normal tab links to it[0m
+2026-10-22T05:20:17.5536014Z [36;1mcurl -s http://localhost:3004/tabs/budgets.html | grep -qF 'href="/tabs/ai-mode.html"' \[0m
+2026-10-22T05:20:17.5536292Z [36;1m  || { echo "FAIL budgets.html lacks the AI Mode tab link"; exit 1; }[0m
+2026-10-22T05:20:17.5536522Z [36;1mpage=$(curl -s http://localhost:3004/tabs/ai-mode.html)[0m
+2026-10-22T05:20:17.5536905Z [36;1mfor needle in 'hx-get="/ui/ai/status"' 'hx-post="/ui/mcp/tool"' 'hx-get="/ui/mcp/tools"' 'hx-post="/ui/rag/query"' 'hx-post="/ui/multi-agent/workflows"' 'id="ma-history"'; do[0m
+2026-10-22T05:20:17.5537265Z [36;1m  printf '%s' "$page" | grep -qF "$needle" \[0m
+2026-10-22T05:20:17.5537455Z [36;1m    || { echo "FAIL frontend tab lacks $needle"; exit 1; }[0m
+2026-10-22T05:20:17.5537620Z [36;1mdone[0m
+2026-10-22T05:20:17.5537964Z [36;1mecho "panels present in the frontend; status fragments report the inactive state"[0m
+2026-10-22T05:20:17.5574084Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:17.5574211Z env:
+2026-10-22T05:20:17.5574347Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:17.5574614Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:17.5574838Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:17.5575053Z   MCP_ENABLED: false
+2026-10-22T05:20:17.5575164Z   RAG_ENABLED: false
+2026-10-22T05:20:17.5575283Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:17.5575407Z ##[endgroup]
+2026-10-22T05:20:17.5748719Z ai_mode: {'enabled': False, 'provider': 'gemini'}
+2026-10-22T05:20:17.5749032Z mcp: {'enabled': False, 'url': 'http://host.docker.internal:8100/mcp'}
+2026-10-22T05:20:17.5749298Z rag: {'enabled': False, 'url': 'http://host.docker.internal:8200'}
+2026-10-22T05:20:17.6303992Z panels present in the frontend; status fragments report the inactive state
+2026-10-22T05:20:17.6377057Z ##[group]Run actions/setup-python@v5
+2026-10-22T05:20:17.6377206Z with:
+2026-10-22T05:20:17.6377321Z   python-version: 3.12
+2026-10-22T05:20:17.6377435Z   cache: pip
+2026-10-22T05:20:17.6377659Z   cache-dependency-path: .github/workflows/student-4.yml
+services/budgeting/backend/requirements.txt
+
+2026-10-22T05:20:17.6377912Z   check-latest: false
+2026-10-22T05:20:17.6379067Z   token: ***
+2026-10-22T05:20:17.6379185Z   update-environment: true
+2026-10-22T05:20:17.6379314Z   allow-prereleases: false
+2026-10-22T05:20:17.6379435Z   freethreaded: false
+2026-10-22T05:20:17.6379542Z env:
+2026-10-22T05:20:17.6379651Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:17.6379870Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:17.6380090Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:17.6380206Z   MCP_ENABLED: false
+2026-10-22T05:20:17.6380316Z   RAG_ENABLED: false
+2026-10-22T05:20:17.6380428Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:17.6380575Z ##[endgroup]
+2026-10-22T05:20:17.7200710Z ##[group]Installed versions
+2026-10-22T05:20:17.7251569Z (node:3179) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-22T05:20:17.7252163Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-22T05:20:17.7252510Z Successfully set up CPython (3.12.15)
+2026-10-22T05:20:17.7252924Z ##[endgroup]
+2026-10-22T05:20:17.7463643Z [command]/opt/hostedtoolcache/Python/3.12.15/x64/bin/pip cache dir
+2026-10-22T05:20:17.9541003Z /home/runner/.cache/pip
+2026-10-22T05:20:18.1989455Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.12.15-pip-ef0caa11ba591da5224a7c9505828d87a309b7f95fdbcb32f831d8e559abc726
+2026-10-22T05:20:18.2049125Z (node:3179) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-22T05:20:19.0676761Z Received 2957606 of 2957606 (100.0%), 4.9 MBs/sec
+2026-10-22T05:20:19.0677023Z Cache Size: ~3 MB (2957606 B)
+2026-10-22T05:20:19.0691040Z [command]/usr/bin/tar -xf /home/runner/work/_temp/6a06dfd9-ed93-4929-a077-822e6c12cc59/cache.tzst -P -C /home/runner/work/SmartBanking/SmartBanking --use-compress-program unzstd
+2026-10-22T05:20:19.0827695Z Cache restored successfully
+2026-10-22T05:20:19.0831946Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.12.15-pip-ef0caa11ba591da5224a7c9505828d87a309b7f95fdbcb32f831d8e559abc726
+2026-10-22T05:20:19.0953051Z ##[group]Run pip install pytest==9.1.1 "$(grep -E '^requests==' services/budgeting/backend/requirements.txt)"
+2026-10-22T05:20:19.0953418Z [36;1mpip install pytest==9.1.1 "$(grep -E '^requests==' services/budgeting/backend/requirements.txt)"[0m
+2026-10-22T05:20:19.0996312Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:19.0996451Z env:
+2026-10-22T05:20:19.0996567Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:19.0996802Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:19.0997031Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:19.0997156Z   MCP_ENABLED: false
+2026-10-22T05:20:19.0997270Z   RAG_ENABLED: false
+2026-10-22T05:20:19.0997411Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:19.0997580Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:19.0997811Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:20:19.0998189Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:19.0998393Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:19.0998590Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:19.0998793Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:20:19.0998964Z ##[endgroup]
+2026-10-22T05:20:19.5359977Z Collecting pytest==9.1.1
+2026-10-22T05:20:19.5369233Z   Using cached pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+2026-10-22T05:20:19.5520157Z Collecting requests==2.33.0
+2026-10-22T05:20:19.5528076Z   Using cached requests-2.33.0-py3-none-any.whl.metadata (5.1 kB)
+2026-10-22T05:20:19.5629549Z Collecting iniconfig>=1.0.1 (from pytest==9.1.1)
+2026-10-22T05:20:19.5636813Z   Using cached iniconfig-2.3.1-py3-none-any.whl.metadata (2.8 kB)
+2026-10-22T05:20:19.5747575Z Collecting packaging>=22 (from pytest==9.1.1)
+2026-10-22T05:20:19.5754846Z   Using cached packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+2026-10-22T05:20:19.5852375Z Collecting pluggy<2,>=1.5 (from pytest==9.1.1)
+2026-10-22T05:20:19.5859286Z   Using cached pluggy-1.7.0-py3-none-any.whl.metadata (5.0 kB)
+2026-10-22T05:20:19.5981215Z Collecting pygments>=2.7.2 (from pytest==9.1.1)
+2026-10-22T05:20:19.5988481Z   Using cached pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+2026-10-22T05:20:19.6719851Z Collecting charset_normalizer<4,>=2 (from requests==2.33.0)
+2026-10-22T05:20:19.6728651Z   Using cached charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+2026-10-22T05:20:19.6853455Z Collecting idna<4,>=2.5 (from requests==2.33.0)
+2026-10-22T05:20:19.6860360Z   Using cached idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-10-22T05:20:19.7002856Z Collecting urllib3<3,>=1.26 (from requests==2.33.0)
+2026-10-22T05:20:19.7009925Z   Using cached urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+2026-10-22T05:20:19.7137923Z Collecting certifi>=2023.5.7 (from requests==2.33.0)
+2026-10-22T05:20:19.7145155Z   Using cached certifi-2026.10.19-py3-none-any.whl.metadata (2.5 kB)
+2026-10-22T05:20:19.7170067Z Using cached pytest-9.1.1-py3-none-any.whl (386 kB)
+2026-10-22T05:20:19.7178317Z Using cached requests-2.33.0-py3-none-any.whl (65 kB)
+2026-10-22T05:20:19.7185349Z Using cached charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (257 kB)
+2026-10-22T05:20:19.7192130Z Using cached idna-3.20-py3-none-any.whl (69 kB)
+2026-10-22T05:20:19.7198235Z Using cached pluggy-1.7.0-py3-none-any.whl (27 kB)
+2026-10-22T05:20:19.7204451Z Using cached urllib3-2.8.0-py3-none-any.whl (135 kB)
+2026-10-22T05:20:19.7210710Z Using cached certifi-2026.10.19-py3-none-any.whl (136 kB)
+2026-10-22T05:20:19.7217103Z Using cached iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+2026-10-22T05:20:19.7223037Z Using cached packaging-26.3-py3-none-any.whl (129 kB)
+2026-10-22T05:20:19.7229160Z Using cached pygments-2.21.0-py3-none-any.whl (1.3 MB)
+2026-10-22T05:20:19.7744075Z Installing collected packages: urllib3, pygments, pluggy, packaging, iniconfig, idna, charset_normalizer, certifi, requests, pytest
+2026-10-22T05:20:20.5071430Z 
+2026-10-22T05:20:20.5080719Z Successfully installed certifi-2026.10.19 charset_normalizer-3.5.2 idna-3.20 iniconfig-2.3.1 packaging-26.3 pluggy-1.7.0 pygments-2.21.0 pytest-9.1.1 requests-2.33.0 urllib3-2.8.0
+2026-10-22T05:20:20.5086122Z 
+2026-10-22T05:20:20.5086264Z [notice] A new release of pip is available: 26.2.1 -> 26.2.2
+2026-10-22T05:20:20.5086561Z [notice] To update, run: pip install --upgrade pip
+2026-10-22T05:20:20.5500031Z ##[group]Run python -m pytest services/budgeting/backend/budgeting_endpoint_tests \
+2026-10-22T05:20:20.5500364Z [36;1mpython -m pytest services/budgeting/backend/budgeting_endpoint_tests \[0m
+2026-10-22T05:20:20.5500683Z [36;1m  -q -p no:cacheprovider -o junit_family=xunit1 --junitxml=reports/endpoint-tests-junit.xml[0m
+2026-10-22T05:20:20.5541093Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:20.5541358Z env:
+2026-10-22T05:20:20.5541477Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:20.5541707Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:20.5541929Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:20.5542053Z   MCP_ENABLED: false
+2026-10-22T05:20:20.5542169Z   RAG_ENABLED: false
+2026-10-22T05:20:20.5542288Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:20.5542453Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5542709Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:20:20.5542928Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5543131Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5543335Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:20.5543538Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:20:20.5543732Z   BUDGET_API_URL: http://localhost:5004
+2026-10-22T05:20:20.5543888Z   ENDPOINT_REPORT_DIR: reports
+2026-10-22T05:20:20.5544058Z   ENDPOINT_COMMIT: fa227e0b61887327b2edce92a6160bbdd81dd929
+2026-10-22T05:20:20.5544224Z   ENDPOINT_BRANCH: main
+2026-10-22T05:20:20.5544343Z ##[endgroup]
+2026-10-22T05:20:21.0444166Z ..                                                                       [100%]
+2026-10-22T05:20:21.0444648Z endpoint report written to reports/post-commit-endpoint-report-student-4.{json,md}: passed
+2026-10-22T05:20:21.0444958Z 
+2026-10-22T05:20:21.0445040Z 2 passed in 0.31s
+2026-10-22T05:20:21.0660567Z ##[group]Run cat reports/post-commit-endpoint-report-student-4.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no endpoint report was written" >> "$GITHUB_STEP_SUMMARY"
+2026-10-22T05:20:21.0661345Z [36;1mcat reports/post-commit-endpoint-report-student-4.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no endpoint report was written" >> "$GITHUB_STEP_SUMMARY"[0m
+2026-10-22T05:20:21.0701870Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:21.0702015Z env:
+2026-10-22T05:20:21.0702133Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:21.0702363Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:21.0702591Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:21.0702717Z   MCP_ENABLED: false
+2026-10-22T05:20:21.0702831Z   RAG_ENABLED: false
+2026-10-22T05:20:21.0702952Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:21.0703121Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0703367Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:20:21.0703589Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0703793Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0703997Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0704199Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:20:21.0704371Z ##[endgroup]
+2026-10-22T05:20:21.0829965Z ##[group]Run actions/upload-artifact@v4
+2026-10-22T05:20:21.0830116Z with:
+2026-10-22T05:20:21.0830234Z   name: student-4-endpoint-tests
+2026-10-22T05:20:21.0830368Z   path: reports/
+2026-10-22T05:20:21.0830480Z   retention-days: 30
+2026-10-22T05:20:21.0830599Z   if-no-files-found: warn
+2026-10-22T05:20:21.0830727Z   compression-level: 6
+2026-10-22T05:20:21.0831099Z   overwrite: false
+2026-10-22T05:20:21.0831261Z   include-hidden-files: false
+2026-10-22T05:20:21.0831389Z env:
+2026-10-22T05:20:21.0831499Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:21.0831725Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:21.0831950Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:21.0832072Z   MCP_ENABLED: false
+2026-10-22T05:20:21.0832184Z   RAG_ENABLED: false
+2026-10-22T05:20:21.0832303Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:21.0832465Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0832705Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:20:21.0833058Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0833259Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0833460Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:21.0833662Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:20:21.0833829Z ##[endgroup]
+2026-10-22T05:20:21.1839572Z (node:3272) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-22T05:20:21.1840043Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-22T05:20:21.1882872Z With the provided path, there will be 3 files uploaded
+2026-10-22T05:20:21.1883361Z Artifact name is valid!
+2026-10-22T05:20:21.1883560Z Root directory input is valid!
+2026-10-22T05:20:21.5565512Z Beginning upload of artifact content to blob storage
+2026-10-22T05:20:21.5701591Z (node:3272) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-22T05:20:21.8328146Z Uploaded bytes 7535
+2026-10-22T05:20:21.9066679Z Finished uploading artifact content to blob storage!
+2026-10-22T05:20:21.9067228Z SHA256 digest of uploaded artifact zip is de9ae1664353dc6c7c94abba219472aa445b2787a633cf14b353d3d766a7538f
+2026-10-22T05:20:21.9068197Z Finalizing artifact upload
+2026-10-22T05:20:22.3363462Z Artifact student-4-endpoint-tests.zip successfully finalized. Artifact ID 12403347397
+2026-10-22T05:20:22.3363980Z Artifact student-4-endpoint-tests has been successfully uploaded! Final size is 7535 bytes. Artifact ID is 12403347397
+2026-10-22T05:20:22.3367681Z Artifact download URL: https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/39725293520/artifacts/12403347397
+2026-10-22T05:20:22.3488440Z ##[group]Run docker compose -f "$COMPOSE_FILE" ps
+2026-10-22T05:20:22.3488671Z [36;1mdocker compose -f "$COMPOSE_FILE" ps[0m
+2026-10-22T05:20:22.3529658Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:22.3529797Z env:
+2026-10-22T05:20:22.3529915Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:22.3530155Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:22.3530382Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:22.3530507Z   MCP_ENABLED: false
+2026-10-22T05:20:22.3530627Z   RAG_ENABLED: false
+2026-10-22T05:20:22.3530747Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:22.3531064Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.3531292Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:20:22.3531515Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.3531723Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.3531949Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.3532158Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:20:22.3532336Z ##[endgroup]
+2026-10-22T05:20:22.4180661Z NAME                         IMAGE                         COMMAND                  SERVICE                      CREATED          STATUS                    PORTS
+2026-10-22T05:20:22.4181593Z budgeting-database-service   smartbank-budgeting-db:0.1    "python app.py"          budgeting-database-service   13 seconds ago   Up 13 seconds (healthy)   0.0.0.0:5014->5014/tcp, [::]:5014->5014/tcp
+2026-10-22T05:20:22.4183148Z budgeting-frontend-service   smartbank-budgeting-web:0.1   "/docker-entrypoint.…"   budgeting-frontend-service   13 seconds ago   Up 7 seconds              0.0.0.0:3004->80/tcp, [::]:3004->80/tcp
+2026-10-22T05:20:22.4183801Z budgeting-service            smartbank-budgeting-api:0.1   "python app.py"          budgeting-service            13 seconds ago   Up 7 seconds              0.0.0.0:5004->5004/tcp, [::]:5004->5004/tcp
+2026-10-22T05:20:22.4254456Z ##[group]Run docker compose -f "$COMPOSE_FILE" down -v
+2026-10-22T05:20:22.4254690Z [36;1mdocker compose -f "$COMPOSE_FILE" down -v[0m
+2026-10-22T05:20:22.4296017Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:22.4296160Z env:
+2026-10-22T05:20:22.4296280Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:22.4296517Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:22.4296751Z   AI_MODE_ENABLED: false
+2026-10-22T05:20:22.4296877Z   MCP_ENABLED: false
+2026-10-22T05:20:22.4296998Z   RAG_ENABLED: false
+2026-10-22T05:20:22.4297117Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:20:22.4297282Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.4297510Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:20:22.4297733Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.4297939Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.4298176Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:20:22.4298383Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:20:22.4298560Z ##[endgroup]
+2026-10-22T05:20:22.4935473Z  Container budgeting-frontend-service  Stopping
+2026-10-22T05:20:22.7515249Z  Container budgeting-frontend-service  Stopped
+2026-10-22T05:20:22.7521704Z  Container budgeting-frontend-service  Removing
+2026-10-22T05:20:22.7573616Z  Container budgeting-frontend-service  Removed
+2026-10-22T05:20:22.7574528Z  Container budgeting-service  Stopping
+2026-10-22T05:20:32.8585701Z  Container budgeting-service  Stopped
+2026-10-22T05:20:32.8586062Z  Container budgeting-service  Removing
+2026-10-22T05:20:32.8706833Z  Container budgeting-service  Removed
+2026-10-22T05:20:32.8707155Z  Container budgeting-database-service  Stopping
+2026-10-22T05:20:42.9639070Z  Container budgeting-database-service  Stopped
+2026-10-22T05:20:42.9639463Z  Container budgeting-database-service  Removing
+2026-10-22T05:20:42.9693015Z  Container budgeting-database-service  Removed
+2026-10-22T05:20:42.9702789Z  Network smartbank-network  Removing
+2026-10-22T05:20:42.9703362Z  Volume smartbanking_budgets-data  Removing
+2026-10-22T05:20:42.9715932Z  Volume smartbanking_budgets-data  Removed
+2026-10-22T05:20:43.0349931Z  Network smartbank-network  Removed
+2026-10-22T05:20:43.0448510Z Post job cleanup.
+2026-10-22T05:20:43.1248930Z Cache hit occurred on the primary key setup-python-Linux-x64-24.04-Ubuntu-python-3.12.15-pip-ef0caa11ba591da5224a7c9505828d87a309b7f95fdbcb32f831d8e559abc726, not saving cache.
+2026-10-22T05:20:43.1249880Z (node:3579) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-22T05:20:43.1250404Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-22T05:20:43.1357462Z Post job cleanup.
+2026-10-22T05:20:43.1910151Z [command]/usr/bin/git version
+2026-10-22T05:20:43.1944689Z git version 2.55.0
+2026-10-22T05:20:43.1970302Z Temporarily overriding HOME='/home/runner/work/_temp/019b5907-9185-427c-bd99-b35c18e703da' before making global git config changes
+2026-10-22T05:20:43.1970980Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:20:43.1974826Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:20:43.2012403Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:20:43.2048782Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:20:43.2258403Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:20:43.2283953Z http.https://github.com/.extraheader
+2026-10-22T05:20:43.2291497Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-22T05:20:43.2326938Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:20:43.2574061Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:20:43.2617521Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:20:43.2971581Z Cleaning up orphan processes
+2026-10-22T05:20:43.3197298Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
