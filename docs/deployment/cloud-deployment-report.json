@@ -424,5 +424,11 @@
     "rag": "disabled",
     "multi_agent": "disabled"
   },
-  "issues": []
+  "issues": [],
+  "release_decision": {
+    "decision": "approved",
+    "by": "Cong Bao Nguyen",
+    "note": "Baseline on fa227e0: every endpoint and CRUD check passed and all four AI services are off. Approved for Release 2.",
+    "decided_at": "2026-10-22T06:14:29+00:00"
+  }
 }
