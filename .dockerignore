@@ -12,3 +12,8 @@ docs/evidence/
 
 # Local secrets never belong in an image.
 .env
+
+# Runtime state of the shared servers (workflows, audit files, the RAG index):
+# the cloud images of those servers start empty.
+multi_agent_server/data/
+rag_server/data/

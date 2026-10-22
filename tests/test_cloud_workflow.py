@@ -60,3 +60,9 @@ def test_ai_mode_follows_a_repository_variable_and_the_key_a_secret():
     assert holders == ["Deploy the Container Apps environment and apps"]
     step = next(s for s in deploy["steps"] if s.get("name") == holders[0])
     assert step["env"]["GEMINI_API_KEY"] == "${{ secrets.GEMINI_API_KEY }}"  # pragma: allowlist secret
+
+
+def test_mcp_and_multi_agent_follow_repository_variables():
+    env = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]["env"]
+    assert env["MCP_ENABLED"] == "${{ vars.MCP_ENABLED || 'false' }}"
+    assert env["MULTI_AGENT_ENABLED"] == "${{ vars.MULTI_AGENT_ENABLED || 'false' }}"

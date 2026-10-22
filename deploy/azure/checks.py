@@ -163,6 +163,13 @@ def wait_until_ready(web_urls, timeout=180, interval=5):
 SCRIPTS = ["deploy/azure/setup.sh", "deploy/azure/build-images.sh", "deploy/azure/deploy.sh",
            "deploy/azure/main.bicep", "deploy/azure/apps.json"]
 AI_SERVICES = ("ai_mode", "mcp", "rag", "multi_agent")
+# The variable that switches each service on in the bonus profile.
+AI_SWITCHES = {"ai_mode": "AI_MODE_ENABLED", "mcp": "MCP_ENABLED", "rag": "RAG_ENABLED",
+               "multi_agent": "MULTI_AGENT_ENABLED"}
+# A server that is on must answer a real call through fraud's frontend and
+# backend: MCP tools/list, and the Multi-Agent Server's workflow list.
+AI_CALLS = {"mcp": ("fraud mcp tools", "/api/mcp/tools"),
+            "multi_agent": ("fraud multi-agent workflows", "/api/agents/workflows")}
 
 
 def ai_services(fraud_web_url):
@@ -183,8 +190,8 @@ def _run_meta():
         "deployed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "commit": (os.getenv("GITHUB_SHA") or os.getenv("IMAGE_TAG") or "")[:7] or None,
         "deployed_by": os.getenv("GITHUB_ACTOR") or os.getenv("USER"),
-        # The bonus profile: deploy.sh turned AI-Mode on (the variable AI_MODE_ENABLED).
-        "ai_mode": os.getenv("AI_MODE_ENABLED", "false").strip().lower() == "true",
+        # The bonus profile: the services deploy.sh was asked to turn on.
+        "requested": {name: os.getenv(var, "false").strip().lower() == "true" for name, var in AI_SWITCHES.items()},
         # The deployment steps before this one succeeded, or this would not run.
         "workflow": {"name": "cloud-deployment.yml", "run_id": run_id,
                      "run_url": f"{server}/{repo}/actions/runs/{run_id}" if run_id else None,
@@ -195,17 +202,21 @@ def _run_meta():
 def build_report(web_urls, home_url, meta, resources=()):
     """The cloud deployment report: every endpoint and CRUD check, the AI flags,
     and one issue per check that did not return its expected status."""
+    requested = meta.get("requested") or {}
     endpoints = []
     _check(endpoints, "home page", "GET", f"{home_url}/", 200)
     for feature in FEATURES:
         endpoints += endpoint_checks(feature, web_urls[feature])
+    for name, (check, path) in AI_CALLS.items():
+        if requested.get(name):
+            _check(endpoints, check, "GET", f"{web_urls['fraud']}{path}", 200)
     crud = [check for feature in FEATURES for check in crud_checks(feature, web_urls[feature])]
     ai = ai_services(web_urls["fraud"])
     issues = [f"{c['name']}: {c['method']} {c['url']} returned {c['status']}, expected {c['expected_status']}"
               for c in endpoints + crud if c["status"] != c["expected_status"]]
-    # The baseline keeps all four AI services off; the bonus profile turns AI-Mode on.
-    profile = "bonus" if meta.get("ai_mode") else "baseline"
-    wanted = {name: "enabled" if name == "ai_mode" and profile == "bonus" else "disabled" for name in AI_SERVICES}
+    # The baseline keeps all four AI services off; the bonus profile turns on the ones asked for.
+    profile = "bonus" if any(requested.values()) else "baseline"
+    wanted = {name: "enabled" if requested.get(name) else "disabled" for name in AI_SERVICES}
     issues += [f"{name} is {ai.get(name)}, expected {state} ({profile} profile)"
                for name, state in wanted.items() if ai.get(name) != state]
     return {"schema": "smartbank-cloud-deployment-report/1", "sample": False, "provider": "azure",

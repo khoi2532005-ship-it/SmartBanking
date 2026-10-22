@@ -7,7 +7,7 @@ follows the reference architecture in Lecture 11 (slides 12-14) and Lab 11 §5.
 
 | What | Where |
 |---|---|
-| The 16 container apps: one public frontend per feature plus the home page; APIs and databases internal | `deploy/azure/apps.json` |
+| The 16 container apps: one public frontend per feature plus the home page; APIs and databases internal. Plus the MCP and Multi-Agent servers, internal, in the bonus profile only | `deploy/azure/apps.json` |
 | Infrastructure as code (Bicep, compiled to ARM) | `deploy/azure/main.bicep` |
 | Reusable scripts | `deploy/azure/{oidc-setup,setup,build-images,deploy,cleanup}.sh` |
 | Endpoint and CRUD checks, and the deployment report | `deploy/azure/checks.py` |
@@ -109,29 +109,48 @@ Then run `python deploy/azure/checks.py --outputs reports/cloud/outputs.json --o
    `CLOUD_DEPLOYMENT_REPORT=docs/deployment/cloud-deployment-report.json python agentic_loop.py --mode cloud_deployment_review`.
    Then record the human release decision in the report's `release_decision`.
 
-## 5. AI-Mode in the cloud (bonus profile)
+## 5. AI services in the cloud (bonus profile)
 
-The required deployment is the baseline, with every AI service off. To turn on
-AI-Mode (Gemini) for a bonus run:
+The required deployment is the baseline, with every AI service off. Each bonus
+service has a repository variable that turns it on:
+
+| Variable | Bonus | What turns on |
+|---|---|---|
+| `AI_MODE_ENABLED` | B1 | AI-Mode (Gemini) in every backend |
+| `MCP_ENABLED` | B2 | the app `mcp-server` (the shared MCP server), and every backend calling it at `http://mcp-server/mcp` |
+| `MULTI_AGENT_ENABLED` | B4 | the app `multi-agent-server` (Planner → Worker → Reviewer → human), and the backends calling it at `http://multi-agent-server` |
 
 ```bash
 gh secret set GEMINI_API_KEY                   # paste the key; it never enters the repository
 gh variable set AI_MODE_ENABLED --body true
+gh variable set MCP_ENABLED --body true
+gh variable set MULTI_AGENT_ENABLED --body true
 ```
 
-Then deploy as in section 3. `deploy.sh` passes the key to `main.bicep` as a
-secure parameter. Each backend stores it as a Container Apps secret and reads
-it as `GEMINI_API_KEY`, and `AI_MODE_ENABLED` turns on in every backend. The
-report then says `"profile": "bonus"`, and `checks.py` expects AI-Mode on with
-MCP, RAG and Multi-Agent still off. With the variable on and no secret,
-`deploy.sh` stops before deploying.
+Then deploy as in section 3.
 
-To go back to the baseline, run `gh variable set AI_MODE_ENABLED --body false`
-and deploy again. The key leaves the apps on that deployment.
+- **The two servers** are internal apps built from `deploy/azure/Dockerfile.mcp-server`
+  and `deploy/azure/Dockerfile.multi-agent-server`. Locally they still run on
+  the host and never in Compose. Each reaches the feature APIs by app name.
+- **AI-Mode and Multi-Agent call Gemini**, so either needs the secret.
+  `deploy.sh` passes the key to `main.bicep` as a secure parameter. Each app that
+  needs it stores it as a Container Apps secret and reads it as `GEMINI_API_KEY`.
+  With either variable on and no secret, `deploy.sh` stops before deploying.
+- **The backends and the Multi-Agent Server share a bearer token**
+  (`MULTI_AGENT_API_TOKEN`). `main.bicep` makes a new one on every deployment,
+  so nobody stores it.
+- **The report** says `"profile": "bonus"` and expects exactly the services
+  asked for to be on. For each server that is on, it makes one real call
+  through the fraud frontend: `GET /api/mcp/tools` (an MCP `tools/list`) and
+  `GET /api/agents/workflows` (the Multi-Agent Server's workflow list).
 
-MCP, RAG and the Multi-Agent Server are separate servers that this deployment
-doesn't run in the cloud. Turning them on means deploying each as its own
-container app.
+To go back to the baseline, set the variables to `false` and deploy again.
+The keys leave the apps, and `deploy.sh` removes `mcp-server` and
+`multi-agent-server`, because Bicep never removes an app by itself. The
+Multi-Agent Server keeps its workflows on its one replica, so a new revision
+starts with none.
+
+RAG (B3) is not deployed yet: `RAG_ENABLED` stays off in every backend.
 
 ## Things to know
 

@@ -20,14 +20,49 @@ param envName string = 'smartbank-env'
 @description('AI-Mode (Gemini) in every backend. Off by default: the brief\'s cloud baseline. On is the bonus profile.')
 param aiModeEnabled bool = false
 
+@description('The shared MCP server as an app of its own, and the backends calling it. Off by default; on is bonus B2.')
+param mcpEnabled bool = false
+
+@description('The shared Multi-Agent Server as an app of its own, and the backends calling it. Off by default; on is bonus B4.')
+param multiAgentEnabled bool = false
+
 @secure()
-@description('Gemini API key (the GEMINI_API_KEY repository secret). The backends get it, as a Container Apps secret, only when aiModeEnabled is true.')
+@description('Gemini API key (the GEMINI_API_KEY repository secret). It reaches an app only as a Container Apps secret: the backends with aiModeEnabled, the Multi-Agent Server with multiAgentEnabled.')
 param geminiApiKey string = ''
+
+@secure()
+@description('Bearer token between the backends and the Multi-Agent Server. New on every deployment, so nobody stores it.')
+param multiAgentToken string = newGuid()
 
 var apps = loadJsonContent('apps.json').apps
 var features = ['accounts', 'loans', 'fraud', 'budgeting', 'transactions']
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-var aiModeFlag = aiModeEnabled ? 'true' : 'false'
+
+// apps.json keeps every backend's AI flags "false"; these switches override them.
+var flags = {
+  AI_MODE_ENABLED: aiModeEnabled ? 'true' : 'false'
+  MCP_ENABLED: mcpEnabled ? 'true' : 'false'
+  RAG_ENABLED: 'false'
+  MULTI_AGENT_ENABLED: multiAgentEnabled ? 'true' : 'false'
+}
+
+// An app with a "switch" in apps.json (an AI server) is deployed only when that
+// flag is on; every other app always is.
+var deployWhen = union(flags, { ALWAYS: 'true' })
+
+// The secrets each app reads, by the variable it reads them from: a backend
+// gets the Gemini key with AI-Mode on and the token with Multi-Agent on; the
+// Multi-Agent Server gets both, since its agents call Gemini.
+var secretNames = {
+  GEMINI_API_KEY: 'gemini-api-key'  // pragma: allowlist secret (the secret's name, not its value)
+  MULTI_AGENT_API_TOKEN: 'multi-agent-token'  // pragma: allowlist secret (the secret's name, not its value)
+}
+var backendSecrets = concat(aiModeEnabled ? ['GEMINI_API_KEY'] : [], multiAgentEnabled ? ['MULTI_AGENT_API_TOKEN'] : [])
+var serverSecrets = {
+  MCP_ENABLED: []
+  MULTI_AGENT_ENABLED: ['GEMINI_API_KEY', 'MULTI_AGENT_API_TOKEN']
+}
+var appSecrets = [for app in apps: app.role == 'backend' ? backendSecrets : (contains(app, 'switch') ? serverSecrets[app.switch] : [])]
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
@@ -83,7 +118,7 @@ resource pullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for app in apps: {
+resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for (app, i) in apps: if (deployWhen[app.?switch ?? 'ALWAYS'] == 'true') {
   name: app.name
   location: location
   dependsOn: [pullRole]
@@ -109,12 +144,10 @@ resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for app in ap
           identity: pullIdentity.id
         }
       ]
-      secrets: aiModeEnabled && app.role == 'backend' ? [
-        {
-          name: 'gemini-api-key'
-          value: geminiApiKey
-        }
-      ] : []
+      secrets: [for key in appSecrets[i]: {
+        name: secretNames[key]
+        value: key == 'GEMINI_API_KEY' ? geminiApiKey : multiAgentToken
+      }]
     }
     template: {
       containers: [
@@ -122,14 +155,14 @@ resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for app in ap
           name: app.name
           image: replace(replace(app.image, '{acr}', acrName), '{tag}', imageTag)
           command: app.?command
-          // apps.json keeps AI_MODE_ENABLED "false"; the switch overrides it, and
-          // with AI-Mode on each backend also reads GEMINI_API_KEY from the secret.
-          env: [for item in items(union(app.env, aiModeEnabled && app.role == 'backend' ? { GEMINI_API_KEY: '' } : {})): item.key == 'GEMINI_API_KEY' ? {
+          // The AI flags come from the switches, and each secret this app gets
+          // is read from its Container Apps secret, never written out as a value.
+          env: [for item in items(union(app.env, toObject(appSecrets[i], key => key, key => ''))): contains(secretNames, item.key) ? {
             name: item.key
-            secretRef: 'gemini-api-key'  // pragma: allowlist secret (the secret's name, not its value)
+            secretRef: secretNames[item.key]
           } : {
             name: item.key
-            value: item.key == 'AI_MODE_ENABLED' ? aiModeFlag : replace(item.value, '{defaultDomain}', managedEnv.properties.defaultDomain)
+            value: flags[?item.key] ?? replace(item.value, '{defaultDomain}', managedEnv.properties.defaultDomain)
           }]
           resources: {
             cpu: json('0.25')

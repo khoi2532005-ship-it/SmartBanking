@@ -72,9 +72,12 @@ jobs:
       contents: read
     env:
       AZ_RG: ${{ vars.AZ_RG || 'rg-smartbank' }}
-      # Bonus profile: set the variable AI_MODE_ENABLED to true (and the secret
-      # GEMINI_API_KEY) to turn AI-Mode on; unset, the baseline keeps it off.
+      # Bonus profile: set any of these variables to true to turn that service
+      # on (AI-Mode and Multi-Agent also need the secret GEMINI_API_KEY); unset,
+      # the baseline keeps them off. MCP and Multi-Agent run as apps of their own.
       AI_MODE_ENABLED: ${{ vars.AI_MODE_ENABLED || 'false' }}
+      MCP_ENABLED: ${{ vars.MCP_ENABLED || 'false' }}
+      MULTI_AGENT_ENABLED: ${{ vars.MULTI_AGENT_ENABLED || 'false' }}
       AZ_LOCATION: ${{ vars.AZ_LOCATION || 'australiaeast' }}
       ACR_NAME: ${{ vars.ACR_NAME }}
       IMAGE_TAG: ${{ github.sha }}
