@@ -13,9 +13,11 @@
 #   4. grants Contributor and User Access Administrator (the latter so
 #      main.bicep can give the apps AcrPull) on the resource group only;
 #   5. stores AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as
-#      GitHub secrets and ACR_NAME, AZ_LOCATION, AZURE_DEPLOY_ENABLED=false as variables,
+#      GitHub secrets and ACR_NAME, AZ_RG, AZ_LOCATION, AZURE_DEPLOY_ENABLED=false as variables,
 #      and creates the `azure` environment.
 #   ACR_NAME=<globally unique, lower-case> bash deploy/azure/oidc-setup.sh
+# AZ_RG names another resource group (default rg-smartbank), e.g. one the
+# registry was created in from the portal; the workflow reads it back.
 set -euo pipefail
 export MSYS_NO_PATHCONV=1   # Git Bash on Windows: keep "/subscriptions/..." intact
 
@@ -75,6 +77,7 @@ gh secret set AZURE_CLIENT_ID --body "$CLIENT_ID"
 gh secret set AZURE_TENANT_ID --body "$TENANT_ID"
 gh secret set AZURE_SUBSCRIPTION_ID --body "$SUBSCRIPTION_ID"
 gh variable set ACR_NAME --body "$ACR_NAME"
+gh variable set AZ_RG --body "$AZ_RG"
 gh variable set AZ_LOCATION --body "$AZ_LOCATION"
 gh variable list --json name --jq '.[].name' | grep -qx AZURE_DEPLOY_ENABLED || gh variable set AZURE_DEPLOY_ENABLED --body false
 echo "Done. Run the deployment from GitHub: Actions -> cloud-deployment -> Run workflow."

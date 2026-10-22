@@ -8,7 +8,7 @@ name: cloud-deployment
 #
 # One-time setup by the subscription owner: deploy/azure/oidc-setup.sh. It
 # stores the secrets AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID
-# and the variables ACR_NAME, AZ_LOCATION and AZURE_DEPLOY_ENABLED, and creates the `azure`
+# and the variables ACR_NAME, AZ_RG, AZ_LOCATION and AZURE_DEPLOY_ENABLED, and creates the `azure`
 # environment this job runs in.
 # Manual: Actions -> cloud-deployment -> Run workflow.
 # Automatic: every push to main that touches the app, once AZURE_DEPLOY_ENABLED
@@ -71,7 +71,7 @@ jobs:
       id-token: write
       contents: read
     env:
-      AZ_RG: rg-smartbank
+      AZ_RG: ${{ vars.AZ_RG || 'rg-smartbank' }}
       AZ_LOCATION: ${{ vars.AZ_LOCATION || 'australiaeast' }}
       ACR_NAME: ${{ vars.ACR_NAME }}
       IMAGE_TAG: ${{ github.sha }}

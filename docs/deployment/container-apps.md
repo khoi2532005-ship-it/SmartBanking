@@ -50,7 +50,9 @@ ACR_NAME=smartbank<something unique, lower-case> bash deploy/azure/oidc-setup.sh
 If the subscription only allows some regions (Azure for Students often does),
 prefix the command with `AZ_LOCATION=<allowed region>`. Everything follows the
 resource group's region, and the workflow reads the `AZ_LOCATION` variable this
-script sets.
+script sets. To use a resource group with another name, such as one you created
+the registry in from the portal, prefix `AZ_RG=<name>` to this script and to
+`setup.sh`; the script stores it as the `AZ_RG` variable, and the workflow uses that.
 
 This registers the resource providers the deployment uses (Container Apps, Log
 Analytics, Container Registry, Managed Identity) and creates `rg-smartbank`. It then
@@ -60,7 +62,7 @@ stored. It's a managed identity rather than an app registration because
 university tenants usually stop students registering applications ("Directory
 permission is needed"). The identity gets Contributor and User Access
 Administrator on **that resource group only**. Finally, the script stores `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
-`AZURE_SUBSCRIPTION_ID` as secrets, and `ACR_NAME` and
+`AZURE_SUBSCRIPTION_ID` as secrets, and `ACR_NAME`, `AZ_RG`, `AZ_LOCATION` and
 `AZURE_DEPLOY_ENABLED=false` as variables.
 
 ## 3. Deploy

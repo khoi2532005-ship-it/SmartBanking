@@ -45,3 +45,9 @@ def test_the_first_deploy_can_run_from_the_conversion_branch():
 def test_the_region_comes_from_a_repository_variable():
     deploy = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]
     assert deploy["env"]["AZ_LOCATION"] == "${{ vars.AZ_LOCATION || 'australiaeast' }}"
+
+
+def test_the_resource_group_comes_from_a_repository_variable():
+    # The registry may be made in the portal, in a group with another name.
+    deploy = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]
+    assert deploy["env"]["AZ_RG"] == "${{ vars.AZ_RG || 'rg-smartbank' }}"

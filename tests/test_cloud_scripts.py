@@ -41,8 +41,8 @@ def run_script(tmp_path):
     env = {**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "ACR_NAME": "smartbanktest",
            "IMAGE_TAG": "abc123"}
 
-    def run(script):
-        result = subprocess.run(["bash", str(ROOT / "deploy/azure" / script)], env=env, cwd=ROOT,  # noqa: S603, S607  # a script from this repo
+    def run(script, **extra_env):
+        result = subprocess.run(["bash", str(ROOT / "deploy/azure" / script)], env={**env, **extra_env}, cwd=ROOT,  # noqa: S603, S607  # a script from this repo
                                 capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
         return log.read_text().splitlines()
@@ -85,6 +85,12 @@ def test_oidc_setup_needs_no_directory_permission(run_script):
     assert len(grants) == 2
     assert all("--assignee-object-id principal-1 --assignee-principal-type ServicePrincipal" in g for g in grants)
     assert "gh secret set AZURE_CLIENT_ID --body client-1" in calls
+
+
+def test_oidc_setup_tells_the_workflow_which_resource_group(run_script):
+    calls = run_script("oidc-setup.sh", AZ_RG="smartbankacr")
+    assert "gh variable set AZ_RG --body smartbankacr" in calls
+    assert any(c.startswith("az identity create") and "--resource-group smartbankacr" in c for c in calls)
 
 
 def test_oidc_setup_registers_the_same_providers():
