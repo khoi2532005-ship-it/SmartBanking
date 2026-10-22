@@ -560,11 +560,19 @@ def update_repayment(repayment_id):
     )
 
     conn.commit()
+    updated_repayment = conn.execute(
+        """
+        SELECT repayment_id, loan_id, due_date, payment_amount,
+               principal_amount, interest_amount, amount_paid,
+               payment_date, payment_status
+        FROM repayments
+        WHERE repayment_id = ?
+        """,
+        (repayment_id,),
+    ).fetchone()
     conn.close()
 
-    return jsonify({
-        "message": "Repayment updated"
-    })
+    return jsonify(dict(updated_repayment))
 
 
 # ============================================================
