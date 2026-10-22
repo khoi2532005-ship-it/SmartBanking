@@ -42,7 +42,7 @@ FEATURES = {
                  "create_status": 201, "delete_status": 200},
     },
     "loans": {
-        "web_port": 3002, "api_port": 5002, "page": "/tabs/loans.html", "origin_rule": False,
+        "web_port": 3002, "api_port": 5002, "page": "/", "origin_rule": False,
         "crud": {"collection": "/api/loans",
                  "create": {"customer_id": 1, "loan_type": "PERSONAL", "requested_amount": 5000,
                             "loan_purpose": "cloud check"},

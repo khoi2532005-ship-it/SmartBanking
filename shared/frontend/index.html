@@ -31,7 +31,7 @@
              hx-target="#feature-view" hx-swap="innerHTML" hx-indicator="#nav-spinner">
             <button class="nav-item" data-feature="accounts" data-href="http://localhost:3001/"
                     hx-get="/features/accounts.html" hx-push-url="/?feature=accounts">Accounts</button>
-            <button class="nav-item" data-feature="loans" data-href="http://localhost:3002/tabs/loans.html"
+            <button class="nav-item" data-feature="loans" data-href="http://localhost:3002/"
                     hx-get="/features/loans.html" hx-push-url="/?feature=loans">Loans</button>
             <button class="nav-item" data-feature="fraud" data-href="http://localhost:3003/tabs/normal.html"
                     hx-get="/features/fraud.html" hx-push-url="/?feature=fraud">Fraud Alerts</button>
@@ -120,7 +120,7 @@ window.addEventListener("popstate", () => {
 // never blank. Nothing here runs when the fragments are served normally.
 const FEATURES = [
     ["accounts",     "Accounts &amp; Customers",          "Student 1 &middot; William Por",        "http://localhost:3001/"],
-    ["loans",        "Loans &amp; Credit",                "Student 2 &middot; David Lee",          "http://localhost:3002/tabs/loans.html"],
+    ["loans",        "Loans &amp; Credit",                "Student 2 &middot; David Lee",          "http://localhost:3002/"],
     ["fraud",        "Fraud Alerts",                      "Student 3 &middot; Duc Minh Khoi Tran", "http://localhost:3003/tabs/normal.html"],
     ["budgeting",    "Budgeting &amp; Spending Insights", "Student 4 &middot; Cong Bao Nguyen",    "http://localhost:3004/tabs/budgets.html"],
     ["transactions", "Transactions",                      "Student 5 &middot; Aidan Lei",          "http://localhost:3005/"],

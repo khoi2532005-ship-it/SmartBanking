@@ -57,9 +57,17 @@ jobs:
     env:
       MCP_ENABLED: "false"
       RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install post-commit test dependencies
+        run: pip install pytest requests
 
       - name: Verify docker-compose
         run: |
@@ -95,9 +103,30 @@ jobs:
           check_url "http://localhost:5002/api/health"
           check_url "http://localhost:5012/"
 
+      - name: Run loans post-commit API tests
+        run: |
+          mkdir -p reports
+          python -m pytest services/loans/backend/tests/post_commit/test_api_loans.py \
+            -v --junitxml=reports/student-2-endpoint-tests.xml
+
+      - name: Verify MCP and RAG modes are disabled in CI
+        run: |
+          mcp=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5002/api/mcp/tools)
+          rag=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"query":"ci check"}' http://localhost:5002/api/rag/answer)
+          echo "mcp=$mcp rag=$rag"
+          [ "$mcp" = "403" ] && [ "$rag" = "403" ]
+
       - name: Stop services
         if: always()
         run: docker-compose down -v
+
+      - name: Upload endpoint test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-2-endpoint-tests
+          path: reports/student-2-endpoint-tests.xml
+          if-no-files-found: warn
 
   evidence-pack:
     runs-on: ubuntu-latest

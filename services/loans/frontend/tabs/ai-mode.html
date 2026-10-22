@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Mode</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body { margin: 0; min-height: auto; background: transparent; font-family: system-ui, sans-serif; }
+        .app-shell { max-width: none; padding: 1rem; }
+        .card { margin-bottom: 1.5rem; }
+        table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #d5dbe3; padding: 4px 8px; text-align: left; }
+        th { background: #f0f3f7; cursor: pointer; }
+        /* Long unbroken names and explanations wrap instead of widening the page. */
+        td { overflow-wrap: anywhere; }
+        .table-wrap { overflow-x: auto; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > div { display: flex; flex-direction: column; }
+        pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; }
+        .is-hidden { display: none; }
+        .panel { border: 1px solid #d5dbe3; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; background: #fafbfc; }
+        .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
+        .sev-high { background: #c0392b; }
+        .sev-medium { background: #d68910; }
+        .sev-low { background: #7f8c8d; }
+        button { cursor: pointer; }
+        /* Tab strip linking the Normal and AI Mode views. */
+        .tab-strip { margin: 0 0 1rem; }
+        .tab-strip .nav-item { text-decoration: none; border-radius: var(--radius-small); }
+    </style>
+</head>
+<body>
+<main class="app-shell">
+    <section class="card">
+        <h2>AI Explanations for a Loan</h2>
+        <p>Enter a loan ID to get plain-language explanations of its eligibility checks, approval or rejection decision, and repayment schedule.</p>
+        <form id="loan-ai-form" class="row">
+            <div><label for="ai_loan_id">Loan ID</label>
+                <input id="ai_loan_id" type="number" min="1" placeholder="4"></div>
+            <button type="button" class="btn-ai" id="explain-eligibility-btn">Explain Eligibility</button>
+            <button type="button" class="btn-ai" id="explain-decision-btn">Explain Decision</button>
+            <button type="button" class="btn-ai" id="explain-repayments-btn">Explain Repayments</button>
+        </form>
+        <div id="explanation-result" class="panel is-hidden"></div>
+
+        <h2>Compare Repayment Options &amp; Get a Recommendation</h2>
+        <p>Compare monthly payments and total interest across different loan terms, using an existing loan or the amount, rate, and income you provide.</p>
+        <form id="compare-form" class="row">
+            <div><label for="cmp_loan_id">Existing Loan ID (optional)</label>
+                <input id="cmp_loan_id" type="number" min="1" placeholder="1"></div>
+            <div><label for="cmp_amount">Amount (if no loan ID)</label>
+                <input id="cmp_amount" type="number" min="100" step="0.01" placeholder="15000"></div>
+            <div><label for="cmp_rate">Interest rate %</label>
+                <input id="cmp_rate" type="number" min="0" step="0.1" placeholder="8.5"></div>
+            <div><label for="cmp_income">Monthly income</label>
+                <input id="cmp_income" type="number" min="0" step="0.01" placeholder="4200"></div>
+            <div><label for="cmp_terms">Terms (comma separated)</label>
+                <input id="cmp_terms" type="text" placeholder="12,24,36,48,60"></div>
+            <button type="submit" class="btn-ai">Compare Options</button>
+        </form>
+        <div id="compare-result" class="panel is-hidden"></div>
+    </section>
+</main>
+<script src="/config.js"></script>
+<script src="/loans-js/ai-mode.js"></script>
+</body>
+</html>

@@ -12,8 +12,10 @@ if str(BASE_DIR) not in sys.path:
 from routes.ai import ai_bp
 from routes.loans import loans_bp
 from routes.mcp_mode import mcp_bp
+from routes.multi_agent import multi_agent_bp
 from routes.rag_mode import rag_bp
 from routes.repayments import repayments_bp
+from services import multi_agent_client
 
 
 def create_app():
@@ -25,10 +27,16 @@ def create_app():
     app.register_blueprint(ai_bp)
     app.register_blueprint(mcp_bp)
     app.register_blueprint(rag_bp)
+    app.register_blueprint(multi_agent_bp)
 
     @app.get("/api/health")
     def health():
-        return jsonify({"service": "loan-service", "status": "running"})
+        # Configuration only, no calls out, so health stays instant.
+        return jsonify({
+            "service": "loan-service",
+            "status": "running",
+            "multi_agent": {"enabled": multi_agent_client.enabled(), "url": multi_agent_client.server_url()},
+        })
 
     return app
 

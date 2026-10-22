@@ -1,10 +1,46 @@
+const API = window.SMARTBANK_SAME_ORIGIN_API ? window.location.origin : `http://${window.location.hostname}:5002`;
+
+async function api(path, options = {}) {
+    options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+    const response = await fetch(`${API}${path}`, options);
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+}
+
+function show(panelId, content) {
+    const panel = document.getElementById(panelId);
+    panel.classList.remove("is-hidden");
+    panel.innerHTML = content;
+}
+
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    })[character]);
+}
+
+function errorBox(error) {
+    return `<p>Request failed.</p><pre>${escapeHtml(errorMessage(error))}</pre>`;
+}
+
+function errorMessage(error, status = "") {
+    if (typeof error === "string") return error;
+    if (error && typeof error.message === "string") return error.message;
+    if (error && typeof error.error === "string") return error.error;
+    return status ? `Request failed (${status}).` : "Request failed.";
+}
+
 function explain(kind) {
     const loanId = document.getElementById("ai_loan_id").value;
     show("explanation-result", "<p>Thinking...</p>");
     api(`/api/ai/loans/${loanId}/${kind}`)
         .then((result) => result.ok
-            ? show("explanation-result", `<pre>${result.body.explanation}</pre>`)
-            : show("explanation-result", `<p>Error: ${result.body.error || result.status}</p>`))
+            ? show("explanation-result", `<pre>${escapeHtml(result.body.explanation)}</pre>`)
+            : show("explanation-result", `<p>Error: ${escapeHtml(errorMessage(result.body.error, result.status))}</p>`))
         .catch((error) => show("explanation-result", errorBox(error)));
 }
 
@@ -28,13 +64,13 @@ document.getElementById("compare-form").addEventListener("submit", async (event)
     show("compare-result", "<p>Comparing options...</p>");
     try {
         const result = await api("/api/ai/repayment-options", { method: "POST", body: JSON.stringify(payload) });
-        if (!result.ok) return show("compare-result", `<p>Error: ${result.body.error || result.status}</p>`);
+        if (!result.ok) return show("compare-result", `<p>Error: ${escapeHtml(errorMessage(result.body.error, result.status))}</p>`);
         const rows = result.body.options.map((o) => `
             <tr><td>${o.term_months} mo</td><td>$${Number(o.monthly_payment).toFixed(2)}</td>
             <td>$${Number(o.total_interest).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
             <td>${o.payment_share_of_income != null ? o.payment_share_of_income + "%" : "-"}</td></tr>`).join("");
         show("compare-result",
             `<table><tr><th>Term</th><th>Monthly</th><th>Total Interest</th><th>% of Income</th></tr>${rows}</table>
-             <p><b>AI Recommendation:</b></p><pre>${result.body.recommendation}</pre>`);
+             <p><b>AI Recommendation:</b></p><pre>${escapeHtml(result.body.recommendation)}</pre>`);
     } catch (error) { show("compare-result", errorBox(error)); }
 });
