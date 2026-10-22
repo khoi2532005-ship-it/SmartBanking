@@ -31,6 +31,8 @@ def run_script(tmp_path):
                          '  "group show"*|"acr show"*) exit 1 ;;\n'
                          '  "identity show"*clientId*) echo client-1 ;;\n'
                          '  "identity show"*principalId*) echo principal-1 ;;\n'
+                         '  "deployment group create"*) echo \'{"frontends": {"value": {}}, "homeUrl": {"value": "https://home.example"}}\' ;;\n'
+                         '  "containerapp list"*) echo "[]" ;;\n'
                          'esac\n')
     # oidc-setup.sh writes repository secrets: never let it reach the real gh.
     stub(tmp_path, "gh", f'echo "gh $*" >> "{log}"\n'
@@ -38,12 +40,16 @@ def run_script(tmp_path):
                          '  "repo view"*) echo owner/repo ;;\n'
                          '  "api repos/"*) echo 7 ;;\n'
                          'esac\n')
-    env = {**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "ACR_NAME": "smartbanktest",
-           "IMAGE_TAG": "abc123"}
+    inherited = {k: v for k, v in os.environ.items() if k not in ("AI_MODE_ENABLED", "GEMINI_API_KEY")}
+    env = {**inherited, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "ACR_NAME": "smartbanktest",
+           "IMAGE_TAG": "abc123", "REPORT_DIR": str(tmp_path / "reports")}
 
-    def run(script, **extra_env):
+    def run(script, *, fails=False, **extra_env):
         result = subprocess.run(["bash", str(ROOT / "deploy/azure" / script)], env={**env, **extra_env}, cwd=ROOT,  # noqa: S603, S607  # a script from this repo
                                 capture_output=True, text=True)
+        if fails:
+            assert result.returncode != 0
+            return result.stderr
         assert result.returncode == 0, result.stderr
         return log.read_text().splitlines()
     return run
@@ -98,3 +104,19 @@ def test_oidc_setup_registers_the_same_providers():
     # resource group only), so the owner's one-time setup must register them all.
     line = re.search(r"for namespace in (.+); do", (ROOT / "deploy/azure/oidc-setup.sh").read_text()).group(1)
     assert set(line.split()) == PROVIDERS
+
+
+def test_deploy_keeps_ai_mode_off_by_default(run_script):
+    # The brief's cloud baseline: AI-Mode off, and no model key anywhere near the apps.
+    create = next(c for c in run_script("deploy.sh") if c.startswith("az deployment group create"))
+    assert "aiModeEnabled=false" in create and "geminiApiKey" not in create
+
+
+def test_deploy_passes_the_key_only_when_ai_mode_is_on(run_script):
+    create = next(c for c in run_script("deploy.sh", AI_MODE_ENABLED="true", GEMINI_API_KEY="key-1")
+                  if c.startswith("az deployment group create"))
+    assert "aiModeEnabled=true" in create and "geminiApiKey=key-1" in create
+
+
+def test_deploy_refuses_ai_mode_without_a_key(run_script):
+    assert "GEMINI_API_KEY" in run_script("deploy.sh", fails=True, AI_MODE_ENABLED="true")

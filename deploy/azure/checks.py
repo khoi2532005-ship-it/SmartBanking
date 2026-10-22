@@ -183,6 +183,8 @@ def _run_meta():
         "deployed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "commit": (os.getenv("GITHUB_SHA") or os.getenv("IMAGE_TAG") or "")[:7] or None,
         "deployed_by": os.getenv("GITHUB_ACTOR") or os.getenv("USER"),
+        # The bonus profile: deploy.sh turned AI-Mode on (the variable AI_MODE_ENABLED).
+        "ai_mode": os.getenv("AI_MODE_ENABLED", "false").strip().lower() == "true",
         # The deployment steps before this one succeeded, or this would not run.
         "workflow": {"name": "cloud-deployment.yml", "run_id": run_id,
                      "run_url": f"{server}/{repo}/actions/runs/{run_id}" if run_id else None,
@@ -201,9 +203,14 @@ def build_report(web_urls, home_url, meta, resources=()):
     ai = ai_services(web_urls["fraud"])
     issues = [f"{c['name']}: {c['method']} {c['url']} returned {c['status']}, expected {c['expected_status']}"
               for c in endpoints + crud if c["status"] != c["expected_status"]]
-    issues += [f"{name} is {state} in the cloud baseline" for name, state in ai.items() if state != "disabled"]
+    # The baseline keeps all four AI services off; the bonus profile turns AI-Mode on.
+    profile = "bonus" if meta.get("ai_mode") else "baseline"
+    wanted = {name: "enabled" if name == "ai_mode" and profile == "bonus" else "disabled" for name in AI_SERVICES}
+    issues += [f"{name} is {ai.get(name)}, expected {state} ({profile} profile)"
+               for name, state in wanted.items() if ai.get(name) != state]
     return {"schema": "smartbank-cloud-deployment-report/1", "sample": False, "provider": "azure",
-            "region": meta["region"], "environment": "release-2-baseline", "deployed_at": meta["deployed_at"],
+            "region": meta["region"], "environment": f"release-2-{profile}", "profile": profile,
+            "deployed_at": meta["deployed_at"],
             "commit": meta["commit"], "deployed_by": meta["deployed_by"], "workflow": meta["workflow"],
             "scripts": SCRIPTS, "resources": list(resources), "endpoints": endpoints, "crud_checks": crud,
             "ai_services": ai, "issues": issues}
