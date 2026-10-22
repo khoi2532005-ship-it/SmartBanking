@@ -40,3 +40,10 @@ def test_more_origins_come_from_the_environment(monkeypatch):
     for origin in ("https://fraud.example.net", "http://localhost:8080"):
         r = preflight(client, origin)
         assert r.status_code == 200 and r.headers.get("Access-Control-Allow-Origin") == origin
+
+
+def test_an_extra_origin_may_end_in_a_slash(monkeypatch):
+    # Copied from the address bar; browsers send the Origin header without it.
+    monkeypatch.setenv("FRAUD_FRONTEND_ORIGINS", "https://fraud.example.net/")
+    r = preflight(create_app().test_client(), "https://fraud.example.net")
+    assert r.status_code == 200 and r.headers.get("Access-Control-Allow-Origin") == "https://fraud.example.net"

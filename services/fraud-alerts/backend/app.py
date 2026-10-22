@@ -56,7 +56,10 @@ FRAUD_TAB_ORIGIN = re.compile(r"^https?://[^/]+:3003$")
 
 
 def extra_origins():
-    return [origin.strip() for origin in os.getenv("FRAUD_FRONTEND_ORIGINS", "").split(",") if origin.strip()]
+    # A trailing slash, as copied from the address bar, is dropped: browsers
+    # send the Origin header without one, so it would never match.
+    origins = (origin.strip().rstrip("/") for origin in os.getenv("FRAUD_FRONTEND_ORIGINS", "").split(","))
+    return [origin for origin in origins if origin]
 
 
 def allowed_origins():

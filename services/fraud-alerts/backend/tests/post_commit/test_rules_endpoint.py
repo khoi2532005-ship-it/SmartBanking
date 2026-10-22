@@ -1,16 +1,12 @@
 """Write endpoint: POST /api/rules (submit_rule), through a full
 create-read-update-delete cycle. That cycle is also fraud's post-deploy CRUD
-check, so every rule it creates is deleted again, even when an assertion fails."""
-
-import uuid
+check, so every rule it creates is deleted again, even when an assertion fails,
+and a rule an interrupted run left behind is swept at the start of the next."""
 
 import pytest
 import requests
 
-
-def rule(**changes):
-    return {"rule_name": f"release-check {uuid.uuid4().hex[:8]}", "rule_type": "amount_over",
-            "threshold_value": 7500, "severity": "high", "enabled": True, **changes}
+from tests.post_commit.helpers import TEST_CUSTOMER, TIMEOUT, new_rule, remove_rule, sweep_leftovers
 
 
 def stored(api, rule_id):
@@ -19,44 +15,78 @@ def stored(api, rule_id):
 
 @pytest.fixture
 def created(api):
-    """Ids of the rules a test created; each one is deleted afterwards."""
+    """Ids of the rules a test created; each one is removed afterwards."""
     ids = []
     yield ids
     for rule_id in ids:
-        requests.delete(f"{api}/api/rules/{rule_id}", timeout=5)
+        remove_rule(api, rule_id)
 
 
 def test_rule_crud_cycle(api, created):
-    r = requests.post(f"{api}/api/rules", json=rule(), timeout=5)
+    r = requests.post(f"{api}/api/rules", json=new_rule(), timeout=5)
     assert r.status_code == 201, r.text
     rule_id = r.json()["rule_id"]
     created.append(rule_id)
     row = stored(api, rule_id).json()
     assert (row["rule_type"], row["threshold_value"], row["threshold_secondary"], row["severity"], row["enabled"]) == \
-           ("amount_over", 7500, None, "high", 1)
-    assert requests.put(f"{api}/api/rules/{rule_id}", json={"severity": "medium", "enabled": False}, timeout=5).status_code == 200
+           ("amount_over", 7500, None, "high", 0)
+    assert requests.put(f"{api}/api/rules/{rule_id}", json={"severity": "medium", "threshold_value": 8000}, timeout=5).status_code == 200
     row = stored(api, rule_id).json()
-    assert (row["severity"], row["enabled"]) == ("medium", 0)
+    # Still disabled: a run cut off before the DELETE must not leave a rule that fires on real customers.
+    assert (row["severity"], row["threshold_value"], row["enabled"]) == ("medium", 8000, 0)
     assert requests.delete(f"{api}/api/rules/{rule_id}", timeout=5).status_code == 200
     created.remove(rule_id)
     assert stored(api, rule_id).status_code == 404
 
 
 @pytest.mark.parametrize("body, message", [
-    (rule(rule_name="  "), "rule_name is required"),
-    (rule(rule_type="sometimes"), "rule_type must be one of"),
-    (rule(rule_type="velocity", threshold_value=3), "velocity needs threshold_secondary"),
-    (rule(rule_type="unusual_time", threshold_value=3, threshold_secondary=3), "start and end hours must differ"),
-    (rule(threshold_value="NaN"), "threshold_value must be a finite number"),
+    (new_rule(rule_name="  "), "rule_name is required"),
+    (new_rule(rule_type="sometimes"), "rule_type must be one of"),
+    (new_rule(rule_type="velocity", threshold_value=3), "velocity needs threshold_secondary"),
+    (new_rule(rule_type="unusual_time", threshold_value=3, threshold_secondary=3), "start and end hours must differ"),
+    (new_rule(threshold_value="NaN"), "threshold_value must be a finite number"),
 ])
 def test_invalid_rules_are_400_and_store_nothing(api, body, message):
-    before = len(requests.get(f"{api}/api/rules", timeout=5).json())
     r = requests.post(f"{api}/api/rules", json=body, timeout=5)
     assert r.status_code == 400 and message in r.json()["error"]
-    assert len(requests.get(f"{api}/api/rules", timeout=5).json()) == before
+    # By name, not by counting rows: an analyst may add a rule while this runs.
+    names = [rule["rule_name"].strip() for rule in requests.get(f"{api}/api/rules", timeout=5).json()]
+    assert body["rule_name"].strip() not in names
 
 
 def test_form_posts_are_400(api):
     r = requests.post(f"{api}/api/rules", data="rule_name=x", timeout=5,
                       headers={"Content-Type": "application/x-www-form-urlencoded"})
     assert r.status_code == 400 and r.json()["error"] == "JSON body required"
+
+
+def test_sweep_removes_what_an_interrupted_run_left(api):
+    r = requests.post(f"{api}/api/rules", json=new_rule(), timeout=TIMEOUT)
+    assert r.status_code == 201, r.text
+    rule_id = r.json()["rule_id"]
+    alert = {"rule_id": rule_id, "customer_id": TEST_CUSTOMER, "transaction_id": 1,
+             "transaction_amount": 7500, "severity": "high"}
+    assert requests.post(f"{api}/api/alerts", json=alert, timeout=TIMEOUT).status_code == 201
+    assert rule_id in sweep_leftovers(api)
+    assert stored(api, rule_id).status_code == 404
+    assert requests.get(f"{api}/api/alerts", params={"rule_id": rule_id}, timeout=TIMEOUT).json() == []
+
+
+def test_a_test_rule_with_other_customers_alerts_is_left_for_a_person(api):
+    # Such a rule fired on real data (an older suite created its rules enabled):
+    # those alerts may carry an analyst's work, so cleanup refuses them loudly.
+    r = requests.post(f"{api}/api/rules", json=new_rule(), timeout=TIMEOUT)
+    assert r.status_code == 201, r.text
+    rule_id = r.json()["rule_id"]
+    alert = {"rule_id": rule_id, "customer_id": TEST_CUSTOMER - 1, "transaction_id": 1,
+             "transaction_amount": 7500, "severity": "high"}
+    r = requests.post(f"{api}/api/alerts", json=alert, timeout=TIMEOUT)
+    assert r.status_code == 201, r.text
+    alert_id = r.json()["alert_id"]
+    try:
+        with pytest.raises(AssertionError, match=str(TEST_CUSTOMER - 1)):
+            remove_rule(api, rule_id)
+        assert requests.get(f"{api}/api/alerts/{alert_id}", timeout=TIMEOUT).status_code == 200
+    finally:
+        requests.delete(f"{api}/api/alerts/{alert_id}", timeout=TIMEOUT)
+        requests.delete(f"{api}/api/rules/{rule_id}", timeout=TIMEOUT)

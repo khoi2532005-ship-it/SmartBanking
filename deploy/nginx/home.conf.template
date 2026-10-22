@@ -1,0 +1,20 @@
+# nginx for the shared home page (port 3000 locally, the `home` app in Azure).
+# The nginx image runs envsubst over this at start-up and fills in
+# SMARTBANK_FRONTENDS: a JSON map from each feature's local port to its
+# deployed frontend, e.g. {"3003": "https://fraud-frontend-service.<domain>"}.
+# The image default is {}: locally each feature is a port on this same host.
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # index.html reads this before rewriting the feature links.
+    location = /config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store";
+        return 200 'window.SMARTBANK_FRONTENDS = ${SMARTBANK_FRONTENDS};';
+    }
+
+    location /features/ { add_header Cache-Control "no-store"; }
+    location / { try_files $uri $uri/ /index.html; }
+}

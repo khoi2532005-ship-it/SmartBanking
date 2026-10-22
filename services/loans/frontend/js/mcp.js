@@ -3,7 +3,8 @@
 // localStorage plus a tool form that POSTs to the loans backend, which runs
 // the tool against the shared MCP server. The X-MCP-Mode header is the same
 // per-request gate the backend checks alongside MCP_ENABLED.
-const MCP_BASE = `http://${window.location.hostname}:5002`;
+// Cloud mode (config.js): call this page's own frontend, which forwards /api/.
+const MCP_BASE = window.SMARTBANK_SAME_ORIGIN_API ? window.location.origin : `http://${window.location.hostname}:5002`;
 const MCP_STORAGE_KEY = "loans_mcp_mode_enabled";
 
 const mcpToggle = document.getElementById("mcp-mode-toggle");
