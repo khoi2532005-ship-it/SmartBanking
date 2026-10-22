@@ -57,6 +57,7 @@ jobs:
     env:
       MCP_ENABLED: "false"
       RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
 
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +104,10 @@ jobs:
           check_url "http://localhost:5012/"
 
       - name: Run loans post-commit API tests
-        run: python -m pytest services/loans/backend/tests/post_commit/test_api_loans.py -v
+        run: |
+          mkdir -p reports
+          python -m pytest services/loans/backend/tests/post_commit/test_api_loans.py \
+            -v --junitxml=reports/student-2-endpoint-tests.xml
 
       - name: Verify MCP and RAG modes are disabled in CI
         run: |
@@ -115,6 +119,14 @@ jobs:
       - name: Stop services
         if: always()
         run: docker-compose down -v
+
+      - name: Upload endpoint test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-2-endpoint-tests
+          path: reports/student-2-endpoint-tests.xml
+          if-no-files-found: warn
 
   evidence-pack:
     runs-on: ubuntu-latest

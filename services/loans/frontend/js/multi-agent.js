@@ -1,4 +1,4 @@
-const apiBase = `http://${window.location.hostname}:5002`;
+const apiBase = window.SMARTBANK_SAME_ORIGIN_API ? window.location.origin : `http://${window.location.hostname}:5002`;
 const output = document.getElementById("multi-agent-results");
 const modeToggle = document.getElementById("multi-agent-toggle");
 const modeState = document.getElementById("multi-agent-state");

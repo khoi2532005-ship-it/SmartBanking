@@ -199,7 +199,13 @@ def pending() -> list[dict[str, Any]]:
 
 def audit_metrics() -> dict[str, Any]:
     """Audit counts and workflow totals for this feature."""
-    metrics = _call("GET", f"/metrics?feature={FEATURE}")
+    workflow_ids = []
+    for workflow in history():
+        workflow_id = workflow.get("workflow_id")
+        if not isinstance(workflow_id, str) or not WORKFLOW_ID.fullmatch(workflow_id):
+            raise BadServerResponse("Multi-Agent Server returned an invalid workflow id")
+        workflow_ids.append(workflow_id)
+    metrics = _call("GET", f"/metrics?workflows={','.join(workflow_ids)}")
     counts = metrics.get("counts") if isinstance(metrics, dict) else None
     workflows = metrics.get("workflows") if isinstance(metrics, dict) else None
     if (not isinstance(counts, dict)

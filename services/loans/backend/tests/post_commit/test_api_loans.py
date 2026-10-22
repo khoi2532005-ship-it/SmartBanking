@@ -9,7 +9,9 @@ TIMEOUT = 5
 def test_service_health():
     response = requests.get(f"{LOANS_DB_URL}/api/health", timeout=TIMEOUT)
     assert response.status_code == 200
-    assert response.json()["service"] == "loan-service"
+    health = response.json()
+    assert health["service"] == "loan-service"
+    assert health["multi_agent"]["enabled"] is False
 
 
 def test_loans_exist():
