@@ -524,6 +524,43 @@ def test_every_target_of_a_budget_row_exists_on_the_normal_tab():
         assert f'id="{target}"' in normal_tab, f"#{target} is not on the Normal tab"
 
 
+def _borrowed_targets(html):
+    """Each htmx request element with no hx-target of its own inside one that has an
+    hx-target: htmx swaps its answer into that enclosing target instead of itself."""
+    from html.parser import HTMLParser
+
+    void = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+    open_elements, borrowed = [], []
+
+    class Walker(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if not {"hx-get", "hx-post", "hx-put", "hx-delete"}.isdisjoint(attrs) and "hx-target" not in attrs:
+                enclosing = next((a["hx-target"] for _, a in reversed(open_elements) if "hx-target" in a), None)
+                if enclosing:
+                    borrowed.append(f'<{tag} id="{attrs.get("id", "")}"> -> {enclosing}')
+            if tag not in void:
+                open_elements.append((tag, attrs))
+
+        def handle_endtag(self, tag):
+            names = [name for name, _ in open_elements]
+            if tag in names:
+                del open_elements[len(names) - 1 - names[::-1].index(tag):]
+
+    Walker().feed(html)
+    return borrowed
+
+
+def test_no_htmx_request_on_a_tab_takes_its_target_from_an_enclosing_element():
+    """The create form's category select took the form's hx-target, #budget-list: its options
+    went into the budget list, the select stayed on "Loading categories..." and no budget could
+    be created from the page."""
+    assert _borrowed_targets('<form hx-target="#x"><select hx-get="/a"></select></form>') == ['<select id=""> -> #x']
+    for tab in ("budgets.html", "ai-mode.html"):
+        borrowed = _borrowed_targets((BASE_DIR.parent / "frontend" / "tabs" / tab).read_text(encoding="utf-8"))
+        assert borrowed == [], f"{tab}: {borrowed}"
+
+
 def test_ai_insight_card_has_its_status_line():
     html = FRONTEND_TAB.read_text(encoding="utf-8")
     assert 'id="ai-status"' in html and html.count('hx-get="/ui/ai/status"') == 2, "status line and Re-check"

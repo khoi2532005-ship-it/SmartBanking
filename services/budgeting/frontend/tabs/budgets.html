@@ -138,8 +138,10 @@
               hx-include="#period-form">
             <div>
                 <label for="category">Category</label>
+                <!-- hx-target="this": otherwise the select inherits the form's #budget-list. -->
                 <select id="category" name="category" required
                         hx-get="/ui/categories-options"
+                        hx-target="this"
                         hx-trigger="load"
                         hx-swap="innerHTML">
                     <option value="">Loading categories...</option>
