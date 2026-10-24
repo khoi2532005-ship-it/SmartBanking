@@ -118,39 +118,41 @@ service has a repository variable that turns it on:
 |---|---|---|
 | `AI_MODE_ENABLED` | B1 | AI-Mode (Gemini) in every backend |
 | `MCP_ENABLED` | B2 | the app `mcp-server` (the shared MCP server), and every backend calling it at `http://mcp-server/mcp` |
+| `RAG_ENABLED` | B3 | the app `rag-server` (the shared RAG server, its index of the approved documents built into the image), and every backend calling it at `http://rag-server` |
 | `MULTI_AGENT_ENABLED` | B4 | the app `multi-agent-server` (Planner → Worker → Reviewer → human), and the backends calling it at `http://multi-agent-server` |
 
 ```bash
 gh secret set GEMINI_API_KEY                   # paste the key; it never enters the repository
 gh variable set AI_MODE_ENABLED --body true
 gh variable set MCP_ENABLED --body true
+gh variable set RAG_ENABLED --body true
 gh variable set MULTI_AGENT_ENABLED --body true
 ```
 
 Then deploy as in section 3.
 
-- **The two servers** are internal apps built from `deploy/azure/Dockerfile.mcp-server`
-  and `deploy/azure/Dockerfile.multi-agent-server`. Locally they still run on
-  the host and never in Compose. Each reaches the feature APIs by app name.
-- **AI-Mode and Multi-Agent call Gemini**, so either needs the secret.
+- **The three servers** are internal apps built from `deploy/azure/Dockerfile.mcp-server`,
+  `deploy/azure/Dockerfile.rag-server` and `deploy/azure/Dockerfile.multi-agent-server`.
+  Locally they still run on the host and never in Compose. MCP and Multi-Agent
+  reach the feature APIs by app name; RAG answers from its documents only.
+- **AI-Mode, RAG and Multi-Agent call Gemini**, so any of them needs the secret.
   `deploy.sh` passes the key to `main.bicep` as a secure parameter. Each app that
   needs it stores it as a Container Apps secret and reads it as `GEMINI_API_KEY`.
-  With either variable on and no secret, `deploy.sh` stops before deploying.
+  With one of those variables on and no secret, `deploy.sh` stops before deploying.
 - **The backends and the Multi-Agent Server share a bearer token**
   (`MULTI_AGENT_API_TOKEN`). `main.bicep` makes a new one on every deployment,
   so nobody stores it.
 - **The report** says `"profile": "bonus"` and expects exactly the services
   asked for to be on. For each server that is on, it makes one real call
-  through the fraud frontend: `GET /api/mcp/tools` (an MCP `tools/list`) and
+  through the fraud frontend: `GET /api/mcp/tools` (an MCP `tools/list`),
+  `POST /api/rag/query` (a question to the RAG server) and
   `GET /api/agents/workflows` (the Multi-Agent Server's workflow list).
 
 To go back to the baseline, set the variables to `false` and deploy again.
-The keys leave the apps, and `deploy.sh` removes `mcp-server` and
-`multi-agent-server`, because Bicep never removes an app by itself. The
+The keys leave the apps, and `deploy.sh` removes `mcp-server`, `rag-server`
+and `multi-agent-server`, because Bicep never removes an app by itself. The
 Multi-Agent Server keeps its workflows on its one replica, so a new revision
 starts with none.
-
-RAG (B3) is not deployed yet: `RAG_ENABLED` stays off in every backend.
 
 ## Things to know
 

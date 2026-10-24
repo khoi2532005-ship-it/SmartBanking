@@ -3,11 +3,12 @@
 # images build-images.sh pushed (Lecture 11, slide 14 "deploy.sh"), then writes
 # the frontend addresses for deploy/azure/checks.py to reports/cloud/outputs.json.
 #   ACR_NAME=<registry> [IMAGE_TAG=<sha>] bash deploy/azure/deploy.sh
-# AI-Mode, MCP and Multi-Agent stay off, the brief's cloud baseline, unless
-# AI_MODE_ENABLED, MCP_ENABLED or MULTI_AGENT_ENABLED is true (the bonus
-# profile). AI-Mode and Multi-Agent call Gemini, so either needs GEMINI_API_KEY,
-# and only then is it passed, as a secure parameter that becomes a Container
-# Apps secret. An AI server whose switch is off is removed after the deployment.
+# AI-Mode, MCP, RAG and Multi-Agent stay off, the brief's cloud baseline, unless
+# AI_MODE_ENABLED, MCP_ENABLED, RAG_ENABLED or MULTI_AGENT_ENABLED is true (the
+# bonus profile). AI-Mode, RAG and Multi-Agent call Gemini, so any of them needs
+# GEMINI_API_KEY, and only then is it passed, as a secure parameter that becomes
+# a Container Apps secret. An AI server whose switch is off is removed after the
+# deployment.
 set -euo pipefail
 
 AZ_RG="${AZ_RG:-rg-smartbank}"
@@ -19,9 +20,10 @@ mkdir -p "$REPORT_DIR"
 
 on() { [ "${!1:-false}" = true ] && echo true || echo false; }
 
-ai_params=(aiModeEnabled="$(on AI_MODE_ENABLED)" mcpEnabled="$(on MCP_ENABLED)" multiAgentEnabled="$(on MULTI_AGENT_ENABLED)")
-if [ "$(on AI_MODE_ENABLED)" = true ] || [ "$(on MULTI_AGENT_ENABLED)" = true ]; then
-  : "${GEMINI_API_KEY:?AI_MODE_ENABLED or MULTI_AGENT_ENABLED needs GEMINI_API_KEY (the repository secret of that name)}"
+ai_params=(aiModeEnabled="$(on AI_MODE_ENABLED)" mcpEnabled="$(on MCP_ENABLED)" ragEnabled="$(on RAG_ENABLED)"
+           multiAgentEnabled="$(on MULTI_AGENT_ENABLED)")
+if [ "$(on AI_MODE_ENABLED)" = true ] || [ "$(on RAG_ENABLED)" = true ] || [ "$(on MULTI_AGENT_ENABLED)" = true ]; then
+  : "${GEMINI_API_KEY:?AI_MODE_ENABLED, RAG_ENABLED or MULTI_AGENT_ENABLED needs GEMINI_API_KEY (the repository secret of that name)}"
   ai_params+=("geminiApiKey=$GEMINI_API_KEY")
 fi
 

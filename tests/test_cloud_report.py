@@ -49,10 +49,14 @@ def test_a_server_that_is_on_must_answer_through_the_application(report):
     # The flag only says the backend will try; a call through the fraud
     # frontend proves the backend reaches the server: an MCP tools/list, and
     # the Multi-Agent Server's workflow list (with the bearer token).
-    calls = lambda r: [e["url"] for e in r["endpoints"] if e["name"].startswith("fraud ")]  # noqa: E731
+    calls = lambda r: [(e["method"], e["url"]) for e in r["endpoints"] if e["name"].startswith("fraud ")]  # noqa: E731
     assert calls(report(ALL_OFF)) == []
     on = {**ALL_OFF, "mcp": "enabled", "multi_agent": "enabled"}
-    assert calls(report(on, mcp=True, multi_agent=True)) == ["https://x/api/mcp/tools", "https://x/api/agents/workflows"]
+    assert calls(report(on, mcp=True, multi_agent=True)) == [("GET", "https://x/api/mcp/tools"),
+                                                             ("GET", "https://x/api/agents/workflows")]
+    # RAG answers a question: a POST with a query, and "insufficient context"
+    # is still a 200 from the server, so this proves the backend reaches it.
+    assert calls(report({**ALL_OFF, "rag": "enabled"}, rag=True)) == [("POST", "https://x/api/rag/query")]
 
 
 def test_the_run_says_which_services_were_asked_for(monkeypatch):

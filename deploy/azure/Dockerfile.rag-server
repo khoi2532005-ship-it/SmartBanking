@@ -1,0 +1,35 @@
+# The shared RAG server (rag_server/) as a container, for the cloud only.
+# Locally it runs on the host beside Compose and is never a Compose service
+# (Release 1 brief); in Azure it is the internal app rag-server in apps.json,
+# deployed only in the bonus profile (RAG_ENABLED=true, bonus B3). The
+# generator reuses agentic/llm.py and the prompts in prompts/.
+# Build context: the repository root.
+#   docker build -f deploy/azure/Dockerfile.rag-server -t smartbank-rag-server .
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-rag.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY agentic/ ./agentic/
+COPY prompts/ ./prompts/
+COPY rag_server/ ./rag_server/
+
+# rag_server/data is not in the build context, so the vector index of the
+# approved documents (rag_server/corpus) is built here, into the image: the
+# embeddings are deterministic and need no model or network, and the server
+# then starts with its index ready instead of building it on the first request.
+ENV ANONYMIZED_TELEMETRY=False
+RUN python -c "from rag_server.server import get_retriever; print(get_retriever().refresh())"
+
+# main.bicep gives GEMINI_API_KEY as a Container Apps secret. Bound to every
+# interface so the ingress reaches it; only apps in the environment can.
+ENV RAG_HOST=0.0.0.0 \
+    RAG_PORT=8200 \
+    LLM_PROVIDER=gemini \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8200
+
+CMD ["python", "-m", "rag_server.server"]

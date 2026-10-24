@@ -50,6 +50,7 @@
         "RAG_ENABLED": "false",
         "MULTI_AGENT_ENABLED": "false",
         "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
@@ -96,6 +97,7 @@
         "RAG_ENABLED": "false",
         "MULTI_AGENT_ENABLED": "false",
         "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
@@ -141,6 +143,7 @@
         "RAG_ENABLED": "false",
         "MULTI_AGENT_ENABLED": "false",
         "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
@@ -185,6 +188,7 @@
         "RAG_ENABLED": "false",
         "MULTI_AGENT_ENABLED": "false",
         "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
@@ -236,6 +240,7 @@
         "RAG_ENABLED": "false",
         "MULTI_AGENT_ENABLED": "false",
         "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
@@ -271,6 +276,19 @@
         "FRAUD_SERVICE_URL": "http://fraud-service",
         "BUDGET_SERVICE_URL": "http://budgeting-service",
         "TRANSACTIONS_SERVICE_URL": "http://transactions"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "rag-server",
+      "role": "ai-server",
+      "switch": "RAG_ENABLED",
+      "image": "{acr}.azurecr.io/smartbank-rag-server:{tag}",
+      "targetPort": 8200,
+      "external": false,
+      "env": {
+        "RAG_RELEVANCE_THRESHOLD": "0.35"
       },
       "minReplicas": 1,
       "maxReplicas": 1

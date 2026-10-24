@@ -14,7 +14,8 @@ APPS = {a["name"]: a for a in json.loads((ROOT / "deploy/azure/apps.json").read_
 FEATURES = ("accounts", "loans", "fraud", "budgeting", "transactions")
 AI_FLAGS = ("AI_MODE_ENABLED", "MCP_ENABLED", "RAG_ENABLED", "MULTI_AGENT_ENABLED")
 # The shared servers that run as apps of their own in the bonus profile: name -> (switch, port).
-AI_SERVERS = {"mcp-server": ("MCP_ENABLED", 8100), "multi-agent-server": ("MULTI_AGENT_ENABLED", 8300)}
+AI_SERVERS = {"mcp-server": ("MCP_ENABLED", 8100), "rag-server": ("RAG_ENABLED", 8200),
+              "multi-agent-server": ("MULTI_AGENT_ENABLED", 8300)}
 FEATURE_APIS = {"ACCOUNTS_SERVICE_URL": "http://accounts", "LOANS_SERVICE_URL": "http://loans-service",
                 "FRAUD_SERVICE_URL": "http://fraud-service", "BUDGET_SERVICE_URL": "http://budgeting-service",
                 "TRANSACTIONS_SERVICE_URL": "http://transactions"}
@@ -162,8 +163,23 @@ def test_each_ai_server_is_an_internal_app_behind_its_switch():
 
 
 def test_ai_servers_reach_every_feature_api_by_app_name():
+    # The RAG server answers from the approved documents baked into its image
+    # and calls no feature API.
     for name in AI_SERVERS:
-        assert {k: APPS[name]["env"].get(k) for k in FEATURE_APIS} == FEATURE_APIS, name
+        if name != "rag-server":
+            assert {k: APPS[name]["env"].get(k) for k in FEATURE_APIS} == FEATURE_APIS, name
+    assert not any(k.endswith("_SERVICE_URL") for k in APPS["rag-server"]["env"])
+
+
+def test_the_rag_image_bakes_in_the_index_of_the_approved_documents():
+    # rag_server/data is gitignored and dockerignored, so the image must build
+    # the index itself; a server that starts with no index would spend its
+    # first request building one.
+    text = (ROOT / "deploy/azure/Dockerfile.rag-server").read_text()
+    assert "requirements-rag.txt" in text and "COPY rag_server/" in text
+    assert "COPY agentic/" in text and "COPY prompts/" in text   # the generator reuses agentic/llm.py and prompts/
+    assert re.search(r"RUN python .*refresh\(\)", text), "the index is built at image build time"
+    assert "RAG_PORT=8200" in text and 'CMD ["python", "-m", "rag_server.server"]' in text
 
 
 def test_backends_call_the_ai_servers_in_the_environment_not_on_the_host():
@@ -172,6 +188,7 @@ def test_backends_call_the_ai_servers_in_the_environment_not_on_the_host():
     for a in APPS.values():
         if a["role"] == "backend":
             assert a["env"]["MCP_SERVER_URL"] == "http://mcp-server/mcp", a["name"]
+            assert a["env"]["RAG_SERVER_URL"] == "http://rag-server", a["name"]
             assert a["env"]["MULTI_AGENT_SERVER_URL"] == "http://multi-agent-server", a["name"]
 
 
@@ -183,7 +200,7 @@ def container_apps(template):
 
 def test_mcp_and_multi_agent_are_switches_that_start_off():
     params = compiled_template()["parameters"]
-    for name in ("mcpEnabled", "multiAgentEnabled"):
+    for name in ("mcpEnabled", "ragEnabled", "multiAgentEnabled"):
         assert (params[name]["type"], params[name]["defaultValue"]) == ("bool", False), name
     # A new token on every deployment, given to the server and the backends
     # alike: nobody has to store it.

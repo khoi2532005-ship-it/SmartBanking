@@ -15,7 +15,7 @@ REGISTRY="${ACR_NAME}.azurecr.io"
 
 # <image> <Dockerfile>: the names in docker-compose.yml, the two nginx
 # frontends Accounts and Transactions run as separate apps in the cloud, and
-# the shared MCP and Multi-Agent servers (deployed only in the bonus profile).
+# the shared MCP, RAG and Multi-Agent servers (deployed only in the bonus profile).
 # tests/test_cloud_infra.py checks this list against deploy/azure/apps.json.
 # It is read into an array first, so no command in the build loop can read
 # (and swallow) the rest of the list from stdin.
@@ -36,6 +36,7 @@ smartbank-budgeting-web services/budgeting/frontend/Dockerfile
 smartbank-transactions services/transactions/Dockerfile
 smartbank-transactions-web services/transactions/frontend/Dockerfile.web
 smartbank-mcp-server deploy/azure/Dockerfile.mcp-server
+smartbank-rag-server deploy/azure/Dockerfile.rag-server
 smartbank-multi-agent-server deploy/azure/Dockerfile.multi-agent-server
 LIST
 

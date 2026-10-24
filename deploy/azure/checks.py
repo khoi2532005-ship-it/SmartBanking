@@ -167,9 +167,12 @@ AI_SERVICES = ("ai_mode", "mcp", "rag", "multi_agent")
 AI_SWITCHES = {"ai_mode": "AI_MODE_ENABLED", "mcp": "MCP_ENABLED", "rag": "RAG_ENABLED",
                "multi_agent": "MULTI_AGENT_ENABLED"}
 # A server that is on must answer a real call through fraud's frontend and
-# backend: MCP tools/list, and the Multi-Agent Server's workflow list.
-AI_CALLS = {"mcp": ("fraud mcp tools", "/api/mcp/tools"),
-            "multi_agent": ("fraud multi-agent workflows", "/api/agents/workflows")}
+# backend: MCP tools/list, a RAG question (an "insufficient context" reply is
+# still a 200 from the server), and the Multi-Agent Server's workflow list.
+# name -> (check, method, path, JSON body)
+AI_CALLS = {"mcp": ("fraud mcp tools", "GET", "/api/mcp/tools", None),
+            "rag": ("fraud rag query", "POST", "/api/rag/query", {"query": "What does the fraud alerts feature do?"}),
+            "multi_agent": ("fraud multi-agent workflows", "GET", "/api/agents/workflows", None)}
 
 
 def ai_services(fraud_web_url):
@@ -207,9 +210,9 @@ def build_report(web_urls, home_url, meta, resources=()):
     _check(endpoints, "home page", "GET", f"{home_url}/", 200)
     for feature in FEATURES:
         endpoints += endpoint_checks(feature, web_urls[feature])
-    for name, (check, path) in AI_CALLS.items():
+    for name, (check, method, path, body) in AI_CALLS.items():
         if requested.get(name):
-            _check(endpoints, check, "GET", f"{web_urls['fraud']}{path}", 200)
+            _check(endpoints, check, method, f"{web_urls['fraud']}{path}", 200, **({"json": body} if body else {}))
     crud = [check for feature in FEATURES for check in crud_checks(feature, web_urls[feature])]
     ai = ai_services(web_urls["fraud"])
     issues = [f"{c['name']}: {c['method']} {c['url']} returned {c['status']}, expected {c['expected_status']}"

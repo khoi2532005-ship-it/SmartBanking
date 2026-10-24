@@ -65,4 +65,5 @@ def test_ai_mode_follows_a_repository_variable_and_the_key_a_secret():
 def test_mcp_and_multi_agent_follow_repository_variables():
     env = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]["env"]
     assert env["MCP_ENABLED"] == "${{ vars.MCP_ENABLED || 'false' }}"
+    assert env["RAG_ENABLED"] == "${{ vars.RAG_ENABLED || 'false' }}"
     assert env["MULTI_AGENT_ENABLED"] == "${{ vars.MULTI_AGENT_ENABLED || 'false' }}"

@@ -23,11 +23,14 @@ param aiModeEnabled bool = false
 @description('The shared MCP server as an app of its own, and the backends calling it. Off by default; on is bonus B2.')
 param mcpEnabled bool = false
 
+@description('The shared RAG server as an app of its own, and the backends calling it. Off by default; on is bonus B3.')
+param ragEnabled bool = false
+
 @description('The shared Multi-Agent Server as an app of its own, and the backends calling it. Off by default; on is bonus B4.')
 param multiAgentEnabled bool = false
 
 @secure()
-@description('Gemini API key (the GEMINI_API_KEY repository secret). It reaches an app only as a Container Apps secret: the backends with aiModeEnabled, the Multi-Agent Server with multiAgentEnabled.')
+@description('Gemini API key (the GEMINI_API_KEY repository secret). It reaches an app only as a Container Apps secret: the backends with aiModeEnabled, the RAG server with ragEnabled, the Multi-Agent Server with multiAgentEnabled.')
 param geminiApiKey string = ''
 
 @secure()
@@ -42,7 +45,7 @@ var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 var flags = {
   AI_MODE_ENABLED: aiModeEnabled ? 'true' : 'false'
   MCP_ENABLED: mcpEnabled ? 'true' : 'false'
-  RAG_ENABLED: 'false'
+  RAG_ENABLED: ragEnabled ? 'true' : 'false'
   MULTI_AGENT_ENABLED: multiAgentEnabled ? 'true' : 'false'
 }
 
@@ -52,7 +55,8 @@ var deployWhen = union(flags, { ALWAYS: 'true' })
 
 // The secrets each app reads, by the variable it reads them from: a backend
 // gets the Gemini key with AI-Mode on and the token with Multi-Agent on; the
-// Multi-Agent Server gets both, since its agents call Gemini.
+// RAG server gets the key, since its generator writes the grounded answer with
+// Gemini; the Multi-Agent Server gets both, since its agents call Gemini.
 var secretNames = {
   GEMINI_API_KEY: 'gemini-api-key'  // pragma: allowlist secret (the secret's name, not its value)
   MULTI_AGENT_API_TOKEN: 'multi-agent-token'  // pragma: allowlist secret (the secret's name, not its value)
@@ -60,6 +64,7 @@ var secretNames = {
 var backendSecrets = concat(aiModeEnabled ? ['GEMINI_API_KEY'] : [], multiAgentEnabled ? ['MULTI_AGENT_API_TOKEN'] : [])
 var serverSecrets = {
   MCP_ENABLED: []
+  RAG_ENABLED: ['GEMINI_API_KEY']
   MULTI_AGENT_ENABLED: ['GEMINI_API_KEY', 'MULTI_AGENT_API_TOKEN']
 }
 var appSecrets = [for app in apps: app.role == 'backend' ? backendSecrets : (contains(app, 'switch') ? serverSecrets[app.switch] : [])]
