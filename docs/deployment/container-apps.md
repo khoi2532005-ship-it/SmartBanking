@@ -143,10 +143,16 @@ Then deploy as in section 3.
   (`MULTI_AGENT_API_TOKEN`). `main.bicep` makes a new one on every deployment,
   so nobody stores it.
 - **The report** says `"profile": "bonus"` and expects exactly the services
-  asked for to be on. For each server that is on, it makes one real call
-  through the fraud frontend: `GET /api/mcp/tools` (an MCP `tools/list`),
-  `POST /api/rag/query` (a question to the RAG server) and
-  `GET /api/agents/workflows` (the Multi-Agent Server's workflow list).
+  asked for to be on. For each server that is on, it does that server's real
+  job through the fraud frontend and backend, which is what the bonus marks ask
+  for: MCP lists its tools and fraud's backend calls its own tool
+  (`POST /api/mcp/tool`); RAG answers a question about fraud alerts, and the
+  answer must be grounded, with citations; the Multi-Agent Server runs a
+  workflow started through fraud to the human gate, the check accepts it as
+  `cloud-deployment.yml`, and the final response must be released. A reply
+  that is a 200 but not that (an "insufficient context" answer, a workflow
+  that failed) is recorded with `"ok": false` and an issue, so the report and
+  the cloud review hold the release.
 
 To go back to the baseline, set the variables to `false` and deploy again.
 The keys leave the apps, and `deploy.sh` removes `mcp-server`, `rag-server`

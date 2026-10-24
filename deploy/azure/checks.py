@@ -166,13 +166,112 @@ AI_SERVICES = ("ai_mode", "mcp", "rag", "multi_agent")
 # The variable that switches each service on in the bonus profile.
 AI_SWITCHES = {"ai_mode": "AI_MODE_ENABLED", "mcp": "MCP_ENABLED", "rag": "RAG_ENABLED",
                "multi_agent": "MULTI_AGENT_ENABLED"}
-# A server that is on must answer a real call through fraud's frontend and
-# backend: MCP tools/list, a RAG question (an "insufficient context" reply is
-# still a 200 from the server), and the Multi-Agent Server's workflow list.
-# name -> (check, method, path, JSON body)
-AI_CALLS = {"mcp": ("fraud mcp tools", "GET", "/api/mcp/tools", None),
-            "rag": ("fraud rag query", "POST", "/api/rag/query", {"query": "What does the fraud alerts feature do?"}),
-            "multi_agent": ("fraud multi-agent workflows", "GET", "/api/agents/workflows", None)}
+# In the bonus profile each server that is on must do its real job through the
+# application (the fraud frontend and backend), which is what the bonus marks
+# ask for: an MCP tool interaction (B2), a grounded RAG answer using retrieved
+# context (B3), and a Planner -> Worker -> Reviewer workflow decided by a person
+# (B4). A check that answers 200 but not with that is recorded with ok=false
+# and an issue, so the report and the cloud review hold the release.
+RAG_QUESTION = "What are the four statuses a fraud alert can have?"   # rag_server/corpus/fraud-alerts-feature.md answers it
+ALERT_STATUSES = ("new", "reviewed", "dismissed", "confirmed")
+WORKFLOW_TASK = "How many fraud alerts does this customer have, by status?"
+WORKFLOW_WAIT = 300        # seconds for the three agents to reach the human gate
+WORKFLOW_POLL = 5
+GATE = "awaiting_human_review"
+ENDED = ("accepted", "partially_accepted", "rejected", "failed")
+
+
+def _interaction(records, issues, name, method, url, expected_status, verdict, **kwargs):
+    """One check whose body matters: `verdict(body)` returns (ok, detail) for a reply
+    with the expected status; a wrong status is left to build_report's issue."""
+    response = _check(records, name, method, url, expected_status, **kwargs)
+    record = records[-1]
+    body = None
+    if response is not None and response.status_code == expected_status:
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        ok, detail = verdict(body if isinstance(body, dict) else {})
+    else:
+        ok, detail = False, "no reply" if response is None else f"HTTP {response.status_code}"
+    record["ok"], record["detail"] = ok, detail
+    if not ok and response is not None and response.status_code == expected_status:
+        issues.append(f"{name}: {detail}")
+    return ok, body if isinstance(body, dict) else {}
+
+
+def _mcp_interaction(records, issues, base):
+    _interaction(records, issues, "fraud mcp tools", "GET", f"{base}/api/mcp/tools", 200,
+                 lambda b: (bool(b.get("tools")), f"{b.get('tool_count', len(b.get('tools') or []))} tools listed"))
+    # fraud's own tool, called by its backend over MCP; an empty body counts every alert.
+    _interaction(records, issues, "fraud mcp tool call", "POST", f"{base}/api/mcp/tool", 200,
+                 lambda b: (bool(b.get("result")), f"{b.get('tool')} -> {json.dumps(b.get('result'))[:120]}"
+                            if b.get("result") else "the reply carries no tool result"), json={})
+
+
+def _rag_interaction(records, issues, base):
+    def verdict(b):
+        if b.get("insufficient_context") or not b.get("citations"):
+            return False, "the RAG server found no relevant document (insufficient context), so nothing was grounded"
+        named = sum(1 for s in ALERT_STATUSES if s in str(b.get("answer", "")).lower())
+        return True, (f"grounded, {len(b['citations'])} citation(s), confidence {b.get('confidence_category')}, "
+                      f"names {named} of the {len(ALERT_STATUSES)} statuses")
+    _interaction(records, issues, "fraud rag query", "POST", f"{base}/api/rag/query", 200, verdict,
+                 json={"query": RAG_QUESTION})
+
+
+def _multi_agent_interaction(records, issues, base):
+    ok, started = _interaction(records, issues, "fraud multi-agent start", "POST", f"{base}/api/agents/workflow", 202,
+                               lambda b: (bool(b.get("workflow_id")), f"workflow {b.get('workflow_id')} started"),
+                               json={"task": WORKFLOW_TASK, "customer_id": 1})
+    if not ok:
+        return
+    workflow = f"{base}/api/agents/workflow/{started['workflow_id']}"
+    # Follow the workflow to the human gate (Planner, Worker, Reviewer each have a stage timeout).
+    deadline = time.monotonic() + WORKFLOW_WAIT
+    body = {}
+    while True:
+        # Polled through _check into a throwaway list: the same call as every
+        # check, but only the last look (below) goes into the report.
+        response = _check([], "fraud multi-agent poll", "GET", workflow, 200)
+        try:
+            body = response.json() if response is not None else {}
+        except ValueError:
+            body = {}
+        body = body if isinstance(body, dict) else {}
+        if body.get("state") == GATE or body.get("state") in ENDED or time.monotonic() >= deadline:
+            break
+        time.sleep(WORKFLOW_POLL)
+
+    def at_gate(b):
+        state = b.get("state")
+        if state == GATE:
+            return True, "Planner, Worker and Reviewer completed; awaiting the human decision"
+        if state in ENDED:
+            return False, f"the workflow ended in state {state} ({b.get('error') or 'no error recorded'})"
+        return False, f"the workflow was still {state or 'unknown'} after {WORKFLOW_WAIT}s"
+    ok, _ = _interaction(records, issues, "fraud multi-agent gate", "GET", workflow, 200, at_gate)
+    if not ok:
+        return
+    ok, _ = _interaction(records, issues, "fraud multi-agent decision", "POST", f"{workflow}/review", 200,
+                         lambda b: (True, f"accepted; state {b.get('state')}"),
+                         json={"decision": "accept", "note": "", "reviewer": "cloud-deployment.yml"})
+    if not ok:
+        return
+    _interaction(records, issues, "fraud multi-agent release", "GET", workflow, 200,
+                 lambda b: (bool((b.get("final_response") or {}).get("released")),
+                            "final response released after the decision" if (b.get("final_response") or {}).get("released")
+                            else "the final response was not released"))
+
+
+def ai_interactions(fraud_web_url, requested):
+    """(check records, issues) for every AI service the deployment was asked to turn on."""
+    records, issues = [], []
+    for name, interaction in (("mcp", _mcp_interaction), ("rag", _rag_interaction), ("multi_agent", _multi_agent_interaction)):
+        if requested.get(name):
+            interaction(records, issues, fraud_web_url)
+    return records, issues
 
 
 def ai_services(fraud_web_url):
@@ -210,13 +309,13 @@ def build_report(web_urls, home_url, meta, resources=()):
     _check(endpoints, "home page", "GET", f"{home_url}/", 200)
     for feature in FEATURES:
         endpoints += endpoint_checks(feature, web_urls[feature])
-    for name, (check, method, path, body) in AI_CALLS.items():
-        if requested.get(name):
-            _check(endpoints, check, method, f"{web_urls['fraud']}{path}", 200, **({"json": body} if body else {}))
+    interactions, interaction_issues = ai_interactions(web_urls["fraud"], requested)
+    endpoints += interactions
     crud = [check for feature in FEATURES for check in crud_checks(feature, web_urls[feature])]
     ai = ai_services(web_urls["fraud"])
     issues = [f"{c['name']}: {c['method']} {c['url']} returned {c['status']}, expected {c['expected_status']}"
               for c in endpoints + crud if c["status"] != c["expected_status"]]
+    issues += interaction_issues
     # The baseline keeps all four AI services off; the bonus profile turns on the ones asked for.
     profile = "bonus" if any(requested.values()) else "baseline"
     wanted = {name: "enabled" if requested.get(name) else "disabled" for name in AI_SERVICES}
