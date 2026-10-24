@@ -1,0 +1,576 @@
+{
+  "mode": "cloud_deployment_review",
+  "timestamp": "20261024T072947Z",
+  "plan": {
+    "goal": "Review the cloud deployment report and write the entry that supports the final human release decision",
+    "checks": [
+      "the report names the provider, region, commit and the cloud-deployment.yml run",
+      "every endpoint and CRUD check in the report returned its expected status",
+      "AI-Mode, MCP, RAG and the Multi-Agent Server are all disabled in the baseline (the bonus profile may enable some)",
+      "the entry quotes the provider, commit, counts, statuses and AI states exactly and records the human decision",
+      "the release recommendation is approve only for a real deployment whose run succeeded, whose checks all passed, whose AI services match the profile and that has no open issue"
+    ],
+    "stop_condition": "An entry passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "azure indonesiacentral, commit e6f91a1, run 40071955252 success: 19 resources; endpoints 25/25 passed (home page 200, accounts page 200, accounts config 200, accounts api health 200, loans page 200, loans config 200, loans api health 200, fraud page 200, fraud config 200, fraud api health 200, budgeting page 200, budgeting config 200, budgeting api health 200, budgeting ui fragment 200, transactions page 200, transactions config 200, transactions api health 200, transactions ui fragment 200, fraud mcp tools 200, fraud mcp tool call 200, fraud rag query 200, fraud multi-agent start 202, fraud multi-agent gate 200, fraud multi-agent decision 200, fraud multi-agent release 200); CRUD 25/25 passed (accounts create 201, accounts read 200, accounts update 200, accounts delete 200, accounts read after delete 404, loans create 201, loans read 200, loans update 200, loans delete 200, loans read after delete 404, fraud create 201, fraud read 200, fraud update 200, fraud delete 200, fraud read after delete 404, budgeting create 201, budgeting read 200, budgeting update 200, budgeting delete 200, budgeting read after delete 404, transactions create 201, transactions read 200, transactions update 200, transactions delete 200, transactions read after delete 404); bonus profile, AI services ai-mode enabled, mcp enabled, rag enabled, multi-agent enabled; issues 0; recommendation approve; human decision pending",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "report": "docs/deployment/cloud-deployment-report-bonus.json",
+      "is_sample": false,
+      "profile": "bonus",
+      "provider": "azure",
+      "region": "indonesiacentral",
+      "environment": "release-2-bonus",
+      "commit": "e6f91a1",
+      "deployed_at": "2026-10-24T07:03:54+00:00",
+      "deployed_by": "CongNguyen46",
+      "workflow_name": "cloud-deployment.yml",
+      "run_id": "40071955252",
+      "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/40071955252",
+      "workflow_conclusion": "success",
+      "scripts": [
+        "deploy/azure/setup.sh",
+        "deploy/azure/build-images.sh",
+        "deploy/azure/deploy.sh",
+        "deploy/azure/main.bicep",
+        "deploy/azure/apps.json"
+      ],
+      "resources": [
+        {
+          "name": "budgeting-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "budgeting-database-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "loans-frontend-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "fraud-database-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "transactions-database-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "accounts",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "transactions",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "loans-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "loans-database-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "fraud-frontend-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "transactions-frontend-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "home",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "accounts-frontend-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "fraud-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "accounts-database-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "budgeting-frontend-service",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "multi-agent-server",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "mcp-server",
+          "status": "Running",
+          "type": "container-app"
+        },
+        {
+          "name": "rag-server",
+          "status": "Running",
+          "type": "container-app"
+        }
+      ],
+      "endpoints": [
+        {
+          "name": "home page",
+          "method": "GET",
+          "url": "https://home.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "accounts page",
+          "method": "GET",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "accounts config",
+          "method": "GET",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "accounts api health",
+          "method": "GET",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "loans page",
+          "method": "GET",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "loans config",
+          "method": "GET",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "loans api health",
+          "method": "GET",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud page",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/tabs/normal.html",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud config",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud api health",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting page",
+          "method": "GET",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/tabs/budgets.html",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting config",
+          "method": "GET",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting api health",
+          "method": "GET",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting ui fragment",
+          "method": "GET",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/ui/budgets",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "transactions page",
+          "method": "GET",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "transactions config",
+          "method": "GET",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "transactions api health",
+          "method": "GET",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "transactions ui fragment",
+          "method": "GET",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/ui/mcp/status",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud mcp tools",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/mcp/tools",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud mcp tool call",
+          "method": "POST",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/mcp/tool",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud rag query",
+          "method": "POST",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rag/query",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud multi-agent start",
+          "method": "POST",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow",
+          "status": "202",
+          "expected_status": 202,
+          "ok": true
+        },
+        {
+          "name": "fraud multi-agent gate",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud multi-agent decision",
+          "method": "POST",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4/review",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud multi-agent release",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        }
+      ],
+      "crud": [
+        {
+          "name": "accounts create",
+          "method": "POST",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers",
+          "status": "201",
+          "expected_status": 201,
+          "ok": true
+        },
+        {
+          "name": "accounts read",
+          "method": "GET",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers/9",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "accounts update",
+          "method": "PUT",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers/9",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "accounts delete",
+          "method": "DELETE",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers/9",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "accounts read after delete",
+          "method": "GET",
+          "url": "https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers/9",
+          "status": "404",
+          "expected_status": 404,
+          "ok": true
+        },
+        {
+          "name": "loans create",
+          "method": "POST",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/loans",
+          "status": "201",
+          "expected_status": 201,
+          "ok": true
+        },
+        {
+          "name": "loans read",
+          "method": "GET",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/loans/4",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "loans update",
+          "method": "PUT",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/loans/4",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "loans delete",
+          "method": "DELETE",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/loans/4",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "loans read after delete",
+          "method": "GET",
+          "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/loans/4",
+          "status": "404",
+          "expected_status": 404,
+          "ok": true
+        },
+        {
+          "name": "fraud create",
+          "method": "POST",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rules",
+          "status": "201",
+          "expected_status": 201,
+          "ok": true
+        },
+        {
+          "name": "fraud read",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rules/11",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud update",
+          "method": "PUT",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rules/11",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud delete",
+          "method": "DELETE",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rules/11",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "fraud read after delete",
+          "method": "GET",
+          "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rules/11",
+          "status": "404",
+          "expected_status": 404,
+          "ok": true
+        },
+        {
+          "name": "budgeting create",
+          "method": "POST",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/budgets",
+          "status": "201",
+          "expected_status": 201,
+          "ok": true
+        },
+        {
+          "name": "budgeting read",
+          "method": "GET",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/budgets/15",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting update",
+          "method": "PUT",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/budgets/15",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting delete",
+          "method": "DELETE",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/budgets/15",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "budgeting read after delete",
+          "method": "GET",
+          "url": "https://budgeting-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/budgets/15",
+          "status": "404",
+          "expected_status": 404,
+          "ok": true
+        },
+        {
+          "name": "transactions create",
+          "method": "POST",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/transactions",
+          "status": "201",
+          "expected_status": 201,
+          "ok": true
+        },
+        {
+          "name": "transactions read",
+          "method": "GET",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/transactions/32",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "transactions update",
+          "method": "PUT",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/transactions/32",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "transactions delete",
+          "method": "DELETE",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/transactions/32",
+          "status": "200",
+          "expected_status": 200,
+          "ok": true
+        },
+        {
+          "name": "transactions read after delete",
+          "method": "GET",
+          "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/transactions/32",
+          "status": "404",
+          "expected_status": 404,
+          "ok": true
+        }
+      ],
+      "ai_services": {
+        "ai-mode": "enabled",
+        "mcp": "enabled",
+        "rag": "enabled",
+        "multi-agent": "enabled"
+      },
+      "issues": [],
+      "endpoints_passed": 25,
+      "crud_passed": 25,
+      "recommendation": "approve",
+      "hold_reasons": [],
+      "human_decision": "pending",
+      "decided_by": "",
+      "decision_note": "",
+      "attention": false
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Deployment: azure indonesiacentral, commit e6f91a1, workflow run 40071955252 success, 19 resources\nEndpoints: 25/25 passed - home page 200, accounts page 200, accounts config 200, accounts api health 200, loans page 200, loans config 200, loans api health 200, fraud page 200, fraud config 200, fraud api health 200, budgeting page 200, budgeting config 200, budgeting api health 200, budgeting ui fragment 200, transactions page 200, transactions config 200, transactions api health 200, transactions ui fragment 200, fraud mcp tools 200, fraud mcp tool call 200, fraud rag query 200, fraud multi-agent start 202, fraud multi-agent gate 200, fraud multi-agent decision 200, fraud multi-agent release 200\nAI services: ai-mode enabled, mcp enabled, rag enabled, multi-agent enabled\nCRUD: 25/25 passed - accounts create 201, accounts read 200, accounts update 200, accounts delete 200, accounts read after delete 404, loans create 201, loans read 200, loans update 200, loans delete 200, loans read after delete 404, fraud create 201, fraud read 200, fraud update 200, fraud delete 200, fraud read after delete 404, budgeting create 201, budgeting read 200, budgeting update 200, budgeting delete 200, budgeting read after delete 404, transactions create 201, transactions read 200, transactions update 200, transactions delete 200, transactions read after delete 404\nRelease recommendation: approve - All endpoint and CRUD checks passed successfully with no open issues.\nHuman decision: pending\nVerdict: PASS - All checks passed successfully.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: No evidence-backed risk identified.\nCorrection: No correction required.\nRetest: Repeat validation after future changes.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}
