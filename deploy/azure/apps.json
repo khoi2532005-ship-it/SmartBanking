@@ -3,7 +3,9 @@
     "The SmartBanking container apps: deploy/azure/main.bicep deploys one per entry, and",
     "tests/test_cloud_infra.py checks them. {acr}, {tag} and {defaultDomain} are filled in at",
     "deploy time. Only frontends are public; databases stay at one replica (SQLite);",
-    "every backend starts with the four AI services off (the required cloud baseline)."
+    "every backend starts with the four AI services off (the required cloud baseline).",
+    "An app with a \"switch\" (the shared MCP and Multi-Agent servers) is deployed only when",
+    "that switch is on: the bonus profile."
   ],
   "apps": [
     {
@@ -46,7 +48,10 @@
         "AI_MODE_ENABLED": "false",
         "MCP_ENABLED": "false",
         "RAG_ENABLED": "false",
-        "MULTI_AGENT_ENABLED": "false"
+        "MULTI_AGENT_ENABLED": "false",
+        "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
+        "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
       "maxReplicas": 1,
@@ -90,7 +95,10 @@
         "AI_MODE_ENABLED": "false",
         "MCP_ENABLED": "false",
         "RAG_ENABLED": "false",
-        "MULTI_AGENT_ENABLED": "false"
+        "MULTI_AGENT_ENABLED": "false",
+        "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
+        "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
       "maxReplicas": 1
@@ -133,7 +141,10 @@
         "AI_MODE_ENABLED": "false",
         "MCP_ENABLED": "false",
         "RAG_ENABLED": "false",
-        "MULTI_AGENT_ENABLED": "false"
+        "MULTI_AGENT_ENABLED": "false",
+        "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
+        "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
       "maxReplicas": 1
@@ -175,7 +186,10 @@
         "AI_MODE_ENABLED": "false",
         "MCP_ENABLED": "false",
         "RAG_ENABLED": "false",
-        "MULTI_AGENT_ENABLED": "false"
+        "MULTI_AGENT_ENABLED": "false",
+        "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
+        "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
       "maxReplicas": 1
@@ -224,7 +238,10 @@
         "AI_MODE_ENABLED": "false",
         "MCP_ENABLED": "false",
         "RAG_ENABLED": "false",
-        "MULTI_AGENT_ENABLED": "false"
+        "MULTI_AGENT_ENABLED": "false",
+        "MCP_SERVER_URL": "http://mcp-server/mcp",
+        "RAG_SERVER_URL": "http://rag-server",
+        "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
       "minReplicas": 1,
       "maxReplicas": 1,
@@ -242,6 +259,53 @@
       "env": {
         "API_UPSTREAM": "https://transactions.internal.{defaultDomain}",
         "SMARTBANK_SAME_ORIGIN_API": "true"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "mcp-server",
+      "role": "ai-server",
+      "switch": "MCP_ENABLED",
+      "image": "{acr}.azurecr.io/smartbank-mcp-server:{tag}",
+      "targetPort": 8100,
+      "external": false,
+      "env": {
+        "ACCOUNTS_SERVICE_URL": "http://accounts",
+        "LOANS_SERVICE_URL": "http://loans-service",
+        "FRAUD_SERVICE_URL": "http://fraud-service",
+        "BUDGET_SERVICE_URL": "http://budgeting-service",
+        "TRANSACTIONS_SERVICE_URL": "http://transactions"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "rag-server",
+      "role": "ai-server",
+      "switch": "RAG_ENABLED",
+      "image": "{acr}.azurecr.io/smartbank-rag-server:{tag}",
+      "targetPort": 8200,
+      "external": false,
+      "env": {
+        "RAG_RELEVANCE_THRESHOLD": "0.35"
+      },
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    {
+      "name": "multi-agent-server",
+      "role": "ai-server",
+      "switch": "MULTI_AGENT_ENABLED",
+      "image": "{acr}.azurecr.io/smartbank-multi-agent-server:{tag}",
+      "targetPort": 8300,
+      "external": false,
+      "env": {
+        "ACCOUNTS_SERVICE_URL": "http://accounts",
+        "LOANS_SERVICE_URL": "http://loans-service",
+        "FRAUD_SERVICE_URL": "http://fraud-service",
+        "BUDGET_SERVICE_URL": "http://budgeting-service",
+        "TRANSACTIONS_SERVICE_URL": "http://transactions"
       },
       "minReplicas": 1,
       "maxReplicas": 1

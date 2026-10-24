@@ -13,6 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 APPS = {a["name"]: a for a in json.loads((ROOT / "deploy/azure/apps.json").read_text())["apps"]}
 FEATURES = ("accounts", "loans", "fraud", "budgeting", "transactions")
 AI_FLAGS = ("AI_MODE_ENABLED", "MCP_ENABLED", "RAG_ENABLED", "MULTI_AGENT_ENABLED")
+# The shared servers that run as apps of their own in the bonus profile: name -> (switch, port).
+AI_SERVERS = {"mcp-server": ("MCP_ENABLED", 8100), "rag-server": ("RAG_ENABLED", 8200),
+              "multi-agent-server": ("MULTI_AGENT_ENABLED", 8300)}
+FEATURE_APIS = {"ACCOUNTS_SERVICE_URL": "http://accounts", "LOANS_SERVICE_URL": "http://loans-service",
+                "FRAUD_SERVICE_URL": "http://fraud-service", "BUDGET_SERVICE_URL": "http://budgeting-service",
+                "TRANSACTIONS_SERVICE_URL": "http://transactions"}
 
 
 def test_only_frontends_are_public():
@@ -123,15 +129,92 @@ def test_ai_mode_is_a_switch_that_starts_off():
     assert (params["geminiApiKey"]["type"], params["geminiApiKey"]["defaultValue"]) == ("securestring", "")
 
 
+def secrets_of(apps):
+    """The apps' configuration.secrets, written as a list or compiled from a loop."""
+    configuration = apps["properties"]["configuration"]
+    return configuration.get("secrets") or next(c["input"] for c in configuration["copy"] if c["name"] == "secrets")
+
+
 def test_the_gemini_key_reaches_the_apps_only_as_a_container_apps_secret():
-    resources = compiled_template()["resources"]
+    template = compiled_template()
+    resources = template["resources"]
     resources = resources.values() if isinstance(resources, dict) else resources
     apps = next(r for r in resources if r["type"] == "Microsoft.App/containerApps")
-    assert "geminiApiKey" in json.dumps(apps["properties"]["configuration"]["secrets"])
+    assert "geminiApiKey" in json.dumps(secrets_of(apps))
     assert "geminiApiKey" not in json.dumps(apps["properties"]["template"])
-    assert "gemini-api-key" in json.dumps(apps["properties"]["template"])
+    assert "secretRef" in json.dumps(apps["properties"]["template"])
+    assert template["variables"]["secretNames"]["GEMINI_API_KEY"] == "gemini-api-key"  # pragma: allowlist secret
 
 
 def test_no_model_key_is_written_into_apps_json():
     text = (ROOT / "deploy/azure/apps.json").read_text()
-    assert "API_KEY" not in text and "AIza" not in text
+    assert "API_KEY" not in text and "AIza" not in text and "TOKEN" not in text
+
+
+def test_each_ai_server_is_an_internal_app_behind_its_switch():
+    # Bonus B2 and B4: the shared servers run as apps of their own, only when
+    # their switch is on, and only apps in the environment can reach them.
+    assert {n for n, a in APPS.items() if "switch" in a} == set(AI_SERVERS)
+    for name, (switch, port) in AI_SERVERS.items():
+        a = APPS[name]
+        assert (a["role"], a["switch"], a["external"], a["targetPort"]) == ("ai-server", switch, False, port)
+        # Multi-Agent keeps its workflows and audit files on the replica's disk.
+        assert (a["minReplicas"], a["maxReplicas"]) == (1, 1), name
+
+
+def test_ai_servers_reach_every_feature_api_by_app_name():
+    # The RAG server answers from the approved documents baked into its image
+    # and calls no feature API.
+    for name in AI_SERVERS:
+        if name != "rag-server":
+            assert {k: APPS[name]["env"].get(k) for k in FEATURE_APIS} == FEATURE_APIS, name
+    assert not any(k.endswith("_SERVICE_URL") for k in APPS["rag-server"]["env"])
+
+
+def test_the_rag_image_bakes_in_the_index_of_the_approved_documents():
+    # rag_server/data is gitignored and dockerignored, so the image must build
+    # the index itself; a server that starts with no index would spend its
+    # first request building one.
+    text = (ROOT / "deploy/azure/Dockerfile.rag-server").read_text()
+    assert "requirements-rag.txt" in text and "COPY rag_server/" in text
+    assert "COPY agentic/" in text and "COPY prompts/" in text   # the generator reuses agentic/llm.py and prompts/
+    assert re.search(r"RUN python .*refresh\(\)", text), "the index is built at image build time"
+    assert "RAG_PORT=8200" in text and 'CMD ["python", "-m", "rag_server.server"]' in text
+
+
+def test_backends_call_the_ai_servers_in_the_environment_not_on_the_host():
+    # The images bake in host.docker.internal, where the servers run beside
+    # Compose; in the cloud each server is an app, reached by name on port 80.
+    for a in APPS.values():
+        if a["role"] == "backend":
+            assert a["env"]["MCP_SERVER_URL"] == "http://mcp-server/mcp", a["name"]
+            assert a["env"]["RAG_SERVER_URL"] == "http://rag-server", a["name"]
+            assert a["env"]["MULTI_AGENT_SERVER_URL"] == "http://multi-agent-server", a["name"]
+
+
+def container_apps(template):
+    resources = template["resources"]
+    resources = resources.values() if isinstance(resources, dict) else resources
+    return next(r for r in resources if r["type"] == "Microsoft.App/containerApps")
+
+
+def test_mcp_and_multi_agent_are_switches_that_start_off():
+    params = compiled_template()["parameters"]
+    for name in ("mcpEnabled", "ragEnabled", "multiAgentEnabled"):
+        assert (params[name]["type"], params[name]["defaultValue"]) == ("bool", False), name
+    # A new token on every deployment, given to the server and the backends
+    # alike: nobody has to store it.
+    assert (params["multiAgentToken"]["type"], params["multiAgentToken"]["defaultValue"]) == ("securestring", "[newGuid()]")
+
+
+def test_an_ai_server_is_deployed_only_when_its_switch_is_on():
+    apps = container_apps(compiled_template())
+    assert "switch" in apps.get("condition", "")
+
+
+def test_the_multi_agent_token_reaches_the_apps_only_as_a_container_apps_secret():
+    template = compiled_template()
+    apps = container_apps(template)
+    assert "multiAgentToken" in json.dumps(secrets_of(apps))
+    assert "multiAgentToken" not in json.dumps(apps["properties"]["template"])
+    assert template["variables"]["secretNames"]["MULTI_AGENT_API_TOKEN"] == "multi-agent-token"  # noqa: S105  # pragma: allowlist secret (the secret's name, not its value)

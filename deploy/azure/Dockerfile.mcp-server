@@ -1,0 +1,24 @@
+# The shared MCP server (mcp_server/) as a container, for the cloud only.
+# Locally it runs on the host beside Compose and is never a Compose service
+# (Release 1 brief); in Azure it is the internal app mcp-server in apps.json,
+# deployed only in the bonus profile (MCP_ENABLED=true, bonus B2).
+# Build context: the repository root.
+#   docker build -f deploy/azure/Dockerfile.mcp-server -t smartbank-mcp-server .
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-mcp.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY mcp_server/ ./mcp_server/
+
+# apps.json gives the feature API addresses (http://<app>). Bound to every
+# interface so the ingress reaches it; only apps in the environment can.
+ENV MCP_HOST=0.0.0.0 \
+    MCP_PORT=8100 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8100
+
+CMD ["python", "-m", "mcp_server.server"]
