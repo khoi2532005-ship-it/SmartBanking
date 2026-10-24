@@ -3,15 +3,16 @@
   "name": "Cong Bao Nguyen",
   "feature": "budgeting",
   "workflow": "student-4-budgets-ci",
-  "job": "local",
-  "commit": "c47d729",
-  "branch": "local",
-  "run_id": "local",
-  "run_url": "",
-  "ran_at": "2026-10-21T02:47:20Z",
+  "job": "smoke-check",
+  "commit": "fa227e0",
+  "branch": "main",
+  "run_id": "39725293520",
+  "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/39725293520",
+  "ran_at": "2026-10-22T05:20:21Z",
   "api_url": "http://localhost:5004",
   "spending_source": "mock",
   "ai_services": {
+    "ai_mode": "disabled",
     "mcp": "disabled",
     "rag": "disabled",
     "multi_agent": "disabled"
@@ -29,7 +30,7 @@
       "method": "GET",
       "endpoint": "/api/budgets/summary",
       "outcome": "passed",
-      "duration_s": 0.014,
+      "duration_s": 0.111,
       "checks": [
         {
           "check": "budgets left by an interrupted run were removed before the period was read",
@@ -165,18 +166,18 @@
       "method": "POST",
       "endpoint": "/api/budgets",
       "outcome": "passed",
-      "duration_s": 0.026,
+      "duration_s": 0.132,
       "checks": [
         {
           "check": "creating a new budget answers 201 with its id",
           "ok": true,
-          "detail": "HTTP 201 '{\"budget_id\":22,\"message\":\"Budget created\"}\\n'",
+          "detail": "HTTP 201 '{\"budget_id\":15,\"message\":\"Budget created\"}\\n'",
           "info": false
         },
         {
           "check": "the new budget appears in the period summary with no spend, on track",
           "ok": true,
-          "detail": "{'budget_id': 22, 'category': 'CI check 71f11d9c', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
+          "detail": "{'budget_id': 15, 'category': 'CI check b293d54f', 'customer_id': 1, 'month': 9, 'monthly_limit': 123.45, 'over_budget': False, 'over_by': 0.0, 'percent_used': 0.0, 'remaining': 123.45, 'spent': 0.0, 'status': 'ON_TRACK', 'year': 2026}",
           "info": false
         },
         {
@@ -218,7 +219,7 @@
         {
           "check": "cleanup: every budget the test created is deleted",
           "ok": true,
-          "detail": "deleted {22: 200}",
+          "detail": "deleted {15: 200}",
           "info": false
         },
         {

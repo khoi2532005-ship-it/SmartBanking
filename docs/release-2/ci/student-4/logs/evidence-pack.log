@@ -1,0 +1,286 @@
+﻿2026-10-22T05:20:48.5996694Z Current runner version: '2.338.0'
+2026-10-22T05:20:48.6021797Z ##[group]Runner Image Provisioner
+2026-10-22T05:20:48.6022844Z Hosted Compute Agent
+2026-10-22T05:20:48.6023497Z Version: 20261012.601
+2026-10-22T05:20:48.6024499Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+2026-10-22T05:20:48.6025247Z Build Date: 2026-10-12T17:48:21Z
+2026-10-22T05:20:48.6025932Z Worker ID: {1b7a1ec9-76c7-4a48-bbb3-66b501c60293}
+2026-10-22T05:20:48.6026782Z Region: centralus
+2026-10-22T05:20:48.6027346Z Cloud: Azure
+2026-10-22T05:20:48.6027970Z ##[endgroup]
+2026-10-22T05:20:48.6029463Z ##[group]Operating System
+2026-10-22T05:20:48.6030113Z Ubuntu
+2026-10-22T05:20:48.6031106Z 24.04.5
+2026-10-22T05:20:48.6031685Z LTS
+2026-10-22T05:20:48.6032273Z ##[endgroup]
+2026-10-22T05:20:48.6032860Z ##[group]Runner Image
+2026-10-22T05:20:48.6033470Z Image: ubuntu-24.04
+2026-10-22T05:20:48.6034125Z Version: 20261012.334.1
+2026-10-22T05:20:48.6035364Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-22T05:20:48.6036974Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+2026-10-22T05:20:48.6037974Z ##[endgroup]
+2026-10-22T05:20:48.6039230Z ##[group]GITHUB_TOKEN Permissions
+2026-10-22T05:20:48.6041675Z Contents: read
+2026-10-22T05:20:48.6042381Z Metadata: read
+2026-10-22T05:20:48.6042953Z Packages: read
+2026-10-22T05:20:48.6043529Z ##[endgroup]
+2026-10-22T05:20:48.6045647Z Secret source: Actions
+2026-10-22T05:20:48.6046593Z Cache mode: write
+2026-10-22T05:20:48.6047597Z Prepare workflow directory
+2026-10-22T05:20:48.6502396Z Prepare all required actions
+2026-10-22T05:20:48.6551610Z Getting action download info
+2026-10-22T05:20:48.8946150Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-22T05:20:49.0075450Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+2026-10-22T05:20:49.4914336Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-22T05:20:49.7509021Z Complete job name: Evidence pack
+2026-10-22T05:20:49.8315500Z ##[group]Run actions/checkout@v4
+2026-10-22T05:20:49.8316516Z with:
+2026-10-22T05:20:49.8317087Z   repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:20:49.8321649Z   token: ***
+2026-10-22T05:20:49.8322139Z   ssh-strict: true
+2026-10-22T05:20:49.8322623Z   ssh-user: git
+2026-10-22T05:20:49.8323117Z   persist-credentials: true
+2026-10-22T05:20:49.8323655Z   clean: true
+2026-10-22T05:20:49.8324149Z   sparse-checkout-cone-mode: true
+2026-10-22T05:20:49.8324710Z   fetch-depth: 1
+2026-10-22T05:20:49.8325221Z   fetch-tags: false
+2026-10-22T05:20:49.8325703Z   show-progress: true
+2026-10-22T05:20:49.8326197Z   lfs: false
+2026-10-22T05:20:49.8326651Z   submodules: false
+2026-10-22T05:20:49.8327135Z   set-safe-directory: true
+2026-10-22T05:20:49.8327683Z   allow-unsafe-pr-checkout: false
+2026-10-22T05:20:49.8328535Z env:
+2026-10-22T05:20:49.8329011Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:49.8329945Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:49.8330992Z ##[endgroup]
+2026-10-22T05:20:49.9353121Z Syncing repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:20:49.9355944Z ##[group]Getting Git version info
+2026-10-22T05:20:49.9357312Z Working directory is '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:20:49.9359323Z [command]/usr/bin/git version
+2026-10-22T05:20:49.9394073Z git version 2.55.0
+2026-10-22T05:20:49.9415627Z ##[endgroup]
+2026-10-22T05:20:49.9430186Z Temporarily overriding HOME='/home/runner/work/_temp/b1839122-84d1-4933-bbf2-e5b288a4c08f' before making global git config changes
+2026-10-22T05:20:49.9433074Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:20:49.9435853Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:20:49.9498067Z Deleting the contents of '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:20:49.9502908Z ##[group]Initializing the repository
+2026-10-22T05:20:49.9506893Z [command]/usr/bin/git init /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:20:49.9609889Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-22T05:20:49.9612589Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-22T05:20:49.9614506Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-22T05:20:49.9615988Z hint: call:
+2026-10-22T05:20:49.9616892Z hint:
+2026-10-22T05:20:49.9618043Z hint: 	git config --global init.defaultBranch <name>
+2026-10-22T05:20:49.9619372Z hint:
+2026-10-22T05:20:49.9620869Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-22T05:20:49.9622888Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-22T05:20:49.9624437Z hint:
+2026-10-22T05:20:49.9625267Z hint: 	git branch -m <name>
+2026-10-22T05:20:49.9626234Z hint:
+2026-10-22T05:20:49.9627550Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-22T05:20:49.9629786Z Initialized empty Git repository in /home/runner/work/SmartBanking/SmartBanking/.git/
+2026-10-22T05:20:49.9633731Z [command]/usr/bin/git remote add origin https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:20:49.9682569Z ##[endgroup]
+2026-10-22T05:20:49.9684295Z ##[group]Disabling automatic garbage collection
+2026-10-22T05:20:49.9686491Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-22T05:20:49.9721166Z ##[endgroup]
+2026-10-22T05:20:49.9722742Z ##[group]Setting up auth
+2026-10-22T05:20:49.9729282Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:20:49.9770964Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:20:50.0148967Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:20:50.0193750Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:20:50.0423270Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:20:50.0460034Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:20:50.0683565Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-22T05:20:50.0725560Z ##[endgroup]
+2026-10-22T05:20:50.0726557Z ##[group]Fetching the repository
+2026-10-22T05:20:50.0736382Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fa227e0b61887327b2edce92a6160bbdd81dd929:refs/remotes/origin/main
+2026-10-22T05:20:50.9362302Z From https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:20:50.9364394Z  * [new ref]         fa227e0b61887327b2edce92a6160bbdd81dd929 -> origin/main
+2026-10-22T05:20:50.9369303Z ##[endgroup]
+2026-10-22T05:20:50.9372163Z ##[group]Determining the checkout info
+2026-10-22T05:20:50.9374799Z ##[endgroup]
+2026-10-22T05:20:50.9379329Z [command]/usr/bin/git sparse-checkout disable
+2026-10-22T05:20:50.9435681Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-22T05:20:50.9472295Z ##[group]Checking out the ref
+2026-10-22T05:20:50.9476504Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-10-22T05:20:51.0103626Z Switched to a new branch 'main'
+2026-10-22T05:20:51.0109466Z branch 'main' set up to track 'origin/main'.
+2026-10-22T05:20:51.0118640Z ##[endgroup]
+2026-10-22T05:20:51.0159923Z [command]/usr/bin/git log -1 --format=%H
+2026-10-22T05:20:51.0187295Z fa227e0b61887327b2edce92a6160bbdd81dd929
+2026-10-22T05:20:51.0514472Z ##[group]Run actions/download-artifact@v4
+2026-10-22T05:20:51.0515858Z with:
+2026-10-22T05:20:51.0516848Z   name: student-4-endpoint-tests
+2026-10-22T05:20:51.0518068Z   path: endpoint
+2026-10-22T05:20:51.0519074Z   merge-multiple: false
+2026-10-22T05:20:51.0520260Z   repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:20:51.0521827Z   run-id: 39725293520
+2026-10-22T05:20:51.0522808Z env:
+2026-10-22T05:20:51.0523739Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:51.0525663Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:51.0527654Z ##[endgroup]
+2026-10-22T05:20:51.2084097Z Downloading single artifact
+2026-10-22T05:20:51.2231958Z (node:2301) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-22T05:20:51.2235197Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-22T05:20:51.3781798Z Preparing to download the following artifacts:
+2026-10-22T05:20:51.3787906Z - student-4-endpoint-tests (ID: 12403347397, Size: 7535, Expected Digest: sha256:de9ae1664353dc6c7c94abba219472aa445b2787a633cf14b353d3d766a7538f)
+2026-10-22T05:20:51.5379767Z Redirecting to blob download url: https://productionresultssa4.blob.core.windows.net/actions-results/febef9cd-2ce5-8c08-92ac-60ea9589a87c/workflow-job-run-c7a01d48-5bdb-56c2-85a3-3ec99cec039d/artifacts/daa710eb9b34c70caa7df0f692b8d3e608283e1a657f1d8df61fcb4ef5961f34.zip
+2026-10-22T05:20:51.5388233Z Starting download of artifact to: /home/runner/work/SmartBanking/SmartBanking/endpoint
+2026-10-22T05:20:51.6629803Z (node:2301) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-10-22T05:20:51.6717574Z SHA256 digest of downloaded artifact is de9ae1664353dc6c7c94abba219472aa445b2787a633cf14b353d3d766a7538f
+2026-10-22T05:20:51.6719241Z Artifact download completed successfully.
+2026-10-22T05:20:51.6720142Z Total of 1 artifact(s) downloaded
+2026-10-22T05:20:51.6724958Z Download artifact has finished successfully
+2026-10-22T05:20:51.6898664Z ##[group]Run mkdir -p reports
+2026-10-22T05:20:51.6899104Z [36;1mmkdir -p reports[0m
+2026-10-22T05:20:51.6899380Z [36;1mfield() {[0m
+2026-10-22T05:20:51.6899635Z [36;1m  python3 -c 'import json, sys[0m
+2026-10-22T05:20:51.6900107Z [36;1md = json.load(open("endpoint/post-commit-endpoint-report-student-4.json"))[0m
+2026-10-22T05:20:51.6900965Z [36;1mfor key in sys.argv[1].split("."):[0m
+2026-10-22T05:20:51.6901273Z [36;1m    d = d[key][0m
+2026-10-22T05:20:51.6901567Z [36;1mprint(d)' "$1" 2>/dev/null || echo "missing"[0m
+2026-10-22T05:20:51.6901888Z [36;1m}[0m
+2026-10-22T05:20:51.6902171Z [36;1mgate() {                       # GitHub's job results in the report's words[0m
+2026-10-22T05:20:51.6902706Z [36;1m  case "$1" in success) echo passed ;; failure) echo failed ;; *) echo "$1" ;; esac[0m
+2026-10-22T05:20:51.6903143Z [36;1m}[0m
+2026-10-22T05:20:51.6903593Z [36;1mBUILD_GATE=$(gate "$BUILD_RESULT"); UNIT_GATE=$(gate "$UNIT_RESULT"); SMOKE_GATE=$(gate "$SMOKE_RESULT")[0m
+2026-10-22T05:20:51.6904137Z [36;1mENDPOINT_RESULT=$(field summary.result)[0m
+2026-10-22T05:20:51.6904485Z [36;1mENDPOINT_CHECKS=$(field summary.checks)[0m
+2026-10-22T05:20:51.6904813Z [36;1mENDPOINT_COMMIT=$(field commit)[0m
+2026-10-22T05:20:51.6905130Z [36;1mNOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)[0m
+2026-10-22T05:20:51.6905407Z [36;1m[0m
+2026-10-22T05:20:51.6905625Z [36;1mcat > reports/report.json <<JSON[0m
+2026-10-22T05:20:51.6905915Z [36;1m{[0m
+2026-10-22T05:20:51.6906160Z [36;1m  "workflow_name": "student-4-budgets-ci",[0m
+2026-10-22T05:20:51.6906526Z [36;1m  "student": "Student 4 - Cong Bao Nguyen",[0m
+2026-10-22T05:20:51.6906914Z [36;1m  "feature": "Budgeting & Spending Insights",[0m
+2026-10-22T05:20:51.6907499Z [36;1m  "services": ["budgeting-frontend-service", "budgeting-service", "budgeting-database-service"],[0m
+2026-10-22T05:20:51.6908204Z [36;1m  "ports": [3004, 5004, 5014],[0m
+2026-10-22T05:20:51.6908504Z [36;1m  "commit_sha": "${HEAD_SHA}",[0m
+2026-10-22T05:20:51.6908801Z [36;1m  "checkout_sha": "${GITHUB_SHA}",[0m
+2026-10-22T05:20:51.6909105Z [36;1m  "run_id": "${GITHUB_RUN_ID}",[0m
+2026-10-22T05:20:51.6909389Z [36;1m  "branch": "${HEAD_BRANCH}",[0m
+2026-10-22T05:20:51.6909682Z [36;1m  "generated_timestamp": "${NOW}",[0m
+2026-10-22T05:20:51.6909963Z [36;1m  "gates": {[0m
+2026-10-22T05:20:51.6910200Z [36;1m    "build": "${BUILD_GATE}",[0m
+2026-10-22T05:20:51.6910702Z [36;1m    "unit": "${UNIT_GATE}",[0m
+2026-10-22T05:20:51.6910986Z [36;1m    "smoke": "${SMOKE_GATE}",[0m
+2026-10-22T05:20:51.6911289Z [36;1m    "endpoint_tests": "${ENDPOINT_RESULT}"[0m
+2026-10-22T05:20:51.6911593Z [36;1m  },[0m
+2026-10-22T05:20:51.6911853Z [36;1m  "endpoint_tests_checks": "${ENDPOINT_CHECKS}",[0m
+2026-10-22T05:20:51.6912237Z [36;1m  "endpoint_report_commit": "${ENDPOINT_COMMIT}",[0m
+2026-10-22T05:20:51.6912649Z [36;1m  "endpoint_tests_artifact": "student-4-endpoint-tests"[0m
+2026-10-22T05:20:51.6912992Z [36;1m}[0m
+2026-10-22T05:20:51.6913186Z [36;1mJSON[0m
+2026-10-22T05:20:51.6913381Z [36;1m[0m
+2026-10-22T05:20:51.6913589Z [36;1mcat > reports/report.md <<MD[0m
+2026-10-22T05:20:51.6913945Z [36;1m# Student 4 CI Report - Budgeting & Spending Insights[0m
+2026-10-22T05:20:51.6914283Z [36;1m[0m
+2026-10-22T05:20:51.6914481Z [36;1m| Field | Value |[0m
+2026-10-22T05:20:51.6914720Z [36;1m|---|---|[0m
+2026-10-22T05:20:51.6914976Z [36;1m| Workflow | student-4-budgets-ci |[0m
+2026-10-22T05:20:51.6915405Z [36;1m| Commit | \`${HEAD_SHA}\` (the endpoint report names \`${ENDPOINT_COMMIT}\`) |[0m
+2026-10-22T05:20:51.6915839Z [36;1m| Branch | \`${HEAD_BRANCH}\` |[0m
+2026-10-22T05:20:51.6916144Z [36;1m| Run ID | \`${GITHUB_RUN_ID}\` |[0m
+2026-10-22T05:20:51.6916449Z [36;1m| Generated (UTC) | ${NOW} |[0m
+2026-10-22T05:20:51.6916714Z [36;1m[0m
+2026-10-22T05:20:51.6916905Z [36;1m## Gates[0m
+2026-10-22T05:20:51.6917125Z [36;1m[0m
+2026-10-22T05:20:51.6917324Z [36;1m| Gate | Result |[0m
+2026-10-22T05:20:51.6917573Z [36;1m|---|---|[0m
+2026-10-22T05:20:51.6918028Z [36;1m| Build: the three service images | ${BUILD_GATE} |[0m
+2026-10-22T05:20:51.6918508Z [36;1m| Unit: budget logic, clients, routes, shared servers | ${UNIT_GATE} |[0m
+2026-10-22T05:20:51.6919035Z [36;1m| Smoke: the stack answers on 5014, 5004 and 3004 | ${SMOKE_GATE} |[0m
+2026-10-22T05:20:51.6919728Z [36;1m| Endpoint tests: \`GET /api/budgets/summary\`, \`POST /api/budgets\` (${ENDPOINT_CHECKS} checks) | ${ENDPOINT_RESULT} |[0m
+2026-10-22T05:20:51.6920327Z [36;1m[0m
+2026-10-22T05:20:51.6921049Z [36;1mThe endpoint report and its JUnit results are in the artifact \`student-4-endpoint-tests\`.[0m
+2026-10-22T05:20:51.6921545Z [36;1m[0m
+2026-10-22T05:20:51.6921756Z [36;1m## Validated endpoints[0m
+2026-10-22T05:20:51.6922008Z [36;1m[0m
+2026-10-22T05:20:51.6922214Z [36;1m| Service | Endpoint |[0m
+2026-10-22T05:20:51.6922472Z [36;1m|---|---|[0m
+2026-10-22T05:20:51.6922938Z [36;1m| budgeting-database-service | \`GET http://localhost:5014/\` |[0m
+2026-10-22T05:20:51.6923486Z [36;1m| budgeting-service | \`GET http://localhost:5004/api/health\` |[0m
+2026-10-22T05:20:51.6924006Z [36;1m| budgeting-service | \`GET http://localhost:5004/api/budgets\` |[0m
+2026-10-22T05:20:51.6924710Z [36;1m| budgeting-service | \`GET http://localhost:5004/api/budgets/summary?customer_id=1&month=9&year=2026\` (seeded period) |[0m
+2026-10-22T05:20:51.6925535Z [36;1m| budgeting-service | \`POST http://localhost:5004/api/budgets\` (create, 409 on the duplicate, 400s) |[0m
+2026-10-22T05:20:51.6926511Z [36;1m| budgeting-service | \`GET http://localhost:5004/ui/ai/status\` and \`POST http://localhost:5004/api/budgets/insight\` (503, inactive in CI: AI_MODE_ENABLED=false) |[0m
+2026-10-22T05:20:51.6927575Z [36;1m| budgeting-service | \`GET http://localhost:5004/ui/mcp/status\`, \`GET http://localhost:5004/ui/rag/status\` (inactive in CI) |[0m
+2026-10-22T05:20:51.6928630Z [36;1m| budgeting-service | \`GET http://localhost:5004/ui/multi-agent/status\` (inactive in CI: MULTI_AGENT_ENABLED=false) |[0m
+2026-10-22T05:20:51.6929407Z [36;1m| budgeting-frontend-service | \`GET http://localhost:3004/tabs/budgets.html\` |[0m
+2026-10-22T05:20:51.6929862Z [36;1m[0m
+2026-10-22T05:20:51.6930167Z [36;1m## Release 2 surface (unit-tested, disabled in the smoke stack)[0m
+2026-10-22T05:20:51.6930785Z [36;1m[0m
+2026-10-22T05:20:51.6931188Z [36;1m\`POST /api/multi-agent/workflows\` (start), \`GET /api/multi-agent/workflows\` (history),[0m
+2026-10-22T05:20:51.6931953Z [36;1m\`GET /api/multi-agent/workflows/<id>\` (the whole workflow), \`POST .../decision\` (Accept / Partially accept / Reject);[0m
+2026-10-22T05:20:51.6932814Z [36;1msettings AI_MODE_ENABLED, MULTI_AGENT_ENABLED, MULTI_AGENT_SERVER_URL, MULTI_AGENT_API_TOKEN, BUDGET_FRONTEND_ORIGINS.[0m
+2026-10-22T05:20:51.6933380Z [36;1mMD[0m
+2026-10-22T05:20:51.6933581Z [36;1m[0m
+2026-10-22T05:20:51.6933950Z [36;1mecho "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \[0m
+2026-10-22T05:20:51.6934466Z [36;1m  > reports/run-view.md[0m
+2026-10-22T05:20:51.7184529Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:51.7184841Z env:
+2026-10-22T05:20:51.7185077Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:51.7185570Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:51.7186117Z   HEAD_SHA: fa227e0b61887327b2edce92a6160bbdd81dd929
+2026-10-22T05:20:51.7186462Z   HEAD_BRANCH: main
+2026-10-22T05:20:51.7186699Z   BUILD_RESULT: success
+2026-10-22T05:20:51.7186944Z   UNIT_RESULT: success
+2026-10-22T05:20:51.7187183Z   SMOKE_RESULT: success
+2026-10-22T05:20:51.7187428Z ##[endgroup]
+2026-10-22T05:20:51.8073916Z ##[group]Run actions/upload-artifact@v4
+2026-10-22T05:20:51.8074247Z with:
+2026-10-22T05:20:51.8074466Z   name: student-4-report
+2026-10-22T05:20:51.8074714Z   path: reports/
+2026-10-22T05:20:51.8074939Z   retention-days: 30
+2026-10-22T05:20:51.8075195Z   if-no-files-found: warn
+2026-10-22T05:20:51.8075444Z   compression-level: 6
+2026-10-22T05:20:51.8075674Z   overwrite: false
+2026-10-22T05:20:51.8075904Z   include-hidden-files: false
+2026-10-22T05:20:51.8076156Z env:
+2026-10-22T05:20:51.8076368Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:51.8076825Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:51.8077280Z ##[endgroup]
+2026-10-22T05:20:51.9733780Z (node:2327) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-22T05:20:51.9734739Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-22T05:20:51.9810227Z With the provided path, there will be 3 files uploaded
+2026-10-22T05:20:51.9811678Z Artifact name is valid!
+2026-10-22T05:20:51.9812170Z Root directory input is valid!
+2026-10-22T05:20:52.2576463Z Beginning upload of artifact content to blob storage
+2026-10-22T05:20:52.2804134Z (node:2327) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-22T05:20:52.4018410Z Uploaded bytes 1658
+2026-10-22T05:20:52.4412014Z Finished uploading artifact content to blob storage!
+2026-10-22T05:20:52.4413099Z SHA256 digest of uploaded artifact zip is d03b76a263603919fe2e17095aea948ebd13692d8b73d17b895fe9ffd9ebe13d
+2026-10-22T05:20:52.4415605Z Finalizing artifact upload
+2026-10-22T05:20:52.8800181Z Artifact student-4-report.zip successfully finalized. Artifact ID 12403781771
+2026-10-22T05:20:52.8801979Z Artifact student-4-report has been successfully uploaded! Final size is 1658 bytes. Artifact ID is 12403781771
+2026-10-22T05:20:52.8808296Z Artifact download URL: https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/39725293520/artifacts/12403781771
+2026-10-22T05:20:52.8926897Z ##[group]Run python3 -c 'import json, sys
+2026-10-22T05:20:52.8927432Z [36;1mpython3 -c 'import json, sys[0m
+2026-10-22T05:20:52.8927799Z [36;1mgates = json.load(open("reports/report.json"))["gates"][0m
+2026-10-22T05:20:52.8928304Z [36;1mfailed = {name: result for name, result in gates.items() if result != "passed"}[0m
+2026-10-22T05:20:52.8928737Z [36;1mprint("gates:", gates)[0m
+2026-10-22T05:20:52.8929111Z [36;1msys.exit(f"gates that did not pass: {failed}" if failed else 0)'[0m
+2026-10-22T05:20:52.8991547Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:20:52.8991816Z env:
+2026-10-22T05:20:52.8992045Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:20:52.8992497Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:20:52.8992954Z ##[endgroup]
+2026-10-22T05:20:52.9253374Z gates: {'build': 'passed', 'unit': 'passed', 'smoke': 'passed', 'endpoint_tests': 'passed'}
+2026-10-22T05:20:52.9404271Z Post job cleanup.
+2026-10-22T05:20:53.0274030Z [command]/usr/bin/git version
+2026-10-22T05:20:53.0319721Z git version 2.55.0
+2026-10-22T05:20:53.0363097Z Temporarily overriding HOME='/home/runner/work/_temp/ac934107-ceb0-47ce-bde2-5c9dea62b6d9' before making global git config changes
+2026-10-22T05:20:53.0364191Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:20:53.0368835Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:20:53.0409210Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:20:53.0445989Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:20:53.0701242Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:20:53.0730315Z http.https://github.com/.extraheader
+2026-10-22T05:20:53.0742553Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-22T05:20:53.0780069Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:20:53.1038274Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:20:53.1079262Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:20:53.1499982Z Cleaning up orphan processes
+2026-10-22T05:20:53.1765232Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

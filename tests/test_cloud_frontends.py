@@ -29,6 +29,19 @@ def test_switching_tabs_load_config_js_first():
             assert text.index('<script src="/config.js"></script>') < text.index("SMARTBANK_SAME_ORIGIN_API"), p
 
 
+def test_home_rewrites_feature_addresses_before_the_swap():
+    # The fragments embed each feature as <iframe src="http://localhost:300x">,
+    # and an iframe starts loading as soon as it is in the page. Rewritten after
+    # the swap, every feature was first requested from localhost (seen on the
+    # live site, 2026-10-22), which Chrome may answer with a local-network
+    # permission prompt. So the fragment's text is rewritten before the swap.
+    script = (ROOT / "shared/frontend/index.html").read_text(encoding="utf-8")
+    before = re.search(r'addEventListener\("htmx:beforeSwap", \(event\) => \{(.*?)\n\}\);', script, re.S)
+    assert before and "event.detail.serverResponse = " in before.group(1)
+    after = re.search(r'addEventListener\("htmx:afterSwap", \(event\) => \{(.*?)\n\}\);', script, re.S)
+    assert after and "src" not in after.group(1) and "rewriteHosts" not in after.group(1)
+
+
 def test_loans_page_loads_config_js_before_its_scripts():
     # Loans keeps its API switch in js/*.js, so the page itself must load the
     # cloud config before the first of those scripts.

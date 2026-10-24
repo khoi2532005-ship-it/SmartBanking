@@ -1,0 +1,430 @@
+﻿2026-10-22T05:19:31.5997189Z Current runner version: '2.338.0'
+2026-10-22T05:19:31.6023955Z ##[group]Runner Image Provisioner
+2026-10-22T05:19:31.6024927Z Hosted Compute Agent
+2026-10-22T05:19:31.6026145Z Version: 20261015.610
+2026-10-22T05:19:31.6027039Z Commit: 267fdb4e8bbec4ab5ea31367f3a00d5c480c7656
+2026-10-22T05:19:31.6027866Z Build Date: 2026-10-14T17:06:54Z
+2026-10-22T05:19:31.6028624Z Worker ID: {d54bd920-d5d0-44c4-88a2-8283663ea16e}
+2026-10-22T05:19:31.6029392Z Region: eastus
+2026-10-22T05:19:31.6029983Z Cloud: Azure
+2026-10-22T05:19:31.6030618Z ##[endgroup]
+2026-10-22T05:19:31.6032235Z ##[group]Operating System
+2026-10-22T05:19:31.6032961Z Ubuntu
+2026-10-22T05:19:31.6033525Z 24.04.5
+2026-10-22T05:19:31.6034050Z LTS
+2026-10-22T05:19:31.6034687Z ##[endgroup]
+2026-10-22T05:19:31.6035597Z ##[group]Runner Image
+2026-10-22T05:19:31.6036302Z Image: ubuntu-24.04
+2026-10-22T05:19:31.6036993Z Version: 20261018.339.1
+2026-10-22T05:19:31.6038325Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261018.339/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-22T05:19:31.6039974Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261018.339
+2026-10-22T05:19:31.6041361Z ##[endgroup]
+2026-10-22T05:19:31.6042633Z ##[group]GITHUB_TOKEN Permissions
+2026-10-22T05:19:31.6044927Z Contents: read
+2026-10-22T05:19:31.6046034Z Metadata: read
+2026-10-22T05:19:31.6046657Z Packages: read
+2026-10-22T05:19:31.6047338Z ##[endgroup]
+2026-10-22T05:19:31.6049837Z Secret source: Actions
+2026-10-22T05:19:31.6050949Z Cache mode: write
+2026-10-22T05:19:31.6051891Z Prepare workflow directory
+2026-10-22T05:19:31.6456967Z Prepare all required actions
+2026-10-22T05:19:31.6506696Z Getting action download info
+2026-10-22T05:19:31.8751198Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-22T05:19:32.0501391Z Complete job name: Build images
+2026-10-22T05:19:32.1399877Z ##[group]Run actions/checkout@v4
+2026-10-22T05:19:32.1400779Z with:
+2026-10-22T05:19:32.1401272Z   repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:32.1405039Z   token: ***
+2026-10-22T05:19:32.1405712Z   ssh-strict: true
+2026-10-22T05:19:32.1406163Z   ssh-user: git
+2026-10-22T05:19:32.1406623Z   persist-credentials: true
+2026-10-22T05:19:32.1407119Z   clean: true
+2026-10-22T05:19:32.1407578Z   sparse-checkout-cone-mode: true
+2026-10-22T05:19:32.1408101Z   fetch-depth: 1
+2026-10-22T05:19:32.1408543Z   fetch-tags: false
+2026-10-22T05:19:32.1408991Z   show-progress: true
+2026-10-22T05:19:32.1409442Z   lfs: false
+2026-10-22T05:19:32.1409867Z   submodules: false
+2026-10-22T05:19:32.1410332Z   set-safe-directory: true
+2026-10-22T05:19:32.1410875Z   allow-unsafe-pr-checkout: false
+2026-10-22T05:19:32.1411644Z env:
+2026-10-22T05:19:32.1412120Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:32.1412969Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:32.1413778Z ##[endgroup]
+2026-10-22T05:19:32.2431612Z Syncing repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:32.2434338Z ##[group]Getting Git version info
+2026-10-22T05:19:32.2435814Z Working directory is '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:19:32.2437618Z [command]/usr/bin/git version
+2026-10-22T05:19:32.2506843Z git version 2.55.0
+2026-10-22T05:19:32.2531337Z ##[endgroup]
+2026-10-22T05:19:32.2548175Z Temporarily overriding HOME='/home/runner/work/_temp/07f4c057-8bb9-4edc-a24b-47f72b4012c5' before making global git config changes
+2026-10-22T05:19:32.2550487Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:19:32.2554060Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:32.2616128Z Deleting the contents of '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:19:32.2621828Z ##[group]Initializing the repository
+2026-10-22T05:19:32.2628624Z [command]/usr/bin/git init /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:32.2740293Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-22T05:19:32.2742958Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-22T05:19:32.2744716Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-22T05:19:32.2746671Z hint: call:
+2026-10-22T05:19:32.2747533Z hint:
+2026-10-22T05:19:32.2748542Z hint: 	git config --global init.defaultBranch <name>
+2026-10-22T05:19:32.2749740Z hint:
+2026-10-22T05:19:32.2750830Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-22T05:19:32.2752515Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-22T05:19:32.2753854Z hint:
+2026-10-22T05:19:32.2754582Z hint: 	git branch -m <name>
+2026-10-22T05:19:32.2755725Z hint:
+2026-10-22T05:19:32.2756852Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-22T05:19:32.2758739Z Initialized empty Git repository in /home/runner/work/SmartBanking/SmartBanking/.git/
+2026-10-22T05:19:32.2761231Z [command]/usr/bin/git remote add origin https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:32.2817578Z ##[endgroup]
+2026-10-22T05:19:32.2818891Z ##[group]Disabling automatic garbage collection
+2026-10-22T05:19:32.2822684Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-22T05:19:32.2859704Z ##[endgroup]
+2026-10-22T05:19:32.2861125Z ##[group]Setting up auth
+2026-10-22T05:19:32.2868549Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:19:32.2906126Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:19:32.3295509Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:19:32.3348830Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:19:32.3609191Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:19:32.3656276Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:19:32.3902896Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-22T05:19:32.3953239Z ##[endgroup]
+2026-10-22T05:19:32.3954073Z ##[group]Fetching the repository
+2026-10-22T05:19:32.3964080Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fa227e0b61887327b2edce92a6160bbdd81dd929:refs/remotes/origin/main
+2026-10-22T05:19:32.9545774Z From https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:32.9547425Z  * [new ref]         fa227e0b61887327b2edce92a6160bbdd81dd929 -> origin/main
+2026-10-22T05:19:32.9550760Z ##[endgroup]
+2026-10-22T05:19:32.9551830Z ##[group]Determining the checkout info
+2026-10-22T05:19:32.9553655Z ##[endgroup]
+2026-10-22T05:19:32.9559973Z [command]/usr/bin/git sparse-checkout disable
+2026-10-22T05:19:32.9622739Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-22T05:19:32.9668614Z ##[group]Checking out the ref
+2026-10-22T05:19:32.9673367Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-10-22T05:19:33.0328296Z Switched to a new branch 'main'
+2026-10-22T05:19:33.0330344Z branch 'main' set up to track 'origin/main'.
+2026-10-22T05:19:33.0338966Z ##[endgroup]
+2026-10-22T05:19:33.0401315Z [command]/usr/bin/git log -1 --format=%H
+2026-10-22T05:19:33.0441769Z fa227e0b61887327b2edce92a6160bbdd81dd929
+2026-10-22T05:19:33.0720734Z ##[group]Run docker compose version
+2026-10-22T05:19:33.0722294Z [36;1mdocker compose version[0m
+2026-10-22T05:19:33.0912050Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:33.0913311Z env:
+2026-10-22T05:19:33.0914619Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:33.0916876Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:33.0918967Z ##[endgroup]
+2026-10-22T05:19:33.4046885Z Docker Compose version v2.38.2
+2026-10-22T05:19:33.4163645Z ##[group]Run docker compose -f "$COMPOSE_FILE" build $SERVICES
+2026-10-22T05:19:33.4165855Z [36;1mdocker compose -f "$COMPOSE_FILE" build $SERVICES[0m
+2026-10-22T05:19:33.4220418Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:33.4221477Z env:
+2026-10-22T05:19:33.4222367Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:33.4224249Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:33.4226460Z ##[endgroup]
+2026-10-22T05:19:33.9266901Z #1 [internal] load local bake definitions
+2026-10-22T05:19:34.0868379Z #1 reading from stdin 1.54kB done
+2026-10-22T05:19:34.0869708Z #1 DONE 0.0s
+2026-10-22T05:19:34.2245622Z 
+2026-10-22T05:19:34.2247379Z #2 [budgeting-database-service internal] load build definition from Dockerfile
+2026-10-22T05:19:34.2249541Z #2 transferring dockerfile: 630B 0.0s done
+2026-10-22T05:19:34.2250219Z #2 DONE 0.0s
+2026-10-22T05:19:34.2250494Z 
+2026-10-22T05:19:34.2251083Z #3 [budgeting-frontend-service internal] load build definition from Dockerfile
+2026-10-22T05:19:34.2252128Z #3 transferring dockerfile: 940B 0.0s done
+2026-10-22T05:19:34.2252753Z #3 DONE 0.0s
+2026-10-22T05:19:34.2253014Z 
+2026-10-22T05:19:34.2253433Z #4 [budgeting-service internal] load build definition from Dockerfile
+2026-10-22T05:19:34.2254350Z #4 transferring dockerfile: 1.32kB 0.0s done
+2026-10-22T05:19:34.2254960Z #4 DONE 0.1s
+2026-10-22T05:19:34.2255445Z 
+2026-10-22T05:19:34.2255810Z #5 [auth] library/nginx:pull token for registry-1.docker.io
+2026-10-22T05:19:34.3750744Z #5 DONE 0.0s
+2026-10-22T05:19:34.3751120Z 
+2026-10-22T05:19:34.3751362Z #6 [auth] library/python:pull token for registry-1.docker.io
+2026-10-22T05:19:34.3751813Z #6 DONE 0.0s
+2026-10-22T05:19:34.3751965Z 
+2026-10-22T05:19:34.3752357Z #7 [budgeting-service internal] load metadata for docker.io/library/python:3.12-slim
+2026-10-22T05:19:34.5341431Z #7 ...
+2026-10-22T05:19:34.5342969Z 
+2026-10-22T05:19:34.5357544Z #8 [budgeting-frontend-service internal] load metadata for docker.io/library/nginx:alpine
+2026-10-22T05:19:34.5358656Z #8 DONE 0.4s
+2026-10-22T05:19:34.6813148Z 
+2026-10-22T05:19:34.6820107Z #7 [budgeting-service internal] load metadata for docker.io/library/python:3.12-slim
+2026-10-22T05:19:34.6846775Z #7 DONE 0.4s
+2026-10-22T05:19:34.6864462Z 
+2026-10-22T05:19:34.6886406Z #9 [budgeting-service internal] load .dockerignore
+2026-10-22T05:19:34.6901677Z #9 transferring context: 414B done
+2026-10-22T05:19:34.6926125Z #9 DONE 0.0s
+2026-10-22T05:19:34.6945890Z 
+2026-10-22T05:19:34.6968497Z #10 [budgeting-frontend-service internal] load build context
+2026-10-22T05:19:34.6986592Z #10 transferring context: 103.27kB 0.0s done
+2026-10-22T05:19:34.7007469Z #10 DONE 0.0s
+2026-10-22T05:19:34.7042167Z 
+2026-10-22T05:19:34.7066597Z #11 [budgeting-service internal] load build context
+2026-10-22T05:19:34.7088004Z #11 transferring context: 282.27kB 0.0s done
+2026-10-22T05:19:34.7088725Z #11 DONE 0.0s
+2026-10-22T05:19:34.7089046Z 
+2026-10-22T05:19:34.7089452Z #12 [budgeting-database-service internal] load build context
+2026-10-22T05:19:34.7090195Z #12 transferring context: 19.15kB done
+2026-10-22T05:19:34.7090765Z #12 DONE 0.0s
+2026-10-22T05:19:34.7091027Z 
+2026-10-22T05:19:34.7091965Z #13 [budgeting-frontend-service 1/4] FROM docker.io/library/nginx:alpine@sha256:060849a174666c53439dc7cecbf8f67e225c7cbfb1a44ca97915d9a172a81e6d
+2026-10-22T05:19:34.7093834Z #13 resolve docker.io/library/nginx:alpine@sha256:060849a174666c53439dc7cecbf8f67e225c7cbfb1a44ca97915d9a172a81e6d 0.0s done
+2026-10-22T05:19:34.7095589Z #13 extracting sha256:7b229517ed222597277036d94892173207d01a731ab3a88eeb1de2e963a2c788
+2026-10-22T05:19:34.7096906Z #13 sha256:12b85cff06fd7d383d36a9c96503fe049c9d4bf3dfda5cbb9ffa6ae99b9c07a6 1.94MB / 1.94MB 0.1s done
+2026-10-22T05:19:34.7098913Z #13 sha256:657023555a2a19dc6036468198bb350d2c7feaac7f2d0a3901b4dd3cb25e40c5 629B / 629B 0.0s done
+2026-10-22T05:19:34.7100343Z #13 sha256:2ec5fb117ffa9a78b15fb6a78745ffc569c8da0aee9f36ace4cd67a44b1fef79 1.21kB / 1.21kB 0.1s done
+2026-10-22T05:19:34.7102028Z #13 sha256:2db7d28517d1fba17c2da3210395f7be11a11b419246ad0da2edf782af72f367 2.50kB / 2.50kB done
+2026-10-22T05:19:34.7103431Z #13 sha256:3d6cab9c2941df2441024a2f02a65ebe1b8916c3cbe7b9527f62627accea8004 12.31kB / 12.31kB done
+2026-10-22T05:19:34.7104751Z #13 sha256:7cc330898115ce55acccb0cc1e7dd091df4410c8c5f3c540710ee0ac689f5fcb 964B / 964B 0.1s done
+2026-10-22T05:19:34.7106343Z #13 sha256:26185d08a3ec318dd85a6c9f2172e714ec13cececd7f33c533b40b1689f9fedb 404B / 404B 0.1s done
+2026-10-22T05:19:34.7107653Z #13 sha256:9b0f7dfe35b2711a17f60dadd6d4035dc0cdee152538cc5c0987029e94679548 1.40kB / 1.40kB 0.1s done
+2026-10-22T05:19:34.7108945Z #13 sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919 3.15MB / 20.53MB 0.1s
+2026-10-22T05:19:34.7110207Z #13 sha256:060849a174666c53439dc7cecbf8f67e225c7cbfb1a44ca97915d9a172a81e6d 10.33kB / 10.33kB done
+2026-10-22T05:19:34.7111463Z #13 sha256:7b229517ed222597277036d94892173207d01a731ab3a88eeb1de2e963a2c788 3.85MB / 3.85MB 0.0s done
+2026-10-22T05:19:34.7949775Z #13 extracting sha256:7b229517ed222597277036d94892173207d01a731ab3a88eeb1de2e963a2c788 0.1s done
+2026-10-22T05:19:34.7951141Z #13 sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919 20.53MB / 20.53MB 0.2s done
+2026-10-22T05:19:34.7951917Z #13 extracting sha256:12b85cff06fd7d383d36a9c96503fe049c9d4bf3dfda5cbb9ffa6ae99b9c07a6
+2026-10-22T05:19:34.9319336Z #13 extracting sha256:12b85cff06fd7d383d36a9c96503fe049c9d4bf3dfda5cbb9ffa6ae99b9c07a6 0.1s done
+2026-10-22T05:19:37.9102587Z #13 extracting sha256:657023555a2a19dc6036468198bb350d2c7feaac7f2d0a3901b4dd3cb25e40c5 done
+2026-10-22T05:19:37.9106072Z #13 extracting sha256:7cc330898115ce55acccb0cc1e7dd091df4410c8c5f3c540710ee0ac689f5fcb done
+2026-10-22T05:19:37.9107553Z #13 extracting sha256:26185d08a3ec318dd85a6c9f2172e714ec13cececd7f33c533b40b1689f9fedb done
+2026-10-22T05:19:37.9109693Z #13 extracting sha256:2ec5fb117ffa9a78b15fb6a78745ffc569c8da0aee9f36ace4cd67a44b1fef79 done
+2026-10-22T05:19:37.9111572Z #13 extracting sha256:9b0f7dfe35b2711a17f60dadd6d4035dc0cdee152538cc5c0987029e94679548 done
+2026-10-22T05:19:37.9113213Z #13 extracting sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919
+2026-10-22T05:19:38.3398634Z #13 extracting sha256:b9b388a21ecfde6ac80505f23f527146a2129dfb104e79b029bbd00d4cc1a919 0.4s done
+2026-10-22T05:19:38.5567097Z #13 DONE 3.9s
+2026-10-22T05:19:38.5567684Z 
+2026-10-22T05:19:38.5568150Z #14 [budgeting-frontend-service 2/4] COPY shared/frontend/ /usr/share/nginx/html/
+2026-10-22T05:19:38.5568876Z #14 DONE 0.0s
+2026-10-22T05:19:38.5569060Z 
+2026-10-22T05:19:38.5569722Z #15 [budgeting-frontend-service 3/4] COPY services/budgeting/frontend/tabs/ /usr/share/nginx/html/tabs/
+2026-10-22T05:19:38.5570568Z #15 DONE 0.0s
+2026-10-22T05:19:38.5570775Z 
+2026-10-22T05:19:38.5571395Z #16 [budgeting-frontend-service 4/4] COPY deploy/nginx/feature.conf.template /etc/nginx/templates/default.conf.template
+2026-10-22T05:19:38.5572291Z #16 DONE 0.0s
+2026-10-22T05:19:38.5572470Z 
+2026-10-22T05:19:38.5572682Z #17 [budgeting-frontend-service] exporting to image
+2026-10-22T05:19:38.5573175Z #17 exporting layers
+2026-10-22T05:19:38.7783157Z #17 ...
+2026-10-22T05:19:38.7783324Z 
+2026-10-22T05:19:38.7783827Z #18 [budgeting-service 1/6] FROM docker.io/library/python:3.12-slim@sha256:cb33f7f771ecec2ef1225cf39b159591a040391bd73e4c01f00fdfc4c47611d2
+2026-10-22T05:19:38.7784839Z #18 resolve docker.io/library/python:3.12-slim@sha256:cb33f7f771ecec2ef1225cf39b159591a040391bd73e4c01f00fdfc4c47611d2 0.0s done
+2026-10-22T05:19:38.7785912Z #18 sha256:cb33f7f771ecec2ef1225cf39b159591a040391bd73e4c01f00fdfc4c47611d2 10.37kB / 10.37kB done
+2026-10-22T05:19:38.7786574Z #18 sha256:e8a38829209aea82774882e5157e1f7c3e8c8393ff53a697b3580896e57f345c 1.75kB / 1.75kB done
+2026-10-22T05:19:38.7787513Z #18 sha256:a33c10a97f11005523814c6eee013986119fe41f3122f444518117536675c8e1 5.66kB / 5.66kB done
+2026-10-22T05:19:38.7788286Z #18 sha256:f2be67225471500c788ce88c597eb5ea8336e912ad1ca4815650e0281afe2034 29.84MB / 29.84MB 0.2s done
+2026-10-22T05:19:38.7789145Z #18 sha256:be6443c06d3c9914acdca3ffb368adad23d4f282b55e71e730878ad3e3c3f75c 1.29MB / 1.29MB 0.1s done
+2026-10-22T05:19:38.7789955Z #18 sha256:b524bb3aba7394d85233f3a0a742b8f1b56179e8f61492f73d42a1ff118623b7 12.12MB / 12.12MB 0.2s done
+2026-10-22T05:19:38.7790817Z #18 sha256:5c397e4307db7bd392eff1d36de88b04da2a137a4b906b7e0e4657bada560645 249B / 249B 0.2s done
+2026-10-22T05:19:38.7791764Z #18 extracting sha256:f2be67225471500c788ce88c597eb5ea8336e912ad1ca4815650e0281afe2034 1.1s done
+2026-10-22T05:19:38.7792941Z #18 extracting sha256:be6443c06d3c9914acdca3ffb368adad23d4f282b55e71e730878ad3e3c3f75c 0.1s done
+2026-10-22T05:19:38.7793773Z #18 extracting sha256:b524bb3aba7394d85233f3a0a742b8f1b56179e8f61492f73d42a1ff118623b7 0.7s done
+2026-10-22T05:19:38.7794579Z #18 extracting sha256:5c397e4307db7bd392eff1d36de88b04da2a137a4b906b7e0e4657bada560645 done
+2026-10-22T05:19:38.7795172Z #18 DONE 4.0s
+2026-10-22T05:19:38.7795831Z 
+2026-10-22T05:19:38.7796131Z #19 [budgeting-database-service 2/6] WORKDIR /app
+2026-10-22T05:19:38.7796597Z #19 DONE 0.0s
+2026-10-22T05:19:38.7796849Z 
+2026-10-22T05:19:38.7797316Z #20 [budgeting-database-service 3/6] COPY services/budgeting/database/requirements.txt requirements.txt
+2026-10-22T05:19:38.7797953Z #20 DONE 0.0s
+2026-10-22T05:19:38.7798206Z 
+2026-10-22T05:19:38.7798611Z #21 [budgeting-service 3/6] COPY services/budgeting/backend/requirements.txt requirements.txt
+2026-10-22T05:19:38.7799193Z #21 DONE 0.0s
+2026-10-22T05:19:38.9284097Z 
+2026-10-22T05:19:38.9284945Z #22 [budgeting-database-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:19:39.1901657Z #22 ...
+2026-10-22T05:19:39.1901913Z 
+2026-10-22T05:19:39.1902185Z #17 [budgeting-frontend-service] exporting to image
+2026-10-22T05:19:39.1902807Z #17 exporting layers 0.5s done
+2026-10-22T05:19:39.1903586Z #17 writing image sha256:39059379c23a8a45d0f6ebd092bf3bf3cb7b6b35e50718a7f7f21513d59002a0 done
+2026-10-22T05:19:39.1904610Z #17 naming to docker.io/library/smartbank-budgeting-web:0.1 done
+2026-10-22T05:19:39.1905472Z #17 DONE 0.5s
+2026-10-22T05:19:39.1905690Z 
+2026-10-22T05:19:39.1906060Z #23 [budgeting-frontend-service] resolving provenance for metadata file
+2026-10-22T05:19:39.1906732Z #23 DONE 0.0s
+2026-10-22T05:19:39.3488153Z 
+2026-10-22T05:19:39.3506673Z #24 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:19:40.2848214Z #24 1.560 Collecting flask==3.1.3 (from -r requirements.txt (line 1))
+2026-10-22T05:19:40.2849056Z #24 1.580   Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+2026-10-22T05:19:40.2849576Z #24 1.603 Collecting flask-cors==6.0.0 (from -r requirements.txt (line 2))
+2026-10-22T05:19:40.2850085Z #24 1.607   Downloading flask_cors-6.0.0-py3-none-any.whl.metadata (961 bytes)
+2026-10-22T05:19:40.2850622Z #24 1.646 Collecting requests==2.33.0 (from -r requirements.txt (line 3))
+2026-10-22T05:19:40.2851107Z #24 1.650   Downloading requests-2.33.0-py3-none-any.whl.metadata (5.1 kB)
+2026-10-22T05:19:40.3849127Z #24 1.728 Collecting openai==3.8.0 (from -r requirements.txt (line 4))
+2026-10-22T05:19:40.3850739Z #24 1.734   Downloading openai-3.8.0-py3-none-any.whl.metadata (41 kB)
+2026-10-22T05:19:40.3852215Z #24 1.754 Collecting blinker>=1.9.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:40.3853415Z #24 1.757   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+2026-10-22T05:19:40.4977041Z #24 1.778 Collecting click>=8.1.3 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:40.4978354Z #24 1.782   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:19:40.4979596Z #24 1.798 Collecting itsdangerous>=2.2.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:40.4980670Z #24 1.804   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+2026-10-22T05:19:40.4982094Z #24 1.822 Collecting jinja2>=3.1.2 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:40.4983027Z #24 1.825   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-10-22T05:19:40.6906563Z #24 1.881 Collecting markupsafe>=2.1.1 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:40.6908054Z #24 1.885   Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-10-22T05:19:40.6909422Z #24 1.909 Collecting werkzeug>=3.1.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:40.6910382Z #24 1.913   Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+2026-10-22T05:19:40.6937618Z #24 2.066 Collecting charset_normalizer<4,>=2 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:19:40.8062843Z #24 2.070   Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+2026-10-22T05:19:40.8064345Z #24 2.091 Collecting idna<4,>=2.5 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:19:40.8065916Z #24 2.094   Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-10-22T05:19:40.8066807Z #24 2.123 Collecting urllib3<3,>=1.26 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:19:40.8067760Z #24 2.127   Downloading urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+2026-10-22T05:19:40.8068455Z #24 2.152 Collecting certifi>=2023.5.7 (from requests==2.33.0->-r requirements.txt (line 3))
+2026-10-22T05:19:40.8069215Z #24 2.156   Downloading certifi-2026.10.19-py3-none-any.whl.metadata (2.5 kB)
+2026-10-22T05:19:40.8069748Z #24 2.179 Collecting anyio<5,>=4.10.0 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:40.9203980Z #24 2.182   Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+2026-10-22T05:19:40.9205000Z #24 2.200 Collecting httpx2<3,>=2.7.0 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:40.9206149Z #24 2.203   Downloading httpx2-2.16.0-py3-none-any.whl.metadata (10 kB)
+2026-10-22T05:19:40.9207043Z #24 2.293 Collecting jiter<1,>=0.16.0 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.0253232Z #24 ...
+2026-10-22T05:19:41.0253692Z 
+2026-10-22T05:19:41.0254226Z #22 [budgeting-database-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:19:41.0255513Z #22 1.551 Collecting flask==3.1.3 (from -r requirements.txt (line 1))
+2026-10-22T05:19:41.0256395Z #22 1.590   Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+2026-10-22T05:19:41.0257313Z #22 1.599 Collecting blinker>=1.9.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:41.0258258Z #22 1.608   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+2026-10-22T05:19:41.0259197Z #22 1.628 Collecting click>=8.1.3 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:41.0260050Z #22 1.637   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:19:41.0261007Z #22 1.648 Collecting itsdangerous>=2.2.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:41.0262033Z #22 1.658   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+2026-10-22T05:19:41.0263003Z #22 1.673 Collecting jinja2>=3.1.2 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:41.0263920Z #22 1.682   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-10-22T05:19:41.0264853Z #22 1.732 Collecting markupsafe>=2.1.1 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:41.0266465Z #22 1.741   Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-10-22T05:19:41.0267836Z #22 1.760 Collecting werkzeug>=3.1.0 (from flask==3.1.3->-r requirements.txt (line 1))
+2026-10-22T05:19:41.0268806Z #22 1.769   Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+2026-10-22T05:19:41.0269620Z #22 1.784 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+2026-10-22T05:19:41.0270733Z #22 1.804 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+2026-10-22T05:19:41.0271442Z #22 1.813 Downloading click-8.5.0-py3-none-any.whl (125 kB)
+2026-10-22T05:19:41.0272429Z #22 1.824 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+2026-10-22T05:19:41.0273205Z #22 1.832 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-10-22T05:19:41.0274349Z #22 1.842 Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+2026-10-22T05:19:41.0278534Z #22 1.851 Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+2026-10-22T05:19:41.0279635Z #22 1.871 Installing collected packages: markupsafe, itsdangerous, click, blinker, werkzeug, jinja2, flask
+2026-10-22T05:19:41.0281139Z #22 2.233 Successfully installed blinker-1.9.0 click-8.5.0 flask-3.1.3 itsdangerous-2.2.0 jinja2-3.1.6 markupsafe-3.0.4 werkzeug-3.1.9
+2026-10-22T05:19:41.0284535Z #22 2.234 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+2026-10-22T05:19:41.0292193Z #22 2.299 
+2026-10-22T05:19:41.0292725Z #22 2.299 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+2026-10-22T05:19:41.0293505Z #22 2.299 [notice] To update, run: pip install --upgrade pip
+2026-10-22T05:19:41.0294097Z #22 DONE 2.4s
+2026-10-22T05:19:41.0294301Z 
+2026-10-22T05:19:41.0294704Z #24 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:19:41.0297937Z #24 2.297   Downloading jiter-0.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.2 kB)
+2026-10-22T05:19:41.1340038Z #24 ...
+2026-10-22T05:19:41.1340222Z 
+2026-10-22T05:19:41.1340493Z #25 [budgeting-database-service 5/6] COPY services/budgeting/database/ ./
+2026-10-22T05:19:41.1340966Z #25 DONE 0.0s
+2026-10-22T05:19:41.1341086Z 
+2026-10-22T05:19:41.1341315Z #24 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:19:41.1342020Z #24 2.481 Collecting pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.1342639Z #24 2.485   Downloading pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+2026-10-22T05:19:41.1343153Z #24 2.506 Collecting sniffio (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.2480351Z #24 ...
+2026-10-22T05:19:41.2480795Z 
+2026-10-22T05:19:41.2481354Z #26 [budgeting-database-service 6/6] RUN python init_db.py
+2026-10-22T05:19:41.2482410Z #26 0.169 Database created successfully: /app/data/budgeting_and_insights.db
+2026-10-22T05:19:41.2483286Z #26 0.169   categories: 10
+2026-10-22T05:19:41.2484728Z #26 0.169   budgets: 14
+2026-10-22T05:19:41.2485533Z #26 0.169   budget_insights: 10
+2026-10-22T05:19:41.2496265Z #26 DONE 0.2s
+2026-10-22T05:19:41.2496687Z 
+2026-10-22T05:19:41.2497129Z #24 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:19:41.2498133Z #24 2.511   Downloading sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+2026-10-22T05:19:41.2498872Z #24 2.534 Collecting typing-extensions<5,>=4.14 (from openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.2499605Z #24 2.538   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-10-22T05:19:41.2500362Z #24 2.570 Collecting httpcore2==2.16.0 (from httpx2<3,>=2.7.0->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.2501059Z #24 2.574   Downloading httpcore2-2.16.0-py3-none-any.whl.metadata (27 kB)
+2026-10-22T05:19:41.2501738Z #24 2.600 Collecting truststore>=0.10 (from httpx2<3,>=2.7.0->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.2502420Z #24 2.610   Downloading truststore-0.10.5-py3-none-any.whl.metadata (4.5 kB)
+2026-10-22T05:19:41.4700833Z #24 2.646 Collecting h11>=0.16 (from httpcore2==2.16.0->httpx2<3,>=2.7.0->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.4701999Z #24 2.646   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-10-22T05:19:41.4703725Z #24 2.682 Collecting annotated-types>=0.6.0 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:41.4705041Z #24 2.687   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+2026-10-22T05:19:42.1824122Z #24 ...
+2026-10-22T05:19:42.1824393Z 
+2026-10-22T05:19:42.1824643Z #27 [budgeting-database-service] exporting to image
+2026-10-22T05:19:42.1825209Z #27 exporting layers 0.8s done
+2026-10-22T05:19:42.1826161Z #27 writing image sha256:68393fbcab649c54424173331be5220c8dcc0a04b96e00190bcd2277de55e424 done
+2026-10-22T05:19:42.1827100Z #27 naming to docker.io/library/smartbank-budgeting-db:0.1 done
+2026-10-22T05:19:42.1827904Z #27 DONE 0.8s
+2026-10-22T05:19:42.1828217Z 
+2026-10-22T05:19:42.1828550Z #28 [budgeting-database-service] resolving provenance for metadata file
+2026-10-22T05:19:42.1829052Z #28 DONE 0.0s
+2026-10-22T05:19:42.1848645Z 
+2026-10-22T05:19:42.1849300Z #24 [budgeting-service 4/6] RUN pip install --no-cache-dir -r requirements.txt
+2026-10-22T05:19:42.1850872Z #24 3.557 Collecting pydantic-core==2.50.1 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:42.2881905Z #24 3.561   Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.5 kB)
+2026-10-22T05:19:42.2883467Z #24 3.575 Collecting typing-inspection>=0.4.4 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r requirements.txt (line 4))
+2026-10-22T05:19:42.2884710Z #24 3.578   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:19:42.2885696Z #24 3.596 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+2026-10-22T05:19:42.2886128Z #24 3.600 Downloading flask_cors-6.0.0-py3-none-any.whl (11 kB)
+2026-10-22T05:19:42.2886574Z #24 3.603 Downloading requests-2.33.0-py3-none-any.whl (65 kB)
+2026-10-22T05:19:42.2886972Z #24 3.608 Downloading openai-3.8.0-py3-none-any.whl (1.7 MB)
+2026-10-22T05:19:42.2887742Z #24 3.617    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.7/1.7 MB 299.7 MB/s eta 0:00:00
+2026-10-22T05:19:42.2888189Z #24 3.621 Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+2026-10-22T05:19:42.2888582Z #24 3.625 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+2026-10-22T05:19:42.2888994Z #24 3.630 Downloading certifi-2026.10.19-py3-none-any.whl (136 kB)
+2026-10-22T05:19:42.2889678Z #24 3.636 Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (257 kB)
+2026-10-22T05:19:42.2890320Z #24 3.642 Downloading click-8.5.0-py3-none-any.whl (125 kB)
+2026-10-22T05:19:42.2890686Z #24 3.646 Downloading httpx2-2.16.0-py3-none-any.whl (97 kB)
+2026-10-22T05:19:42.2891063Z #24 3.650 Downloading httpcore2-2.16.0-py3-none-any.whl (85 kB)
+2026-10-22T05:19:42.2891461Z #24 3.653 Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-10-22T05:19:42.2891845Z #24 3.657 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+2026-10-22T05:19:42.2892246Z #24 3.661 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-10-22T05:19:42.4317322Z #24 3.666 Downloading jiter-0.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (345 kB)
+2026-10-22T05:19:42.4318364Z #24 3.670 Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+2026-10-22T05:19:42.4319187Z #24 3.674 Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+2026-10-22T05:19:42.4319915Z #24 3.680 Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+2026-10-22T05:19:42.4320966Z #24 3.689    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 300.1 MB/s eta 0:00:00
+2026-10-22T05:19:42.4321554Z #24 3.694 Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-10-22T05:19:42.4322443Z #24 3.698 Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
+2026-10-22T05:19:42.4322843Z #24 3.702 Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+2026-10-22T05:19:42.4323477Z #24 3.705 Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+2026-10-22T05:19:42.4323896Z #24 3.709 Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+2026-10-22T05:19:42.4324323Z #24 3.712 Downloading truststore-0.10.5-py3-none-any.whl (19 kB)
+2026-10-22T05:19:42.4324751Z #24 3.716 Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+2026-10-22T05:19:42.4325155Z #24 3.719 Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-10-22T05:19:42.4326771Z #24 3.804 Installing collected packages: urllib3, typing-extensions, truststore, sniffio, markupsafe, jiter, itsdangerous, idna, h11, click, charset_normalizer, certifi, blinker, annotated-types, werkzeug, typing-inspection, requests, pydantic-core, jinja2, httpcore2, anyio, pydantic, httpx2, flask, openai, flask-cors
+2026-10-22T05:19:44.9164254Z #24 6.288 Successfully installed annotated-types-0.8.0 anyio-4.15.1 blinker-1.9.0 certifi-2026.10.19 charset_normalizer-3.5.2 click-8.5.0 flask-3.1.3 flask-cors-6.0.0 h11-0.16.0 httpcore2-2.16.0 httpx2-2.16.0 idna-3.20 itsdangerous-2.2.0 jinja2-3.1.6 jiter-0.17.0 markupsafe-3.0.4 openai-3.8.0 pydantic-2.14.1 pydantic-core-2.50.1 requests-2.33.0 sniffio-1.3.1 truststore-0.10.5 typing-extensions-4.16.0 typing-inspection-0.4.4 urllib3-2.8.0 werkzeug-3.1.9
+2026-10-22T05:19:45.1319550Z #24 6.289 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+2026-10-22T05:19:45.1321517Z #24 6.350 
+2026-10-22T05:19:45.1322026Z #24 6.350 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+2026-10-22T05:19:45.1322998Z #24 6.350 [notice] To update, run: pip install --upgrade pip
+2026-10-22T05:19:45.1905860Z #24 DONE 6.6s
+2026-10-22T05:19:45.3735807Z 
+2026-10-22T05:19:45.3736348Z #29 [budgeting-service 5/6] COPY services/budgeting/backend/ ./
+2026-10-22T05:19:45.3737562Z #29 DONE 0.0s
+2026-10-22T05:19:45.3737777Z 
+2026-10-22T05:19:45.3738273Z #30 [budgeting-service 6/6] COPY prompts/ ./prompts/
+2026-10-22T05:19:45.3738841Z #30 DONE 0.0s
+2026-10-22T05:19:45.3739042Z 
+2026-10-22T05:19:45.3739230Z #31 [budgeting-service] exporting to image
+2026-10-22T05:19:46.1645953Z #31 exporting layers 0.9s done
+2026-10-22T05:19:46.1918163Z #31 writing image sha256:2b5d5feb77179e959856509d5b29aa95dfb58404ca92398c3f9b65f1a23fb358 done
+2026-10-22T05:19:46.1919181Z #31 naming to docker.io/library/smartbank-budgeting-api:0.1 done
+2026-10-22T05:19:46.1919836Z  budgeting-database-service  Built
+2026-10-22T05:19:46.1920292Z  budgeting-service  Built
+2026-10-22T05:19:46.1920752Z  budgeting-frontend-service  Built
+2026-10-22T05:19:46.1921200Z #31 DONE 0.9s
+2026-10-22T05:19:46.1921396Z 
+2026-10-22T05:19:46.1921689Z #32 [budgeting-service] resolving provenance for metadata file
+2026-10-22T05:19:46.1922254Z #32 DONE 0.0s
+2026-10-22T05:19:46.2101699Z Post job cleanup.
+2026-10-22T05:19:46.2974166Z [command]/usr/bin/git version
+2026-10-22T05:19:46.3023548Z git version 2.55.0
+2026-10-22T05:19:46.3070270Z Temporarily overriding HOME='/home/runner/work/_temp/38934541-891e-43d4-8638-f098f4c49947' before making global git config changes
+2026-10-22T05:19:46.3071356Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:19:46.3077006Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:46.3122797Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:19:46.3163607Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:19:46.3427604Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:19:46.3459062Z http.https://github.com/.extraheader
+2026-10-22T05:19:46.3472450Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-22T05:19:46.3512825Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:19:46.3790187Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:19:46.3838170Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:19:46.4329408Z Cleaning up orphan processes
+2026-10-22T05:19:46.4680973Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

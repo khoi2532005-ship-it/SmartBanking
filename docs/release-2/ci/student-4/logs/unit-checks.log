@@ -1,0 +1,478 @@
+﻿2026-10-22T05:19:31.8755495Z Current runner version: '2.338.0'
+2026-10-22T05:19:31.8776718Z ##[group]Runner Image Provisioner
+2026-10-22T05:19:31.8777374Z Hosted Compute Agent
+2026-10-22T05:19:31.8777887Z Version: 20261015.610
+2026-10-22T05:19:31.8778309Z Commit: 267fdb4e8bbec4ab5ea31367f3a00d5c480c7656
+2026-10-22T05:19:31.8778816Z Build Date: 2026-10-14T17:06:54Z
+2026-10-22T05:19:31.8779564Z Worker ID: {f9cfa4bf-ed49-494a-96de-6ddba0b0f775}
+2026-10-22T05:19:31.8780182Z Region: southcentralus
+2026-10-22T05:19:31.8780601Z Cloud: Azure
+2026-10-22T05:19:31.8780956Z ##[endgroup]
+2026-10-22T05:19:31.8781873Z ##[group]Operating System
+2026-10-22T05:19:31.8782344Z Ubuntu
+2026-10-22T05:19:31.8782722Z 24.04.5
+2026-10-22T05:19:31.8783149Z LTS
+2026-10-22T05:19:31.8783489Z ##[endgroup]
+2026-10-22T05:19:31.8783829Z ##[group]Runner Image
+2026-10-22T05:19:31.8784674Z Image: ubuntu-24.04
+2026-10-22T05:19:31.8785089Z Version: 20261018.339.1
+2026-10-22T05:19:31.8786014Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261018.339/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-22T05:19:31.8787040Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261018.339
+2026-10-22T05:19:31.8787713Z ##[endgroup]
+2026-10-22T05:19:31.8788558Z ##[group]GITHUB_TOKEN Permissions
+2026-10-22T05:19:31.8790281Z Contents: read
+2026-10-22T05:19:31.8790668Z Metadata: read
+2026-10-22T05:19:31.8791092Z Packages: read
+2026-10-22T05:19:31.8791513Z ##[endgroup]
+2026-10-22T05:19:31.8793098Z Secret source: Actions
+2026-10-22T05:19:31.8793771Z Cache mode: write
+2026-10-22T05:19:31.8794247Z Prepare workflow directory
+2026-10-22T05:19:31.9725446Z Prepare all required actions
+2026-10-22T05:19:31.9761516Z Getting action download info
+2026-10-22T05:19:32.2035122Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-22T05:19:32.4946150Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-10-22T05:19:33.0994320Z Complete job name: Unit checks
+2026-10-22T05:19:33.1933978Z ##[group]Run actions/checkout@v4
+2026-10-22T05:19:33.1934517Z with:
+2026-10-22T05:19:33.1934867Z   repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:33.1937616Z   token: ***
+2026-10-22T05:19:33.1937925Z   ssh-strict: true
+2026-10-22T05:19:33.1938245Z   ssh-user: git
+2026-10-22T05:19:33.1938565Z   persist-credentials: true
+2026-10-22T05:19:33.1938931Z   clean: true
+2026-10-22T05:19:33.1939382Z   sparse-checkout-cone-mode: true
+2026-10-22T05:19:33.1939761Z   fetch-depth: 1
+2026-10-22T05:19:33.1940072Z   fetch-tags: false
+2026-10-22T05:19:33.1940391Z   show-progress: true
+2026-10-22T05:19:33.1940710Z   lfs: false
+2026-10-22T05:19:33.1941029Z   submodules: false
+2026-10-22T05:19:33.1941369Z   set-safe-directory: true
+2026-10-22T05:19:33.1941737Z   allow-unsafe-pr-checkout: false
+2026-10-22T05:19:33.1942194Z env:
+2026-10-22T05:19:33.1942513Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:33.1943158Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:33.1943755Z ##[endgroup]
+2026-10-22T05:19:33.2684582Z Syncing repository: khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:33.2686754Z ##[group]Getting Git version info
+2026-10-22T05:19:33.2687628Z Working directory is '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:19:33.2688954Z [command]/usr/bin/git version
+2026-10-22T05:19:33.2775794Z git version 2.55.0
+2026-10-22T05:19:33.2794231Z ##[endgroup]
+2026-10-22T05:19:33.2805879Z Temporarily overriding HOME='/home/runner/work/_temp/3db42947-bca7-4d43-aca9-a4a3d48cd908' before making global git config changes
+2026-10-22T05:19:33.2808024Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:19:33.2815028Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:33.2877189Z Deleting the contents of '/home/runner/work/SmartBanking/SmartBanking'
+2026-10-22T05:19:33.2880500Z ##[group]Initializing the repository
+2026-10-22T05:19:33.2883820Z [command]/usr/bin/git init /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:33.3035496Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-22T05:19:33.3037563Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-22T05:19:33.3038918Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-22T05:19:33.3040042Z hint: call:
+2026-10-22T05:19:33.3040628Z hint:
+2026-10-22T05:19:33.3041383Z hint: 	git config --global init.defaultBranch <name>
+2026-10-22T05:19:33.3042228Z hint:
+2026-10-22T05:19:33.3043024Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-22T05:19:33.3044279Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-22T05:19:33.3046279Z hint:
+2026-10-22T05:19:33.3046914Z hint: 	git branch -m <name>
+2026-10-22T05:19:33.3047644Z hint:
+2026-10-22T05:19:33.3048565Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-22T05:19:33.3050296Z Initialized empty Git repository in /home/runner/work/SmartBanking/SmartBanking/.git/
+2026-10-22T05:19:33.3052993Z [command]/usr/bin/git remote add origin https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:33.3132448Z ##[endgroup]
+2026-10-22T05:19:33.3133389Z ##[group]Disabling automatic garbage collection
+2026-10-22T05:19:33.3136231Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-22T05:19:33.3199440Z ##[endgroup]
+2026-10-22T05:19:33.3200383Z ##[group]Setting up auth
+2026-10-22T05:19:33.3210244Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:19:33.3252471Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:19:33.3581354Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:19:33.3623312Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:19:33.3830213Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:19:33.3871713Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:19:33.4076734Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-22T05:19:33.4125432Z ##[endgroup]
+2026-10-22T05:19:33.4126098Z ##[group]Fetching the repository
+2026-10-22T05:19:33.4132499Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fa227e0b61887327b2edce92a6160bbdd81dd929:refs/remotes/origin/main
+2026-10-22T05:19:34.3360734Z From https://github.com/khoi2532005-ship-it/SmartBanking
+2026-10-22T05:19:34.3362278Z  * [new ref]         fa227e0b61887327b2edce92a6160bbdd81dd929 -> origin/main
+2026-10-22T05:19:34.3365996Z ##[endgroup]
+2026-10-22T05:19:34.3367305Z ##[group]Determining the checkout info
+2026-10-22T05:19:34.3368737Z ##[endgroup]
+2026-10-22T05:19:34.3371705Z [command]/usr/bin/git sparse-checkout disable
+2026-10-22T05:19:34.3436034Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-22T05:19:34.3475058Z ##[group]Checking out the ref
+2026-10-22T05:19:34.3480342Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-10-22T05:19:34.3971756Z Switched to a new branch 'main'
+2026-10-22T05:19:34.3975904Z branch 'main' set up to track 'origin/main'.
+2026-10-22T05:19:34.3985026Z ##[endgroup]
+2026-10-22T05:19:34.4037933Z [command]/usr/bin/git log -1 --format=%H
+2026-10-22T05:19:34.4073067Z fa227e0b61887327b2edce92a6160bbdd81dd929
+2026-10-22T05:19:34.4368077Z ##[group]Run actions/setup-python@v5
+2026-10-22T05:19:34.4369024Z with:
+2026-10-22T05:19:34.4369648Z   python-version: 3.12
+2026-10-22T05:19:34.4370237Z   check-latest: false
+2026-10-22T05:19:34.4375817Z   token: ***
+2026-10-22T05:19:34.4376374Z   update-environment: true
+2026-10-22T05:19:34.4377014Z   allow-prereleases: false
+2026-10-22T05:19:34.4377639Z   freethreaded: false
+2026-10-22T05:19:34.4378203Z env:
+2026-10-22T05:19:34.4378731Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:34.4379880Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:34.4380971Z ##[endgroup]
+2026-10-22T05:19:34.5367907Z ##[group]Installed versions
+2026-10-22T05:19:34.5441170Z (node:2097) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-22T05:19:34.5443622Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-22T05:19:34.5445233Z Successfully set up CPython (3.12.15)
+2026-10-22T05:19:34.5446839Z ##[endgroup]
+2026-10-22T05:19:34.5743637Z ##[group]Run pip install -r services/budgeting/backend/requirements.txt -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-multi-agent.txt
+2026-10-22T05:19:34.5746909Z [36;1mpip install -r services/budgeting/backend/requirements.txt -r requirements-agentic.txt -r requirements-mcp.txt -r requirements-multi-agent.txt[0m
+2026-10-22T05:19:34.5912952Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:34.5913703Z env:
+2026-10-22T05:19:34.5914263Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:34.5915340Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:34.5916613Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:34.5917697Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:19:34.5918780Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:34.5919881Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:34.5920950Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:34.5921959Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:19:34.5922806Z ##[endgroup]
+2026-10-22T05:19:35.3445838Z Collecting flask==3.1.3 (from -r services/budgeting/backend/requirements.txt (line 1))
+2026-10-22T05:19:35.4257300Z   Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+2026-10-22T05:19:35.4553313Z Collecting flask-cors==6.0.0 (from -r services/budgeting/backend/requirements.txt (line 2))
+2026-10-22T05:19:35.4692344Z   Downloading flask_cors-6.0.0-py3-none-any.whl.metadata (961 bytes)
+2026-10-22T05:19:35.5075920Z Collecting requests==2.33.0 (from -r services/budgeting/backend/requirements.txt (line 3))
+2026-10-22T05:19:35.5202597Z   Downloading requests-2.33.0-py3-none-any.whl.metadata (5.1 kB)
+2026-10-22T05:19:35.5935015Z Collecting openai==3.8.0 (from -r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:35.6072581Z   Downloading openai-3.8.0-py3-none-any.whl.metadata (41 kB)
+2026-10-22T05:19:35.6475578Z Collecting python-dotenv>=1.0 (from -r requirements-agentic.txt (line 9))
+2026-10-22T05:19:35.6601682Z   Downloading python_dotenv-1.2.4-py3-none-any.whl.metadata (29 kB)
+2026-10-22T05:19:35.7149507Z Collecting mcp<2,>=1.10 (from -r requirements-agentic.txt (line 13))
+2026-10-22T05:19:35.7273529Z   Downloading mcp-1.30.0-py3-none-any.whl.metadata (9.3 kB)
+2026-10-22T05:19:35.7660200Z Collecting pytest>=8.0 (from -r requirements-agentic.txt (line 17))
+2026-10-22T05:19:35.7785505Z   Downloading pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+2026-10-22T05:19:35.8068064Z Collecting blinker>=1.9.0 (from flask==3.1.3->-r services/budgeting/backend/requirements.txt (line 1))
+2026-10-22T05:19:35.8198605Z   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+2026-10-22T05:19:35.8483840Z Collecting click>=8.1.3 (from flask==3.1.3->-r services/budgeting/backend/requirements.txt (line 1))
+2026-10-22T05:19:35.8610980Z   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:19:35.8822236Z Collecting itsdangerous>=2.2.0 (from flask==3.1.3->-r services/budgeting/backend/requirements.txt (line 1))
+2026-10-22T05:19:35.8943983Z   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+2026-10-22T05:19:35.9179649Z Collecting jinja2>=3.1.2 (from flask==3.1.3->-r services/budgeting/backend/requirements.txt (line 1))
+2026-10-22T05:19:35.9299410Z   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-10-22T05:19:35.9770327Z Collecting markupsafe>=2.1.1 (from flask==3.1.3->-r services/budgeting/backend/requirements.txt (line 1))
+2026-10-22T05:19:35.9894934Z   Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-10-22T05:19:36.0146768Z Collecting werkzeug>=3.1.0 (from flask==3.1.3->-r services/budgeting/backend/requirements.txt (line 1))
+2026-10-22T05:19:36.0273203Z   Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+2026-10-22T05:19:36.1233537Z Collecting charset_normalizer<4,>=2 (from requests==2.33.0->-r services/budgeting/backend/requirements.txt (line 3))
+2026-10-22T05:19:36.1355936Z   Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+2026-10-22T05:19:36.1730114Z Collecting idna<4,>=2.5 (from requests==2.33.0->-r services/budgeting/backend/requirements.txt (line 3))
+2026-10-22T05:19:36.1849282Z   Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-10-22T05:19:36.2108441Z Collecting urllib3<3,>=1.26 (from requests==2.33.0->-r services/budgeting/backend/requirements.txt (line 3))
+2026-10-22T05:19:36.2227802Z   Downloading urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+2026-10-22T05:19:36.2475751Z Collecting certifi>=2023.5.7 (from requests==2.33.0->-r services/budgeting/backend/requirements.txt (line 3))
+2026-10-22T05:19:36.2595033Z   Downloading certifi-2026.10.19-py3-none-any.whl.metadata (2.5 kB)
+2026-10-22T05:19:36.2845325Z Collecting anyio<5,>=4.10.0 (from openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:36.2965799Z   Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+2026-10-22T05:19:36.3189296Z Collecting httpx2<3,>=2.7.0 (from openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:36.3317570Z   Downloading httpx2-2.16.0-py3-none-any.whl.metadata (10 kB)
+2026-10-22T05:19:36.4047007Z Collecting jiter<1,>=0.16.0 (from openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:36.4178854Z   Downloading jiter-0.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.2 kB)
+2026-10-22T05:19:36.4957577Z Collecting pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13 (from openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:36.5080513Z   Downloading pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+2026-10-22T05:19:36.5426781Z Collecting sniffio (from openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:36.5549906Z   Downloading sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+2026-10-22T05:19:36.5791786Z Collecting typing-extensions<5,>=4.14 (from openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:36.5921641Z   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-10-22T05:19:36.6197807Z Collecting httpx-sse>=0.4 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.6320283Z   Downloading httpx_sse-0.4.3-py3-none-any.whl.metadata (9.7 kB)
+2026-10-22T05:19:36.6560441Z Collecting httpx<1.0.0,>=0.27.1 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.6695543Z   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+2026-10-22T05:19:36.6952309Z Collecting jsonschema>=4.20.0 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.7073521Z   Downloading jsonschema-4.26.0-py3-none-any.whl.metadata (7.6 kB)
+2026-10-22T05:19:36.7315724Z Collecting pydantic-settings>=2.5.2 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.7481706Z   Downloading pydantic_settings-2.16.1-py3-none-any.whl.metadata (4.0 kB)
+2026-10-22T05:19:36.7759777Z Collecting pyjwt>=2.10.1 (from pyjwt[crypto]>=2.10.1->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.7881410Z   Downloading pyjwt-2.15.1-py3-none-any.whl.metadata (3.5 kB)
+2026-10-22T05:19:36.8233929Z Collecting python-multipart>=0.0.9 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.8360643Z   Downloading python_multipart-0.0.32-py3-none-any.whl.metadata (2.1 kB)
+2026-10-22T05:19:36.8621856Z Collecting sse-starlette>=1.6.1 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.8752668Z   Downloading sse_starlette-3.5.0-py3-none-any.whl.metadata (15 kB)
+2026-10-22T05:19:36.9062070Z Collecting starlette>=0.27 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.9188406Z   Downloading starlette-1.9.0-py3-none-any.whl.metadata (6.6 kB)
+2026-10-22T05:19:36.9423369Z Collecting typing-inspection>=0.4.1 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.9549372Z   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+2026-10-22T05:19:36.9831592Z Collecting uvicorn>=0.31.1 (from mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:36.9955595Z   Downloading uvicorn-0.54.0-py3-none-any.whl.metadata (6.6 kB)
+2026-10-22T05:19:37.0395497Z Collecting httpcore==1.* (from httpx<1.0.0,>=0.27.1->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:37.0518588Z   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+2026-10-22T05:19:37.0746803Z Collecting h11>=0.16 (from httpcore==1.*->httpx<1.0.0,>=0.27.1->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:37.0870310Z   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-10-22T05:19:37.1100435Z Collecting httpcore2==2.16.0 (from httpx2<3,>=2.7.0->openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:37.1225460Z   Downloading httpcore2-2.16.0-py3-none-any.whl.metadata (27 kB)
+2026-10-22T05:19:37.1462428Z Collecting truststore>=0.10 (from httpx2<3,>=2.7.0->openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:37.1583441Z   Downloading truststore-0.10.5-py3-none-any.whl.metadata (4.5 kB)
+2026-10-22T05:19:37.1837414Z Collecting annotated-types>=0.6.0 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:37.1960492Z   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+2026-10-22T05:19:37.6684889Z Collecting pydantic-core==2.50.1 (from pydantic!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,<3,>=1.10.13->openai==3.8.0->-r services/budgeting/backend/requirements.txt (line 4))
+2026-10-22T05:19:37.6819708Z   Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.5 kB)
+2026-10-22T05:19:37.8679700Z Collecting iniconfig>=1.0.1 (from pytest>=8.0->-r requirements-agentic.txt (line 17))
+2026-10-22T05:19:37.8803061Z   Downloading iniconfig-2.3.1-py3-none-any.whl.metadata (2.8 kB)
+2026-10-22T05:19:37.9182356Z Collecting packaging>=22 (from pytest>=8.0->-r requirements-agentic.txt (line 17))
+2026-10-22T05:19:37.9311162Z   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+2026-10-22T05:19:37.9524940Z Collecting pluggy<2,>=1.5 (from pytest>=8.0->-r requirements-agentic.txt (line 17))
+2026-10-22T05:19:37.9645468Z   Downloading pluggy-1.7.0-py3-none-any.whl.metadata (5.0 kB)
+2026-10-22T05:19:37.9890036Z Collecting pygments>=2.7.2 (from pytest>=8.0->-r requirements-agentic.txt (line 17))
+2026-10-22T05:19:38.0009537Z   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+2026-10-22T05:19:38.0282570Z Collecting attrs>=22.2.0 (from jsonschema>=4.20.0->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:38.0404787Z   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+2026-10-22T05:19:38.0837171Z Collecting jsonschema-specifications>=2023.03.6 (from jsonschema>=4.20.0->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:38.0958880Z   Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl.metadata (2.9 kB)
+2026-10-22T05:19:38.1816354Z Collecting referencing>=0.28.4 (from jsonschema>=4.20.0->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:38.1939948Z   Downloading referencing-0.37.0-py3-none-any.whl.metadata (2.8 kB)
+2026-10-22T05:19:38.3617227Z Collecting rpds-py>=0.25.0 (from jsonschema>=4.20.0->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:38.3757179Z   Downloading rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.1 kB)
+2026-10-22T05:19:38.5030955Z Collecting cryptography>=3.4.0 (from pyjwt[crypto]>=2.10.1->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:38.5152543Z   Downloading cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.4 kB)
+2026-10-22T05:19:38.5915534Z Collecting cffi>=2.0.0 (from cryptography>=3.4.0->pyjwt[crypto]>=2.10.1->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:38.6044993Z   Downloading cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+2026-10-22T05:19:38.6265906Z Collecting pycparser (from cffi>=2.0.0->cryptography>=3.4.0->pyjwt[crypto]>=2.10.1->mcp<2,>=1.10->-r requirements-agentic.txt (line 13))
+2026-10-22T05:19:38.6386592Z   Downloading pycparser-3.11-py3-none-any.whl.metadata (8.2 kB)
+2026-10-22T05:19:38.6652816Z Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+2026-10-22T05:19:38.6810751Z Downloading flask_cors-6.0.0-py3-none-any.whl (11 kB)
+2026-10-22T05:19:38.6949943Z Downloading requests-2.33.0-py3-none-any.whl (65 kB)
+2026-10-22T05:19:38.7117060Z Downloading openai-3.8.0-py3-none-any.whl (1.7 MB)
+2026-10-22T05:19:38.7479555Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.7/1.7 MB 61.7 MB/s  0:00:00
+2026-10-22T05:19:38.7604522Z Downloading mcp-1.30.0-py3-none-any.whl (234 kB)
+2026-10-22T05:19:38.7892451Z Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+2026-10-22T05:19:38.8038147Z Downloading charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (257 kB)
+2026-10-22T05:19:38.8206796Z Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+2026-10-22T05:19:38.8351134Z Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+2026-10-22T05:19:38.8497211Z Downloading httpx2-2.16.0-py3-none-any.whl (97 kB)
+2026-10-22T05:19:38.8644111Z Downloading httpcore2-2.16.0-py3-none-any.whl (85 kB)
+2026-10-22T05:19:38.8788297Z Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-10-22T05:19:38.8941670Z Downloading jiter-0.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (345 kB)
+2026-10-22T05:19:38.9099365Z Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+2026-10-22T05:19:38.9261731Z Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.2 MB)
+2026-10-22T05:19:38.9422286Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 149.8 MB/s  0:00:00
+2026-10-22T05:19:38.9545834Z Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-10-22T05:19:38.9693471Z Downloading urllib3-2.8.0-py3-none-any.whl (135 kB)
+2026-10-22T05:19:38.9992700Z Downloading python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+2026-10-22T05:19:39.0141133Z Downloading pytest-9.1.1-py3-none-any.whl (386 kB)
+2026-10-22T05:19:39.0287556Z Downloading pluggy-1.7.0-py3-none-any.whl (27 kB)
+2026-10-22T05:19:39.0430770Z Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+2026-10-22T05:19:39.0568371Z Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+2026-10-22T05:19:39.0711386Z Downloading certifi-2026.10.19-py3-none-any.whl (136 kB)
+2026-10-22T05:19:39.0851243Z Downloading click-8.5.0-py3-none-any.whl (125 kB)
+2026-10-22T05:19:39.0994445Z Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-10-22T05:19:39.1131285Z Downloading httpx_sse-0.4.3-py3-none-any.whl (9.0 kB)
+2026-10-22T05:19:39.1266667Z Downloading iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+2026-10-22T05:19:39.1405759Z Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+2026-10-22T05:19:39.1546977Z Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-10-22T05:19:39.1699735Z Downloading jsonschema-4.26.0-py3-none-any.whl (90 kB)
+2026-10-22T05:19:39.1840348Z Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-10-22T05:19:39.2140796Z Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+2026-10-22T05:19:39.2290572Z Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+2026-10-22T05:19:39.2434277Z Downloading packaging-26.3-py3-none-any.whl (129 kB)
+2026-10-22T05:19:39.2581942Z Downloading pydantic_settings-2.16.1-py3-none-any.whl (80 kB)
+2026-10-22T05:19:39.2738230Z Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+2026-10-22T05:19:39.2791668Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 278.9 MB/s  0:00:00
+2026-10-22T05:19:39.2913139Z Downloading pyjwt-2.15.1-py3-none-any.whl (33 kB)
+2026-10-22T05:19:39.3054482Z Downloading cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl (4.8 MB)
+2026-10-22T05:19:39.3387051Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.8/4.8 MB 145.1 MB/s  0:00:00
+2026-10-22T05:19:39.3509566Z Downloading cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+2026-10-22T05:19:39.3656210Z Downloading python_multipart-0.0.32-py3-none-any.whl (30 kB)
+2026-10-22T05:19:39.3799036Z Downloading referencing-0.37.0-py3-none-any.whl (26 kB)
+2026-10-22T05:19:39.3938896Z Downloading rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (371 kB)
+2026-10-22T05:19:39.4085760Z Downloading sse_starlette-3.5.0-py3-none-any.whl (17 kB)
+2026-10-22T05:19:39.4292700Z Downloading starlette-1.9.0-py3-none-any.whl (80 kB)
+2026-10-22T05:19:39.4432847Z Downloading truststore-0.10.5-py3-none-any.whl (19 kB)
+2026-10-22T05:19:39.4577603Z Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+2026-10-22T05:19:39.4721112Z Downloading uvicorn-0.54.0-py3-none-any.whl (87 kB)
+2026-10-22T05:19:39.4866514Z Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+2026-10-22T05:19:39.5018945Z Downloading pycparser-3.11-py3-none-any.whl (51 kB)
+2026-10-22T05:19:39.5162543Z Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+2026-10-22T05:19:39.6781314Z Installing collected packages: urllib3, typing-extensions, truststore, sniffio, rpds-py, python-multipart, python-dotenv, pyjwt, pygments, pycparser, pluggy, packaging, markupsafe, jiter, itsdangerous, iniconfig, idna, httpx-sse, h11, click, charset_normalizer, certifi, blinker, attrs, annotated-types, werkzeug, uvicorn, typing-inspection, requests, referencing, pytest, pydantic-core, jinja2, httpcore2, httpcore, cffi, anyio, starlette, pydantic, jsonschema-specifications, httpx2, httpx, flask, cryptography, sse-starlette, pydantic-settings, openai, jsonschema, flask-cors, mcp
+2026-10-22T05:19:43.3390640Z 
+2026-10-22T05:19:43.3417111Z Successfully installed annotated-types-0.8.0 anyio-4.15.1 attrs-26.1.0 blinker-1.9.0 certifi-2026.10.19 cffi-2.1.1 charset_normalizer-3.5.2 click-8.5.0 cryptography-50.0.2 flask-3.1.3 flask-cors-6.0.0 h11-0.16.0 httpcore-1.0.9 httpcore2-2.16.0 httpx-0.28.1 httpx-sse-0.4.3 httpx2-2.16.0 idna-3.20 iniconfig-2.3.1 itsdangerous-2.2.0 jinja2-3.1.6 jiter-0.17.0 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 markupsafe-3.0.4 mcp-1.30.0 openai-3.8.0 packaging-26.3 pluggy-1.7.0 pycparser-3.11 pydantic-2.14.1 pydantic-core-2.50.1 pydantic-settings-2.16.1 pygments-2.21.0 pyjwt-2.15.1 pytest-9.1.1 python-dotenv-1.2.4 python-multipart-0.0.32 referencing-0.37.0 requests-2.33.0 rpds-py-2026.9.1 sniffio-1.3.1 sse-starlette-3.5.0 starlette-1.9.0 truststore-0.10.5 typing-extensions-4.16.0 typing-inspection-0.4.4 urllib3-2.8.0 uvicorn-0.54.0 werkzeug-3.1.9
+2026-10-22T05:19:43.3425206Z 
+2026-10-22T05:19:43.3425394Z [notice] A new release of pip is available: 26.2.1 -> 26.2.2
+2026-10-22T05:19:43.3426015Z [notice] To update, run: pip install --upgrade pip
+2026-10-22T05:19:43.6053829Z ##[group]Run python services/budgeting/database/init_db.py
+2026-10-22T05:19:43.6054099Z [36;1mpython services/budgeting/database/init_db.py[0m
+2026-10-22T05:19:43.6100014Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:43.6100167Z env:
+2026-10-22T05:19:43.6100296Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:43.6100539Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:43.6100819Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6101054Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:19:43.6101288Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6101499Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6101709Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6101925Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:19:43.6102162Z ##[endgroup]
+2026-10-22T05:19:43.6374952Z Database created successfully: /home/runner/work/SmartBanking/SmartBanking/services/budgeting/database/data/budgeting_and_insights.db
+2026-10-22T05:19:43.6375416Z   categories: 10
+2026-10-22T05:19:43.6375536Z   budgets: 14
+2026-10-22T05:19:43.6375661Z   budget_insights: 10
+2026-10-22T05:19:43.6438689Z ##[group]Run python -m tests.test_budget_logic
+2026-10-22T05:19:43.6438925Z [36;1mpython -m tests.test_budget_logic[0m
+2026-10-22T05:19:43.6484812Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:43.6484966Z env:
+2026-10-22T05:19:43.6485099Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:43.6485345Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:43.6485626Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6485865Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:19:43.6486101Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6486334Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6486547Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.6486758Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:19:43.6486941Z ##[endgroup]
+2026-10-22T05:19:43.7508198Z PASS test_budget_with_no_matching_spend_shows_zero
+2026-10-22T05:19:43.7508465Z PASS test_exactly_on_limit_is_not_over
+2026-10-22T05:19:43.7508672Z PASS test_mock_transactions_are_filtered_by_period_and_customer
+2026-10-22T05:19:43.7508893Z PASS test_mock_transactions_differ_by_customer
+2026-10-22T05:19:43.7509082Z PASS test_mock_transactions_empty_for_unknown_period
+2026-10-22T05:19:43.7509494Z PASS test_near_limit_threshold
+2026-10-22T05:19:43.7509654Z PASS test_near_limit_threshold_is_80_percent
+2026-10-22T05:19:43.7509821Z PASS test_no_spending_is_on_track
+2026-10-22T05:19:43.7509970Z PASS test_over_budget_is_flagged
+2026-10-22T05:19:43.7510130Z PASS test_seed_holds_the_known_september_budgets
+2026-10-22T05:19:43.7510353Z PASS test_seeded_period_with_mock_spending_gives_the_known_figures
+2026-10-22T05:19:43.7510553Z PASS test_summary_handles_no_budgets
+2026-10-22T05:19:43.7510716Z PASS test_summary_reports_unbudgeted_spending
+2026-10-22T05:19:43.7510893Z PASS test_summary_totals_and_over_budget_list
+2026-10-22T05:19:43.7511058Z PASS test_under_budget_is_on_track
+2026-10-22T05:19:43.7511213Z PASS test_zero_limit_does_not_divide_by_zero
+2026-10-22T05:19:43.7511328Z 
+2026-10-22T05:19:43.7511381Z 16/16 checks passed
+2026-10-22T05:19:43.7733225Z ##[group]Run python -m tests.test_agent_clients
+2026-10-22T05:19:43.7733466Z [36;1mpython -m tests.test_agent_clients[0m
+2026-10-22T05:19:43.7733646Z [36;1mpython -m tests.test_multi_agent_client[0m
+2026-10-22T05:19:43.7733834Z [36;1mpython -m tests.test_multi_agent_contract[0m
+2026-10-22T05:19:43.7734010Z [36;1mpython -m tests.test_budget_routes[0m
+2026-10-22T05:19:43.7778697Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:43.7779012Z env:
+2026-10-22T05:19:43.7779287Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:43.7779564Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:43.7779836Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.7780071Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:19:43.7780302Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.7780511Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.7780765Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:43.7780974Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:19:43.7781168Z   AI_MODE_ENABLED: false
+2026-10-22T05:19:43.7781295Z   MCP_ENABLED: false
+2026-10-22T05:19:43.7781412Z   RAG_ENABLED: false
+2026-10-22T05:19:43.7781535Z   MULTI_AGENT_ENABLED: false
+2026-10-22T05:19:43.7781665Z ##[endgroup]
+2026-10-22T05:19:44.6631518Z PASS test_ai_insight_card_has_its_status_line
+2026-10-22T05:19:44.6632255Z PASS test_ai_mode_is_on_unless_switched_off
+2026-10-22T05:19:44.6632774Z PASS test_ai_mode_off_answers_503_before_any_database_or_model_call
+2026-10-22T05:19:44.6633074Z PASS test_ai_mode_off_fragments_warn_and_the_status_line_says_inactive
+2026-10-22T05:19:44.6633314Z PASS test_ai_mode_off_refuses_the_model_call_itself
+2026-10-22T05:19:44.6633543Z PASS test_ai_mode_on_status_line_names_the_model_without_calling_it
+2026-10-22T05:19:44.6633821Z PASS test_contract_accepts_grounded_and_insufficient_shapes
+2026-10-22T05:19:44.6634043Z PASS test_contract_rejects_missing_fields_and_bad_confidence
+2026-10-22T05:19:44.6634266Z PASS test_every_target_of_a_budget_row_exists_on_the_normal_tab
+2026-10-22T05:19:44.6634483Z PASS test_frontend_tab_wires_every_release_1_fragment
+2026-10-22T05:19:44.6634678Z PASS test_health_and_agents_status_report_ai_mode
+2026-10-22T05:19:44.6634882Z PASS test_http_error_from_mcp_server_becomes_protocol_error
+2026-10-22T05:19:44.6635102Z PASS test_insight_card_names_the_provider_in_use
+2026-10-22T05:19:44.6635288Z PASS test_jsonrpc_error_becomes_protocol_error
+2026-10-22T05:19:44.6635500Z PASS test_mcp_disabled_flag_short_circuits_before_any_network_call
+2026-10-22T05:19:44.6635712Z PASS test_mcp_unreachable_is_a_readable_message
+2026-10-22T05:19:44.6635940Z PASS test_no_htmx_request_on_a_tab_takes_its_target_from_an_enclosing_element
+2026-10-22T05:19:44.6636179Z PASS test_non_object_json_bodies_are_rejected_with_400
+2026-10-22T05:19:44.6636380Z PASS test_null_or_missing_body_falls_back_to_defaults
+2026-10-22T05:19:44.6636593Z PASS test_parse_tool_result_keeps_structured_content_on_success
+2026-10-22T05:19:44.6636827Z PASS test_parse_tool_result_maps_iserror_to_text_and_no_structured
+2026-10-22T05:19:44.6637046Z PASS test_query_relays_server_error_status_and_evidence
+2026-10-22T05:19:44.6637228Z PASS test_query_requires_a_question
+2026-10-22T05:19:44.6637420Z PASS test_rag_disabled_flag_short_circuits_before_any_network_call
+2026-10-22T05:19:44.6637679Z PASS test_rag_fragment_renders_grounded_answer_with_badge_and_citation_chips
+2026-10-22T05:19:44.6637921Z PASS test_rag_question_length_is_capped_before_any_call
+2026-10-22T05:19:44.6638131Z PASS test_rag_status_fragment_escapes_server_supplied_values
+2026-10-22T05:19:44.6638330Z PASS test_rag_unreachable_is_a_readable_message
+2026-10-22T05:19:44.6638550Z PASS test_routes_report_disabled_integrations_as_503_and_health_stays_200
+2026-10-22T05:19:44.6638778Z PASS test_routes_validate_input_before_calling_out
+2026-10-22T05:19:44.6639603Z PASS test_status_fragments_render_the_inactive_state_without_network
+2026-10-22T05:19:44.6639855Z PASS test_status_fragments_render_unreachable_with_the_start_hint
+2026-10-22T05:19:44.6640002Z 
+2026-10-22T05:19:44.6640058Z 32/32 checks passed
+2026-10-22T05:19:45.6427853Z PASS test_bearer_token_is_sent_when_configured
+2026-10-22T05:19:45.6428277Z PASS test_browsers_are_answered_only_from_the_tabs_on_the_apis_own_host
+2026-10-22T05:19:45.6428979Z PASS test_contract_and_auth_errors_are_explained
+2026-10-22T05:19:45.6429393Z PASS test_decide_validates_before_calling_and_relays_the_server_answer
+2026-10-22T05:19:45.6429718Z PASS test_decision_block_posts_without_a_form_and_refreshes_history
+2026-10-22T05:19:45.6429962Z PASS test_decision_fragment_renders_the_released_or_withheld_response
+2026-10-22T05:19:45.6430200Z PASS test_disabled_flag_short_circuits_before_any_network_call
+2026-10-22T05:19:45.6430425Z PASS test_failed_workflow_card_shows_the_structured_error
+2026-10-22T05:19:45.6430645Z PASS test_fragment_validates_the_form_before_calling_out
+2026-10-22T05:19:45.6430862Z PASS test_frontend_tabs_wire_the_panel_and_carry_no_inner_header
+2026-10-22T05:19:45.6431082Z PASS test_health_and_agents_status_carry_the_integration
+2026-10-22T05:19:45.6431310Z PASS test_history_asks_for_this_features_workflows_and_rejects_bad_bodies
+2026-10-22T05:19:45.6431580Z PASS test_history_fragment_lists_the_selected_customers_workflows_newest_first
+2026-10-22T05:19:45.6431825Z PASS test_other_features_workflows_do_not_exist_here
+2026-10-22T05:19:45.6432026Z PASS test_posts_need_the_same_origin_marker
+2026-10-22T05:19:45.6432230Z PASS test_refused_or_failed_decisions_keep_the_block_and_its_note
+2026-10-22T05:19:45.6432435Z PASS test_routes_relay_the_workflow_lifecycle
+2026-10-22T05:19:45.6432658Z PASS test_routes_report_disabled_and_unreachable_as_503_with_the_start_command
+2026-10-22T05:19:45.6432892Z PASS test_routes_validate_input_before_calling_out
+2026-10-22T05:19:45.6433103Z PASS test_server_failures_become_502_without_the_servers_text
+2026-10-22T05:19:45.6433344Z PASS test_start_fragment_returns_the_card_which_polls_itself_until_the_gate
+2026-10-22T05:19:45.6433587Z PASS test_start_validates_the_request_then_posts_the_context
+2026-10-22T05:19:45.6433813Z PASS test_status_fragment_shows_pipeline_and_pending_when_reachable
+2026-10-22T05:19:45.6434032Z PASS test_temporary_failures_keep_the_card_polling
+2026-10-22T05:19:45.6434243Z PASS test_unreachable_is_a_readable_message_with_the_start_command
+2026-10-22T05:19:45.6434485Z PASS test_workflow_ids_are_checked_before_anything_reaches_the_server
+2026-10-22T05:19:45.6434634Z 
+2026-10-22T05:19:45.6434688Z 26/26 checks passed
+2026-10-22T05:19:46.6744358Z PASS test_accept_releases_the_final_response_in_the_card
+2026-10-22T05:19:46.6744678Z PASS test_another_features_workflow_is_invisible_and_undecidable_here
+2026-10-22T05:19:46.6744928Z PASS test_bad_ids_and_cross_site_posts_never_reach_the_server
+2026-10-22T05:19:46.6745198Z PASS test_reject_withholds_the_answer_and_records_the_decision
+2026-10-22T05:19:46.6745343Z 
+2026-10-22T05:19:46.6745393Z 4/4 checks passed
+2026-10-22T05:19:47.6552025Z PASS test_explicit_period_is_used_as_given
+2026-10-22T05:19:47.6552362Z PASS test_non_integer_or_out_of_range_arguments_are_400_not_500
+2026-10-22T05:19:47.6552650Z PASS test_period_defaults_to_the_current_month_and_an_empty_month_stays_empty
+2026-10-22T05:19:47.6552825Z 
+2026-10-22T05:19:47.6552880Z 3/3 checks passed
+2026-10-22T05:19:47.8773081Z ##[group]Run python -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py tests/test_multi_agent_server.py tests/test_release2_review_modes.py -q
+2026-10-22T05:19:47.8773847Z [36;1mpython -m pytest tests/test_mcp_server.py tests/test_rag_server.py tests/test_agentic_validation_modes.py tests/test_budgeting_mode.py tests/test_multi_agent_server.py tests/test_release2_review_modes.py -q[0m
+2026-10-22T05:19:47.8818020Z shell: /usr/bin/bash -e {0}
+2026-10-22T05:19:47.8818167Z env:
+2026-10-22T05:19:47.8818299Z   COMPOSE_FILE: docker-compose.yml
+2026-10-22T05:19:47.8818546Z   SERVICES: budgeting-database-service budgeting-service budgeting-frontend-service
+2026-10-22T05:19:47.8818823Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:47.8819053Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-22T05:19:47.8819424Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:47.8819801Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:47.8820006Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-22T05:19:47.8820218Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-22T05:19:47.8820398Z ##[endgroup]
+2026-10-22T05:19:50.4006113Z ........................................................................ [ 30%]
+2026-10-22T05:19:51.4939538Z ........................................................................ [ 60%]
+2026-10-22T05:19:51.7835412Z ........................................................................ [ 90%]
+2026-10-22T05:19:52.0381974Z ........................                                                 [100%]
+2026-10-22T05:19:52.0382379Z 240 passed in 3.63s
+2026-10-22T05:19:52.5056683Z Post job cleanup.
+2026-10-22T05:19:52.5946091Z (node:2490) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-22T05:19:52.5946526Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-22T05:19:52.6116534Z Post job cleanup.
+2026-10-22T05:19:52.6803857Z [command]/usr/bin/git version
+2026-10-22T05:19:52.6840845Z git version 2.55.0
+2026-10-22T05:19:52.6869358Z Temporarily overriding HOME='/home/runner/work/_temp/462f0872-6c1b-41c0-9be2-150bbe445c99' before making global git config changes
+2026-10-22T05:19:52.6870137Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T05:19:52.6873656Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/SmartBanking/SmartBanking
+2026-10-22T05:19:52.6919572Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T05:19:52.6956498Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T05:19:52.7201052Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T05:19:52.7235234Z http.https://github.com/.extraheader
+2026-10-22T05:19:52.7247276Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-22T05:19:52.7290401Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T05:19:52.7527077Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T05:19:52.7566577Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T05:19:52.7919351Z Cleaning up orphan processes
+2026-10-22T05:19:52.8144351Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

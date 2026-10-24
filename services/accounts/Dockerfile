@@ -3,6 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY services/accounts/database/requirements.txt database-requirements.txt
+COPY services/accounts/backend/requirements.txt backend-requirements.txt
 COPY services/accounts/backend/ backend/
 COPY services/accounts/database/ database/
 COPY services/accounts/frontend/ frontend/
@@ -11,7 +12,7 @@ COPY shared/frontend/js frontend/js
 COPY services/accounts/run.py run.py
 COPY prompts/ prompts/
 
-RUN pip install --no-cache-dir -r database-requirements.txt flask-cors requests openai
+RUN pip install --no-cache-dir -r database-requirements.txt -r backend-requirements.txt
 
 RUN python database/init_db.py
 

@@ -31,7 +31,7 @@
              hx-target="#feature-view" hx-swap="innerHTML" hx-indicator="#nav-spinner">
             <button class="nav-item" data-feature="accounts" data-href="http://localhost:3001/"
                     hx-get="/features/accounts.html" hx-push-url="/?feature=accounts">Accounts</button>
-            <button class="nav-item" data-feature="loans" data-href="http://localhost:3002/tabs/loans.html"
+            <button class="nav-item" data-feature="loans" data-href="http://localhost:3002/"
                     hx-get="/features/loans.html" hx-push-url="/?feature=loans">Loans</button>
             <button class="nav-item" data-feature="fraud" data-href="http://localhost:3003/tabs/normal.html"
                     hx-get="/features/fraud.html" hx-push-url="/?feature=fraud">Fraud Alerts</button>
@@ -83,13 +83,17 @@ function frontendUrl(url) {
     return host === "localhost" ? url : url.replace("//localhost:", `//${host}:`);
 }
 
-// Runs on every htmx swap because the fragments carry the links.
-function rewriteHosts(root) {
-    root.querySelectorAll('[href*="//localhost:"], [src*="//localhost:"]').forEach((el) => {
-        const attr = el.hasAttribute("src") ? "src" : "href";
-        el.setAttribute(attr, frontendUrl(el.getAttribute(attr)));
-    });
+// Rewritten in the fragment's text, before htmx turns it into elements: an
+// iframe starts loading the moment it is in the page, so a src rewritten after
+// the swap had already been requested from localhost.
+function withFrontendUrls(html) {
+    return html.replace(/http:\/\/localhost:\d+(\/[^"'\s<>]*)?/g, (url) => frontendUrl(url));
 }
+
+document.body.addEventListener("htmx:beforeSwap", (event) => {
+    if (event.detail.target.id !== "feature-view") return;
+    event.detail.serverResponse = withFrontendUrls(event.detail.serverResponse);
+});
 
 // Highlight the nav item for whichever feature is on screen.
 function markActive(feature) {
@@ -100,7 +104,6 @@ function markActive(feature) {
 
 document.body.addEventListener("htmx:afterSwap", (event) => {
     if (event.detail.target.id !== "feature-view") return;
-    rewriteHosts(event.detail.target);
     const view = event.detail.target.querySelector("[data-feature]");
     markActive(view ? view.dataset.feature : "");
     window.scrollTo({ top: 0 });
@@ -120,7 +123,7 @@ window.addEventListener("popstate", () => {
 // never blank. Nothing here runs when the fragments are served normally.
 const FEATURES = [
     ["accounts",     "Accounts &amp; Customers",          "Student 1 &middot; William Por",        "http://localhost:3001/"],
-    ["loans",        "Loans &amp; Credit",                "Student 2 &middot; David Lee",          "http://localhost:3002/tabs/loans.html"],
+    ["loans",        "Loans &amp; Credit",                "Student 2 &middot; David Lee",          "http://localhost:3002/"],
     ["fraud",        "Fraud Alerts",                      "Student 3 &middot; Duc Minh Khoi Tran", "http://localhost:3003/tabs/normal.html"],
     ["budgeting",    "Budgeting &amp; Spending Insights", "Student 4 &middot; Cong Bao Nguyen",    "http://localhost:3004/tabs/budgets.html"],
     ["transactions", "Transactions",                      "Student 5 &middot; Aidan Lei",          "http://localhost:3005/"],
@@ -128,7 +131,7 @@ const FEATURES = [
 
 function inlineHome() {
     const cards = FEATURES.map(([key, title, owner, url]) =>
-        `<a class="feature-card" href="${url}"><h3>${title}</h3><span class="owner">${owner}</span></a>`
+        `<a class="feature-card" href="${frontendUrl(url)}"><h3>${title}</h3><span class="owner">${owner}</span></a>`
     ).join("");
     return `<section class="card"><h2>SmartBank</h2>
         <p class="tagline">Choose a feature to open it.</p></section>
@@ -143,7 +146,6 @@ document.body.addEventListener("htmx:responseError", (event) => {
         return;
     }
     event.detail.target.innerHTML = inlineHome();   // the landing fragment is missing: draw it inline
-    rewriteHosts(event.detail.target);
 });
 </script>
 
