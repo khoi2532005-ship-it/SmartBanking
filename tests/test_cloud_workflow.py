@@ -60,3 +60,18 @@ def test_ai_mode_follows_a_repository_variable_and_the_key_a_secret():
     assert holders == ["Deploy the Container Apps environment and apps"]
     step = next(s for s in deploy["steps"] if s.get("name") == holders[0])
     assert step["env"]["GEMINI_API_KEY"] == "${{ secrets.GEMINI_API_KEY }}"  # pragma: allowlist secret
+
+
+def test_the_multi_agent_token_is_a_secret_only_the_deploy_step_holds():
+    deploy = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]
+    holders = [s["name"] for s in deploy["steps"] if "MULTI_AGENT_TOKEN" in (s.get("env") or {})]
+    assert holders == ["Deploy the Container Apps environment and apps"]
+    step = next(s for s in deploy["steps"] if s.get("name") == holders[0])
+    assert step["env"]["MULTI_AGENT_TOKEN"] == "${{ secrets.MULTI_AGENT_TOKEN }}"  # noqa: S105  # pragma: allowlist secret (the expression, not a value)
+
+
+def test_mcp_and_multi_agent_follow_repository_variables():
+    env = yaml.safe_load((WF / "cloud-deployment.yml").read_text())["jobs"]["deploy"]["env"]
+    assert env["MCP_ENABLED"] == "${{ vars.MCP_ENABLED || 'false' }}"
+    assert env["RAG_ENABLED"] == "${{ vars.RAG_ENABLED || 'false' }}"
+    assert env["MULTI_AGENT_ENABLED"] == "${{ vars.MULTI_AGENT_ENABLED || 'false' }}"

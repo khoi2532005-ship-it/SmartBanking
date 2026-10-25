@@ -1,8 +1,8 @@
 # Cloud deployment results
 
-Commit `fa227e0`, 2026-10-22T05:06:48+00:00, run https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/39725293757.
+Commit `e6f91a1`, 2026-10-24T07:03:54+00:00, run https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/40071955252.
 
-AI services: ai_mode enabled, mcp disabled, rag disabled, multi_agent disabled.
+AI services: ai_mode enabled, mcp enabled, rag enabled, multi_agent enabled.
 
 | Check | Method | URL | Expected | Got | Result |
 |---|---|---|---|---|---|
@@ -10,7 +10,7 @@ AI services: ai_mode enabled, mcp disabled, rag disabled, multi_agent disabled.
 | accounts page | GET | https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/ | 200 | 200 | PASS |
 | accounts config | GET | https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js | 200 | 200 | PASS |
 | accounts api health | GET | https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health | 200 | 200 | PASS |
-| loans page | GET | https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/tabs/loans.html | 200 | 200 | PASS |
+| loans page | GET | https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/ | 200 | 200 | PASS |
 | loans config | GET | https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js | 200 | 200 | PASS |
 | loans api health | GET | https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health | 200 | 200 | PASS |
 | fraud page | GET | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/tabs/normal.html | 200 | 200 | PASS |
@@ -24,6 +24,13 @@ AI services: ai_mode enabled, mcp disabled, rag disabled, multi_agent disabled.
 | transactions config | GET | https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/config.js | 200 | 200 | PASS |
 | transactions api health | GET | https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/health | 200 | 200 | PASS |
 | transactions ui fragment | GET | https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/ui/mcp/status | 200 | 200 | PASS |
+| fraud mcp tools | GET | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/mcp/tools | 200 | 200 | PASS |
+| fraud mcp tool call | POST | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/mcp/tool | 200 | 200 | PASS |
+| fraud rag query | POST | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rag/query | 200 | 200 | PASS |
+| fraud multi-agent start | POST | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow | 202 | 202 | PASS |
+| fraud multi-agent gate | GET | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4 | 200 | 200 | PASS |
+| fraud multi-agent decision | POST | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4/review | 200 | 200 | PASS |
+| fraud multi-agent release | GET | https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4 | 200 | 200 | PASS |
 | accounts create | POST | https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers | 201 | 201 | PASS |
 | accounts read | GET | https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers/9 | 200 | 200 | PASS |
 | accounts update | PUT | https://accounts-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/customers/9 | 200 | 200 | PASS |

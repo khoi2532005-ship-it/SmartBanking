@@ -7,7 +7,7 @@ follows the reference architecture in Lecture 11 (slides 12-14) and Lab 11 §5.
 
 | What | Where |
 |---|---|
-| The 16 container apps: one public frontend per feature plus the home page; APIs and databases internal | `deploy/azure/apps.json` |
+| The 16 container apps: one public frontend per feature plus the home page; APIs and databases internal. Plus the MCP, RAG and Multi-Agent servers, internal, in the bonus profile only | `deploy/azure/apps.json` |
 | Infrastructure as code (Bicep, compiled to ARM) | `deploy/azure/main.bicep` |
 | Reusable scripts | `deploy/azure/{oidc-setup,setup,build-images,deploy,cleanup}.sh` |
 | Endpoint and CRUD checks, and the deployment report | `deploy/azure/checks.py` |
@@ -109,29 +109,63 @@ Then run `python deploy/azure/checks.py --outputs reports/cloud/outputs.json --o
    `CLOUD_DEPLOYMENT_REPORT=docs/deployment/cloud-deployment-report.json python agentic_loop.py --mode cloud_deployment_review`.
    Then record the human release decision in the report's `release_decision`.
 
-## 5. AI-Mode in the cloud (bonus profile)
+## 5. AI services in the cloud (bonus profile)
 
-The required deployment is the baseline, with every AI service off. To turn on
-AI-Mode (Gemini) for a bonus run:
+The required deployment is the baseline, with every AI service off. Each bonus
+service has a repository variable that turns it on:
+
+| Variable | Bonus | What turns on |
+|---|---|---|
+| `AI_MODE_ENABLED` | B1 | AI-Mode (Gemini) in every backend |
+| `MCP_ENABLED` | B2 | the app `mcp-server` (the shared MCP server), and every backend calling it at `http://mcp-server/mcp` |
+| `RAG_ENABLED` | B3 | the app `rag-server` (the shared RAG server, its index of the approved documents built into the image), and every backend calling it at `http://rag-server` |
+| `MULTI_AGENT_ENABLED` | B4 | the app `multi-agent-server` (Planner → Worker → Reviewer → human), and the backends calling it at `http://multi-agent-server` |
 
 ```bash
 gh secret set GEMINI_API_KEY                   # paste the key; it never enters the repository
+gh secret set MULTI_AGENT_TOKEN --body "$(openssl rand -hex 32)"   # once; Multi-Agent only
 gh variable set AI_MODE_ENABLED --body true
+gh variable set MCP_ENABLED --body true
+gh variable set RAG_ENABLED --body true
+gh variable set MULTI_AGENT_ENABLED --body true
 ```
 
-Then deploy as in section 3. `deploy.sh` passes the key to `main.bicep` as a
-secure parameter. Each backend stores it as a Container Apps secret and reads
-it as `GEMINI_API_KEY`, and `AI_MODE_ENABLED` turns on in every backend. The
-report then says `"profile": "bonus"`, and `checks.py` expects AI-Mode on with
-MCP, RAG and Multi-Agent still off. With the variable on and no secret,
-`deploy.sh` stops before deploying.
+Then deploy as in section 3.
 
-To go back to the baseline, run `gh variable set AI_MODE_ENABLED --body false`
-and deploy again. The key leaves the apps on that deployment.
+- **The three servers** are internal apps built from `deploy/azure/Dockerfile.mcp-server`,
+  `deploy/azure/Dockerfile.rag-server` and `deploy/azure/Dockerfile.multi-agent-server`.
+  Locally they still run on the host and never in Compose. MCP and Multi-Agent
+  reach the feature APIs by app name; RAG answers from its documents only.
+- **AI-Mode, RAG and Multi-Agent call Gemini**, so any of them needs the secret.
+  `deploy.sh` passes the key to `main.bicep` as a secure parameter. Each app that
+  needs it stores it as a Container Apps secret and reads it as `GEMINI_API_KEY`.
+  With one of those variables on and no secret, `deploy.sh` stops before deploying.
+- **The backends and the Multi-Agent Server share a bearer token**
+  (`MULTI_AGENT_API_TOKEN`), from the `MULTI_AGENT_TOKEN` repository secret.
+  It is the same on every deployment, so a container that restarts later reads
+  the same value as the others, and random, so nobody can work it out. With
+  `MULTI_AGENT_ENABLED` on and no secret, `deploy.sh` stops before deploying.
+- **Checks wait for a cold start.** Each AI check retries for up to two minutes
+  while its server is still starting (no reply, or a 5xx that is not "switched
+  off"), and the RAG question may take up to 100 s, as long as fraud's backend
+  waits for an answer.
+- **The report** says `"profile": "bonus"` and expects exactly the services
+  asked for to be on. For each server that is on, it does that server's real
+  job through the fraud frontend and backend, which is what the bonus marks ask
+  for: MCP lists its tools and fraud's backend calls its own tool
+  (`POST /api/mcp/tool`); RAG answers a question about fraud alerts, and the
+  answer must be grounded, with citations; the Multi-Agent Server runs a
+  workflow started through fraud to the human gate, the check accepts it as
+  `cloud-deployment.yml`, and the final response must be released. A reply
+  that is a 200 but not that (an "insufficient context" answer, a workflow
+  that failed) is recorded with `"ok": false` and an issue, so the report and
+  the cloud review hold the release.
 
-MCP, RAG and the Multi-Agent Server are separate servers that this deployment
-doesn't run in the cloud. Turning them on means deploying each as its own
-container app.
+To go back to the baseline, set the variables to `false` and deploy again.
+The keys leave the apps, and `deploy.sh` removes `mcp-server`, `rag-server`
+and `multi-agent-server`, because Bicep never removes an app by itself. The
+Multi-Agent Server keeps its workflows on its one replica, so a new revision
+starts with none.
 
 ## Things to know
 

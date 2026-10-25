@@ -5,13 +5,13 @@
   "region": "indonesiacentral",
   "environment": "release-2-bonus",
   "profile": "bonus",
-  "deployed_at": "2026-10-22T05:06:48+00:00",
-  "commit": "fa227e0",
+  "deployed_at": "2026-10-24T07:03:54+00:00",
+  "commit": "e6f91a1",
   "deployed_by": "CongNguyen46",
   "workflow": {
     "name": "cloud-deployment.yml",
-    "run_id": "39725293757",
-    "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/39725293757",
+    "run_id": "40071955252",
+    "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/40071955252",
     "conclusion": "success"
   },
   "scripts": [
@@ -101,6 +101,21 @@
       "name": "budgeting-frontend-service",
       "status": "Running",
       "type": "container-app"
+    },
+    {
+      "name": "multi-agent-server",
+      "status": "Running",
+      "type": "container-app"
+    },
+    {
+      "name": "mcp-server",
+      "status": "Running",
+      "type": "container-app"
+    },
+    {
+      "name": "rag-server",
+      "status": "Running",
+      "type": "container-app"
     }
   ],
   "endpoints": [
@@ -135,7 +150,7 @@
     {
       "name": "loans page",
       "method": "GET",
-      "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/tabs/loans.html",
+      "url": "https://loans-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/",
       "expected_status": 200,
       "status": 200
     },
@@ -229,6 +244,69 @@
       "url": "https://transactions-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/ui/mcp/status",
       "expected_status": 200,
       "status": 200
+    },
+    {
+      "name": "fraud mcp tools",
+      "method": "GET",
+      "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/mcp/tools",
+      "expected_status": 200,
+      "status": 200,
+      "ok": true,
+      "detail": "5 tools listed"
+    },
+    {
+      "name": "fraud mcp tool call",
+      "method": "POST",
+      "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/mcp/tool",
+      "expected_status": 200,
+      "status": 200,
+      "ok": true,
+      "detail": "fraud_alerts_count -> {\"alert_count\": 12, \"by_severity\": {\"high\": 8, \"medium\": 4}, \"by_status\": {\"confirmed\": 2, \"dismissed\": 2, \"new\": 6, \"re"
+    },
+    {
+      "name": "fraud rag query",
+      "method": "POST",
+      "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/rag/query",
+      "expected_status": 200,
+      "status": 200,
+      "ok": true,
+      "detail": "grounded, 1 citation(s), confidence High, names 4 of the 4 statuses"
+    },
+    {
+      "name": "fraud multi-agent start",
+      "method": "POST",
+      "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow",
+      "expected_status": 202,
+      "status": 202,
+      "ok": true,
+      "detail": "workflow wf_33b7fcb4 started"
+    },
+    {
+      "name": "fraud multi-agent gate",
+      "method": "GET",
+      "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4",
+      "expected_status": 200,
+      "status": 200,
+      "ok": true,
+      "detail": "Planner, Worker and Reviewer completed; awaiting the human decision"
+    },
+    {
+      "name": "fraud multi-agent decision",
+      "method": "POST",
+      "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4/review",
+      "expected_status": 200,
+      "status": 200,
+      "ok": true,
+      "detail": "accepted; state accepted"
+    },
+    {
+      "name": "fraud multi-agent release",
+      "method": "GET",
+      "url": "https://fraud-frontend-service.icysand-2f0bb3f2.indonesiacentral.azurecontainerapps.io/api/agents/workflow/wf_33b7fcb4",
+      "expected_status": 200,
+      "status": 200,
+      "ok": true,
+      "detail": "final response released after the decision"
     }
   ],
   "crud_checks": [
@@ -410,9 +488,9 @@
   ],
   "ai_services": {
     "ai_mode": "enabled",
-    "mcp": "disabled",
-    "rag": "disabled",
-    "multi_agent": "disabled"
+    "mcp": "enabled",
+    "rag": "enabled",
+    "multi_agent": "enabled"
   },
   "issues": []
 }

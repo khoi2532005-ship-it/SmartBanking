@@ -1,0 +1,29 @@
+# The shared Multi-Agent Server (multi_agent_server/) as a container, for the
+# cloud only. Locally it runs on the host beside Compose; in Azure it is the
+# internal app multi-agent-server in apps.json, deployed only in the bonus
+# profile (MULTI_AGENT_ENABLED=true, bonus B4). The Planner, Worker and
+# Reviewer use the shared client in agentic/llm.py and the prompts in prompts/.
+# Build context: the repository root.
+#   docker build -f deploy/azure/Dockerfile.multi-agent-server -t smartbank-multi-agent-server .
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-multi-agent.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY agentic/ ./agentic/
+COPY prompts/ ./prompts/
+COPY multi_agent_server/ ./multi_agent_server/
+
+# apps.json gives the feature API addresses; main.bicep gives GEMINI_API_KEY
+# and MULTI_AGENT_API_TOKEN as Container Apps secrets. Workflows and their
+# audit files live in multi_agent_server/data on the one replica.
+ENV MULTI_AGENT_HOST=0.0.0.0 \
+    MULTI_AGENT_PORT=8300 \
+    LLM_PROVIDER=gemini \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8300
+
+CMD ["python", "-m", "multi_agent_server.server"]

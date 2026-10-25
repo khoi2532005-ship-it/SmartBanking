@@ -1,6 +1,7 @@
 """deploy/azure/checks.py's report: the AI services must be what the deployment
-asked for. The baseline keeps all four off; with AI_MODE_ENABLED=true (the
-bonus profile) AI-Mode must be on and the other three still off."""
+asked for. The baseline keeps all four off; the bonus profile turns on the ones
+whose switch was set (AI_MODE_ENABLED, MCP_ENABLED, MULTI_AGENT_ENABLED), and
+each server that is on must also answer a real call through the application."""
 
 import pytest
 
@@ -12,35 +13,238 @@ META = {"region": "r", "deployed_at": "t", "commit": "c", "deployed_by": "u", "w
 
 @pytest.fixture
 def report(monkeypatch):
-    """build_report with no HTTP: no endpoint or CRUD checks, the given AI states."""
-    monkeypatch.setattr(checks, "_check", lambda *args: None)
+    """build_report with no HTTP: every call answers as expected, the given AI states."""
+    def answered(results, name, method, url, expected_status, **kwargs):
+        results.append({"name": name, "method": method, "url": url, "expected_status": expected_status,
+                        "status": expected_status})
+    monkeypatch.setattr(checks, "_check", answered)
+    monkeypatch.setattr(checks, "AI_WAIT", 0)   # these replies carry no body: no cold-start retries here
     monkeypatch.setattr(checks, "endpoint_checks", lambda feature, url: [])
     monkeypatch.setattr(checks, "crud_checks", lambda feature, url: [])
 
-    def build(states, ai_mode):
+    def build(states, **requested):
         monkeypatch.setattr(checks, "ai_services", lambda url: states)
         urls = dict.fromkeys(checks.FEATURES, "https://x")
-        return checks.build_report(urls, "https://home", {**META, "ai_mode": ai_mode})
+        return checks.build_report(urls, "https://home", {**META, "requested": requested})
     return build
 
 
 def test_the_baseline_wants_all_four_off(report):
-    r = report(ALL_OFF, ai_mode=False)
+    r = report(ALL_OFF)
     assert (r["profile"], r["issues"]) == ("baseline", [])
-    assert report({**ALL_OFF, "ai_mode": "enabled"}, ai_mode=False)["issues"] == [
+    assert report({**ALL_OFF, "ai_mode": "enabled"})["issues"] == [
         "ai_mode is enabled, expected disabled (baseline profile)"]
 
 
-def test_the_bonus_profile_wants_ai_mode_on_and_the_rest_off(report):
+def test_the_bonus_profile_wants_what_was_switched_on(report):
     r = report({**ALL_OFF, "ai_mode": "enabled"}, ai_mode=True)
     assert (r["profile"], r["issues"]) == ("bonus", [])
     assert report(ALL_OFF, ai_mode=True)["issues"] == ["ai_mode is disabled, expected enabled (bonus profile)"]
     assert report({**ALL_OFF, "ai_mode": "enabled", "mcp": "enabled"}, ai_mode=True)["issues"] == [
         "mcp is enabled, expected disabled (bonus profile)"]
+    on = {**ALL_OFF, "ai_mode": "enabled", "mcp": "enabled", "multi_agent": "enabled"}
+    assert report(on, ai_mode=True, mcp=True, multi_agent=True)["issues"] == []
 
 
-def test_the_run_says_whether_ai_mode_was_asked_for(monkeypatch):
-    monkeypatch.setenv("AI_MODE_ENABLED", "true")
-    assert checks._run_meta()["ai_mode"] is True
-    monkeypatch.delenv("AI_MODE_ENABLED")
-    assert checks._run_meta()["ai_mode"] is False
+class Reply:
+    def __init__(self, status, body):
+        self.status_code, self._body = status, body
+
+    def json(self):
+        return self._body
+
+
+GROUNDED = Reply(200, {"answer": "An alert is new, reviewed, dismissed or confirmed [fraud-alerts-feature:3].",
+                       "citations": [{"chunk_id": "fraud-alerts-feature:3"}], "confidence_category": "high",
+                       "insufficient_context": False, "retrieval_summary": {}})
+INSUFFICIENT = Reply(200, {"answer": "Insufficient context.", "citations": [], "confidence_category": "low",
+                           "insufficient_context": True, "retrieval_summary": {}})
+STARTED = Reply(202, {"workflow_id": "wf_0a1b2c3d", "state": "planning"})
+RELEASED = Reply(200, {"workflow_id": "wf_0a1b2c3d", "state": "accepted",
+                       "final_response": {"released": True, "decision": "accept", "answer": "7 alerts, 2 new."}})
+
+
+@pytest.fixture
+def interactions(monkeypatch):
+    """checks.ai_interactions with no HTTP and no real waiting: each (method, path) answers
+    with the given Reply, or with the next of a list of Replies on each call. The clock
+    moves only when the code sleeps, so the waits and deadlines run instantly."""
+    clock = [0.0]
+    monkeypatch.setattr(checks.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    monkeypatch.setattr(checks.time, "monotonic", lambda: clock[0])
+
+    def run(replies, **requested):
+        calls = []
+
+        def fake_check(results, name, method, url, expected_status, timeout=checks.TIMEOUT, **kwargs):
+            path = url.replace("https://x", "")
+            reply = replies.get((method, path))
+            if isinstance(reply, list):
+                reply = reply.pop(0) if len(reply) > 1 else reply[0]
+            calls.append((method, path, kwargs.get("json")))
+            timeouts.append((method, path, timeout))
+            results.append({"name": name, "method": method, "url": url, "expected_status": expected_status,
+                            "status": reply.status_code if reply else None})
+            return reply
+        timeouts = []
+        monkeypatch.setattr(checks, "_check", fake_check)
+        records, issues = checks.ai_interactions("https://x", requested)
+        run.timeouts = timeouts
+        return records, issues, calls
+    return run
+
+
+def test_the_baseline_makes_no_ai_call(interactions):
+    assert interactions({}) == ([], [], [])
+
+
+def test_mcp_on_means_a_real_tool_call_through_the_application(interactions):
+    # Bonus B2 asks for "a successful MCP tool interaction through the
+    # application": fraud's own tool, called by its backend, not just tools/list.
+    tools = Reply(200, {"tool_count": 5, "tools": [{"name": "fraud_alerts_count"}]})
+    called = Reply(200, {"tool": "fraud_alerts_count", "arguments": {}, "result": {"count": 7}})
+    records, issues, calls = interactions({("GET", "/api/mcp/tools"): tools, ("POST", "/api/mcp/tool"): called}, mcp=True)
+    assert [c[:2] for c in calls] == [("GET", "/api/mcp/tools"), ("POST", "/api/mcp/tool")]
+    assert [(r["name"], r["status"], r["ok"]) for r in records] == [("fraud mcp tools", 200, True),
+                                                                     ("fraud mcp tool call", 200, True)]
+    assert issues == [] and "count" in records[1]["detail"]
+    # A 200 whose body carries no tool result is not an interaction.
+    records, issues, _ = interactions({("GET", "/api/mcp/tools"): tools, ("POST", "/api/mcp/tool"): Reply(200, {"error": "x"})}, mcp=True)
+    assert records[1]["ok"] is False and issues == ["fraud mcp tool call: the reply carries no tool result"]
+
+
+def test_rag_on_means_a_grounded_answer_with_citations(interactions):
+    # Bonus B3 asks for "a successful grounded response using retrieved context".
+    records, issues, calls = interactions({("POST", "/api/rag/query"): GROUNDED}, rag=True)
+    assert calls == [("POST", "/api/rag/query", {"query": checks.RAG_QUESTION})]
+    assert records[0]["name"] == "fraud rag query" and records[0]["ok"] is True and issues == []
+    assert "1 citation" in records[0]["detail"] and "high" in records[0]["detail"]
+    # "Insufficient context" is a valid 200 from the server, but it is not a grounded answer.
+    records, issues, _ = interactions({("POST", "/api/rag/query"): INSUFFICIENT}, rag=True)
+    assert records[0]["ok"] is False
+    assert issues == ["fraud rag query: the RAG server found no relevant document (insufficient context), so nothing was grounded"]
+    # A server that is unreachable through the backend (503) is the same failure as any check.
+    records, issues, _ = interactions({("POST", "/api/rag/query"): Reply(503, {"error": "down", "unreachable": True})}, rag=True)
+    assert (records[0]["status"], records[0]["ok"]) == (503, False) and issues == []   # build_report reports the status mismatch
+
+
+def test_a_grounded_answer_must_name_what_the_question_asks_for(interactions):
+    # Citations alone do not prove the retrieved context was used: the answer
+    # must name the four statuses the fraud document lists.
+    vague = Reply(200, {**GROUNDED.json(), "answer": "Alerts move through several states [fraud-alerts-feature:3]."})
+    records, issues, _ = interactions({("POST", "/api/rag/query"): vague}, rag=True)
+    assert records[0]["ok"] is False
+    assert issues == ["fraud rag query: grounded, but the answer names 0 of the 4 statuses the document lists"]
+
+
+def test_the_rag_check_waits_as_long_as_the_backend_does(interactions):
+    # Gemini can take longer than the 10 s the other checks allow; fraud's own
+    # backend waits 90 s for the RAG server, so the check must not give up first.
+    interactions({("POST", "/api/rag/query"): GROUNDED}, rag=True)
+    [(_, _, timeout)] = interactions.timeouts
+    assert timeout >= 90
+
+
+def test_a_server_still_starting_is_retried_before_it_counts(interactions):
+    # The AI servers start alongside the deployment: a 503 or no reply right
+    # after it is a cold start, retried until AI_WAIT, not a failure.
+    tools = Reply(200, {"tool_count": 5, "tools": [{"name": "fraud_alerts_count"}]})
+    called = Reply(200, {"tool": "fraud_alerts_count", "arguments": {}, "result": {"count": 7}})
+    starting = Reply(503, {"error": "MCP server unreachable", "unreachable": True})
+    records, issues, calls = interactions({("GET", "/api/mcp/tools"): [starting, None, tools],
+                                           ("POST", "/api/mcp/tool"): called}, mcp=True)
+    assert [c[1] for c in calls] == ["/api/mcp/tools", "/api/mcp/tools", "/api/mcp/tools", "/api/mcp/tool"]
+    assert [(r["name"], r["status"], r["ok"]) for r in records] == [("fraud mcp tools", 200, True),
+                                                                     ("fraud mcp tool call", 200, True)]
+    # Still down after the wait: one record, with the last status.
+    records, _, calls = interactions({("GET", "/api/mcp/tools"): starting, ("POST", "/api/mcp/tool"): called}, mcp=True)
+    assert records[0]["status"] == 503 and len([c for c in calls if c[1] == "/api/mcp/tools"]) > 1
+    # A service that is switched off is not starting: no retry.
+    _, _, calls = interactions({("GET", "/api/mcp/tools"): Reply(503, {"error": "off", "disabled": True}),
+                                ("POST", "/api/mcp/tool"): called}, mcp=True)
+    assert len([c for c in calls if c[1] == "/api/mcp/tools"]) == 1
+
+
+def test_multi_agent_on_means_a_workflow_is_decided_and_released(interactions):
+    # Bonus B4 asks for "a successful Planner -> Worker -> Reviewer workflow":
+    # started through fraud, followed to the human gate, decided, released.
+    gate = Reply(200, {"workflow_id": "wf_0a1b2c3d", "state": "awaiting_human_review", "final_response": None})
+    waiting = [Reply(200, {"workflow_id": "wf_0a1b2c3d", "state": "working", "final_response": None}),
+               gate, gate,   # the poll that sees the gate, then the look that goes into the report
+               RELEASED]     # read back after the decision
+    replies = {("POST", "/api/agents/workflow"): STARTED, ("GET", "/api/agents/workflow/wf_0a1b2c3d"): waiting,
+               ("POST", "/api/agents/workflow/wf_0a1b2c3d/review"): Reply(200, {"state": "accepted", "released": True})}
+    records, issues, calls = interactions(replies, multi_agent=True)
+    assert [(c[0], c[1]) for c in calls][:2] == [("POST", "/api/agents/workflow"), ("GET", "/api/agents/workflow/wf_0a1b2c3d")]
+    assert calls[0][2] == {"task": checks.WORKFLOW_TASK, "customer_id": 1}
+    review = next(c for c in calls if c[1].endswith("/review"))
+    assert review[2]["decision"] == "accept" and review[2]["reviewer"], "fraud records who decided"
+    assert [(r["name"], r["status"], r["ok"]) for r in records] == [
+        ("fraud multi-agent start", 202, True), ("fraud multi-agent gate", 200, True),
+        ("fraud multi-agent decision", 200, True), ("fraud multi-agent release", 200, True)]
+    assert issues == [] and "released" in records[3]["detail"]
+
+
+def test_a_workflow_that_fails_or_is_withheld_is_an_issue(interactions):
+    failed = Reply(200, {"workflow_id": "wf_0a1b2c3d", "state": "failed", "final_response": None, "error": "planner timed out"})
+    records, issues, calls = interactions({("POST", "/api/agents/workflow"): STARTED,
+                                           ("GET", "/api/agents/workflow/wf_0a1b2c3d"): failed}, multi_agent=True)
+    assert not any(c[1].endswith("/review") for c in calls), "nothing is decided when the workflow never reached the gate"
+    assert records[1]["ok"] is False and issues == ["fraud multi-agent gate: the workflow ended in state failed (planner timed out)"]
+    # A start that the backend refuses stops there.
+    records, issues, calls = interactions({("POST", "/api/agents/workflow"): Reply(503, {"error": "off", "disabled": True})},
+                                          multi_agent=True)
+    assert len(calls) == 1 and records[0]["status"] == 503 and issues == []
+
+
+def test_a_decision_that_did_not_take_is_an_issue(interactions):
+    gate = Reply(200, {"workflow_id": "wf_0a1b2c3d", "state": "awaiting_human_review", "final_response": None})
+    replies = {("POST", "/api/agents/workflow"): STARTED, ("GET", "/api/agents/workflow/wf_0a1b2c3d"): gate,
+               ("POST", "/api/agents/workflow/wf_0a1b2c3d/review"): Reply(200, {"state": "awaiting_human_review"})}
+    records, issues, calls = interactions(replies, multi_agent=True)
+    assert records[2]["name"] == "fraud multi-agent decision" and records[2]["ok"] is False
+    assert issues == ["fraud multi-agent decision: the decision was not recorded (state awaiting_human_review)"]
+    assert not any(r["name"] == "fraud multi-agent release" for r in records)
+
+
+def test_the_poll_stops_when_the_workflow_is_gone_or_the_backend_keeps_failing(interactions):
+    # A 404 means the backend no longer knows the workflow: nothing to wait for.
+    records, _, calls = interactions({("POST", "/api/agents/workflow"): STARTED,
+                                      ("GET", "/api/agents/workflow/wf_0a1b2c3d"): Reply(404, {"error": "unknown"})},
+                                     multi_agent=True)
+    assert len([c for c in calls if c[0] == "GET"]) == 2          # one poll, then the record
+    assert (records[1]["name"], records[1]["status"], records[1]["ok"]) == ("fraud multi-agent gate", 404, False)
+    # Repeated 5xx: stop after POLL_FAILURES in a row instead of waiting the full WORKFLOW_WAIT.
+    _, _, calls = interactions({("POST", "/api/agents/workflow"): STARTED,
+                                ("GET", "/api/agents/workflow/wf_0a1b2c3d"): Reply(502, {"error": "bad gateway"})},
+                               multi_agent=True)
+    assert len([c for c in calls if c[0] == "GET"]) == checks.POLL_FAILURES + 1
+
+
+def test_the_results_table_agrees_with_the_issues():
+    # A check with the expected status but ok=false (an "insufficient context"
+    # answer) must read FAIL in the table too, not PASS beside an issue.
+    report = {"commit": "c", "deployed_at": "t", "workflow": {"run_url": None}, "ai_services": ALL_OFF,
+              "endpoints": [{"name": "fraud rag query", "method": "POST", "url": "u", "expected_status": 200,
+                             "status": 200, "ok": False},
+                            {"name": "home page", "method": "GET", "url": "h", "expected_status": 200, "status": 200}],
+              "crud_checks": [], "issues": ["fraud rag query: not grounded"]}
+    rows = {line.split(" | ")[0].strip("| "): line for line in checks.results_markdown(report).splitlines() if line.startswith("| ")}
+    assert rows["fraud rag query"].endswith("| FAIL |") and rows["home page"].endswith("| PASS |")
+
+
+def test_build_report_folds_the_interactions_into_endpoints_and_issues(report, monkeypatch):
+    monkeypatch.setattr(checks, "ai_interactions", lambda url, requested: (
+        [{"name": "fraud rag query", "method": "POST", "url": f"{url}/api/rag/query", "expected_status": 200,
+          "status": 200, "ok": False, "detail": "insufficient context"}], ["fraud rag query: not grounded"]))
+    r = report({**ALL_OFF, "rag": "enabled"}, rag=True)
+    assert [e["name"] for e in r["endpoints"]] == ["home page", "fraud rag query"]
+    assert r["issues"] == ["fraud rag query: not grounded"]
+
+
+def test_the_run_says_which_services_were_asked_for(monkeypatch):
+    for name in ("AI_MODE_ENABLED", "MCP_ENABLED", "RAG_ENABLED", "MULTI_AGENT_ENABLED"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("MCP_ENABLED", "true")
+    monkeypatch.setenv("MULTI_AGENT_ENABLED", "TRUE")
+    assert checks._run_meta()["requested"] == {"ai_mode": False, "mcp": True, "rag": False, "multi_agent": True}
