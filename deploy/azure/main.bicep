@@ -34,12 +34,12 @@ param multiAgentEnabled bool = false
 param geminiApiKey string = ''
 
 @secure()
-// The same value on every deployment to this resource group: a new one each
-// time left running replicas holding the old value, so the first container to
-// restart disagreed with its peers and every workflow call got 401. The server
-// is an internal app, reachable only from inside the environment.
-@description('Bearer token between the backends and the Multi-Agent Server. Stable per resource group, so nobody stores it.')
-param multiAgentToken string = guid(resourceGroup().id, 'smartbank-multi-agent-token')
+// The same value on every deployment: a new one each time left running replicas
+// holding the old value, so the first container to restart disagreed with its
+// peers and every workflow call got 401. It comes from a repository secret, not
+// from the resource group, which anyone knowing the subscription id could hash.
+@description('Bearer token between the backends and the Multi-Agent Server (the MULTI_AGENT_TOKEN repository secret). Used only with multiAgentEnabled.')
+param multiAgentToken string = ''
 
 var apps = loadJsonContent('apps.json').apps
 var features = ['accounts', 'loans', 'fraud', 'budgeting', 'transactions']

@@ -18,6 +18,9 @@ def stub(directory, name, body):
     path.chmod(0o755)
 
 
+TOKEN = "token-1"  # noqa: S105  # pragma: allowlist secret (a stand-in value)
+WITH_TOKEN = {"MULTI_AGENT_TOKEN": TOKEN}
+
 @pytest.fixture
 def run_script(tmp_path):
     """Runs a deploy/azure script with stand-ins for az and docker; returns their calls."""
@@ -42,7 +45,8 @@ def run_script(tmp_path):
                          '  "api repos/"*) echo 7 ;;\n'
                          'esac\n')
     inherited = {k: v for k, v in os.environ.items()
-                 if k not in ("AI_MODE_ENABLED", "MCP_ENABLED", "RAG_ENABLED", "MULTI_AGENT_ENABLED", "GEMINI_API_KEY")}
+                 if k not in ("AI_MODE_ENABLED", "MCP_ENABLED", "RAG_ENABLED", "MULTI_AGENT_ENABLED", "GEMINI_API_KEY",
+                           "MULTI_AGENT_TOKEN")}
     env = {**inherited, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "ACR_NAME": "smartbanktest",
            "IMAGE_TAG": "abc123", "REPORT_DIR": str(tmp_path / "reports")}
 
@@ -126,11 +130,19 @@ def test_deploy_refuses_ai_mode_without_a_key(run_script):
 
 
 def test_deploy_passes_the_mcp_and_multi_agent_switches(run_script):
-    create = next(c for c in run_script("deploy.sh", MCP_ENABLED="true", MULTI_AGENT_ENABLED="true", GEMINI_API_KEY="key-1")
+    create = next(c for c in run_script("deploy.sh", **WITH_TOKEN, MCP_ENABLED="true", MULTI_AGENT_ENABLED="true", GEMINI_API_KEY="key-1")
                   if c.startswith("az deployment group create"))
     assert "mcpEnabled=true" in create and "multiAgentEnabled=true" in create and "aiModeEnabled=false" in create
-    # The Planner, Worker and Reviewer call Gemini.
-    assert "geminiApiKey=key-1" in create
+    # The Planner, Worker and Reviewer call Gemini; the backends and the server share the token.
+    assert "geminiApiKey=key-1" in create and f"multiAgentToken={TOKEN}" in create
+
+
+def test_multi_agent_needs_the_token_secret_and_only_it_gets_the_token(run_script):
+    refused = run_script("deploy.sh", fails=True, MULTI_AGENT_ENABLED="true", GEMINI_API_KEY="key-1")
+    assert "MULTI_AGENT_TOKEN" in refused
+    create = next(c for c in run_script("deploy.sh", **WITH_TOKEN, AI_MODE_ENABLED="true", GEMINI_API_KEY="key-1")
+                  if c.startswith("az deployment group create"))
+    assert "multiAgentToken" not in create
 
 
 def test_multi_agent_needs_the_key_and_mcp_does_not(run_script):

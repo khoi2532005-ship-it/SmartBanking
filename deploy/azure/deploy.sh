@@ -7,8 +7,9 @@
 # AI_MODE_ENABLED, MCP_ENABLED, RAG_ENABLED or MULTI_AGENT_ENABLED is true (the
 # bonus profile). AI-Mode, RAG and Multi-Agent call Gemini, so any of them needs
 # GEMINI_API_KEY, and only then is it passed, as a secure parameter that becomes
-# a Container Apps secret. An AI server whose switch is off is removed after the
-# deployment.
+# a Container Apps secret. Multi-Agent also needs MULTI_AGENT_TOKEN, the bearer
+# token its server and the backends share, passed the same way. An AI server
+# whose switch is off is removed after the deployment.
 set -euo pipefail
 
 AZ_RG="${AZ_RG:-rg-smartbank}"
@@ -26,6 +27,10 @@ ai_params=(aiModeEnabled="$(on AI_MODE_ENABLED)" mcpEnabled="$(on MCP_ENABLED)" 
 if [ "$(on AI_MODE_ENABLED)" = true ] || [ "$(on RAG_ENABLED)" = true ] || [ "$(on MULTI_AGENT_ENABLED)" = true ]; then
   : "${GEMINI_API_KEY:?AI_MODE_ENABLED, RAG_ENABLED or MULTI_AGENT_ENABLED needs GEMINI_API_KEY (the repository secret of that name)}"
   ai_params+=("geminiApiKey=$GEMINI_API_KEY")
+fi
+if [ "$(on MULTI_AGENT_ENABLED)" = true ]; then
+  : "${MULTI_AGENT_TOKEN:?MULTI_AGENT_ENABLED needs MULTI_AGENT_TOKEN (the repository secret of that name)}"
+  ai_params+=("multiAgentToken=$MULTI_AGENT_TOKEN")
 fi
 
 az deployment group create \

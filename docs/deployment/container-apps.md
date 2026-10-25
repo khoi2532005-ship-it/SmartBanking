@@ -123,6 +123,7 @@ service has a repository variable that turns it on:
 
 ```bash
 gh secret set GEMINI_API_KEY                   # paste the key; it never enters the repository
+gh secret set MULTI_AGENT_TOKEN --body "$(openssl rand -hex 32)"   # once; Multi-Agent only
 gh variable set AI_MODE_ENABLED --body true
 gh variable set MCP_ENABLED --body true
 gh variable set RAG_ENABLED --body true
@@ -140,9 +141,10 @@ Then deploy as in section 3.
   needs it stores it as a Container Apps secret and reads it as `GEMINI_API_KEY`.
   With one of those variables on and no secret, `deploy.sh` stops before deploying.
 - **The backends and the Multi-Agent Server share a bearer token**
-  (`MULTI_AGENT_API_TOKEN`). `main.bicep` derives it from the resource group,
-  so it is the same on every deployment and nobody stores it; a container that
-  restarts later reads the same value as the others.
+  (`MULTI_AGENT_API_TOKEN`), from the `MULTI_AGENT_TOKEN` repository secret.
+  It is the same on every deployment, so a container that restarts later reads
+  the same value as the others, and random, so nobody can work it out. With
+  `MULTI_AGENT_ENABLED` on and no secret, `deploy.sh` stops before deploying.
 - **Checks wait for a cold start.** Each AI check retries for up to two minutes
   while its server is still starting (no reply, or a 5xx that is not "switched
   off"), and the RAG question may take up to 100 s, as long as fraud's backend

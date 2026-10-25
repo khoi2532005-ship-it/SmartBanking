@@ -121,6 +121,7 @@ jobs:
       - name: Deploy the Container Apps environment and apps
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  # pragma: allowlist secret
+          MULTI_AGENT_TOKEN: ${{ secrets.MULTI_AGENT_TOKEN }}  # pragma: allowlist secret
         run: bash deploy/azure/deploy.sh
 
       - name: Check every frontend, API and CRUD path, and write the report

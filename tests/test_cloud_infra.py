@@ -205,13 +205,13 @@ def test_mcp_and_multi_agent_are_switches_that_start_off():
     params = compiled_template()["parameters"]
     for name in ("mcpEnabled", "ragEnabled", "multiAgentEnabled"):
         assert (params[name]["type"], params[name]["defaultValue"]) == ("bool", False), name
-    # The token is the same on every deployment to this resource group, so a
-    # container that restarts later reads the same value as its peers (a new
-    # one per deployment left running replicas with the old one: 401s), and
-    # nobody has to store it.
+    # The token comes from the MULTI_AGENT_TOKEN repository secret, through
+    # deploy.sh, so it is the same on every deployment (a new one each time
+    # left running replicas with the old one: 401s) and cannot be worked out:
+    # a value derived from the resource group could be, by anyone who knows
+    # the subscription id. No default, so nothing in the template gives it away.
     token = params["multiAgentToken"]
-    assert token["type"] == "securestring" and "newGuid" not in token["defaultValue"]
-    assert token["defaultValue"].startswith("[guid(resourceGroup().id")
+    assert (token["type"], token["defaultValue"]) == ("securestring", "")
 
 
 def test_an_ai_server_is_deployed_only_when_its_switch_is_on():
