@@ -1,0 +1,77 @@
+{
+  "student": "student-2",
+  "name": "David",
+  "feature": "loans-and-credit",
+  "paths": [
+    "services/loans",
+    ".github/workflows/student-2.yml",
+    "deploy/azure/checks.py"
+  ],
+  "commit": "f5125cc",
+  "ran_at": "2026-10-25T08:42:35Z",
+  "config": ".pre-commit-config.yaml",
+  "command": "pre-commit run --all-files",
+  "tools": {
+    "ruff": "0.6.9",
+    "detect-secrets": "1.5.0",
+    "pip-audit": "2.7.3"
+  },
+  "scans": [
+    {
+      "name": "ruff-security",
+      "rules": "S (flake8-bandit); S101 ignored in test files only",
+      "result": "passed",
+      "findings": 3,
+      "fixed": 0,
+      "accepted": [
+        {
+          "id": "S104",
+          "file": "services/loans/backend/app.py",
+          "line": 48,
+          "reason": "the backend binds 0.0.0.0 so the API is reachable from the Docker network"
+        },
+        {
+          "id": "S110",
+          "file": "services/loans/backend/routes/loans.py",
+          "line": 228,
+          "reason": "deleting repayments is best-effort rollback cleanup after a failed loan approval"
+        },
+        {
+          "id": "S104",
+          "file": "services/loans/database/app.py",
+          "line": 605,
+          "reason": "the database service binds 0.0.0.0 so the backend can reach it through Docker"
+        }
+      ]
+    },
+    {
+      "name": "detect-secrets",
+      "baseline": ".secrets.baseline",
+      "result": "passed",
+      "findings": 0,
+      "fixed": 0,
+      "accepted": [],
+      "note": "the configured baseline scan passed with no new secrets detected"
+    },
+    {
+      "name": "pip-audit",
+      "files": [
+        "services/loans/backend/requirements.txt",
+        "services/loans/database/requirements.txt"
+      ],
+      "result": "passed",
+      "findings": 0,
+      "fixed": 0,
+      "accepted": [],
+      "note": "both loan-service requirements hooks passed with no reported advisories"
+    }
+  ],
+  "summary": {
+    "scans": 3,
+    "passed": 3,
+    "failed": 0,
+    "findings": 3,
+    "fixed": 0,
+    "accepted": 3
+  }
+}
