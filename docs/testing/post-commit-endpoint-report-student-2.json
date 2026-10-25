@@ -1,0 +1,184 @@
+{
+  "student": "student-2",
+  "name": "David",
+  "feature": "loans-and-credit",
+  "workflow": "student-2-loans-ci",
+  "job": "smoke-check",
+  "commit": "f5125cc",
+  "branch": "loans-and-credit",
+  "run_id": "39757287753",
+  "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/39757287753",
+  "ran_at": "2026-10-22T09:43:28Z",
+  "api_url": "http://localhost:5002",
+  "integrations": {
+    "mcp": "disabled",
+    "rag": "disabled",
+    "multi_agent": "disabled"
+  },
+  "pytest_exit_status": 0,
+  "tests": [
+    {
+      "test": "test_service_health",
+      "method": "GET",
+      "endpoint": "/api/health",
+      "outcome": "passed",
+      "duration_s": 0.004,
+      "checks": [
+        {
+          "check": "the health endpoint answers 200",
+          "ok": true
+        },
+        {
+          "check": "the service identifies itself as loan-service",
+          "ok": true
+        },
+        {
+          "check": "Multi-Agent is disabled",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_loans_exist",
+      "method": "GET",
+      "endpoint": "/api/loans",
+      "outcome": "passed",
+      "duration_s": 0.017,
+      "checks": [
+        {
+          "check": "the loans endpoint answers 200",
+          "ok": true
+        },
+        {
+          "check": "the response contains at least one loan",
+          "ok": true
+        },
+        {
+          "check": "every loan has loan_id, customer_id, loan_type and status",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_loan_by_id",
+      "method": "GET",
+      "endpoint": "/api/loans/{loan_id}",
+      "outcome": "passed",
+      "duration_s": 0.01,
+      "checks": [
+        {
+          "check": "a loan is available to look up",
+          "ok": true
+        },
+        {
+          "check": "the loan-by-id endpoint answers 200",
+          "ok": true
+        },
+        {
+          "check": "the response loan_id matches the requested id",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_loan_eligibility",
+      "method": "GET",
+      "endpoint": "/api/loans/{loan_id}/eligibility",
+      "outcome": "passed",
+      "duration_s": 0.009,
+      "checks": [
+        {
+          "check": "a loan is available for the eligibility check",
+          "ok": true
+        },
+        {
+          "check": "the eligibility endpoint answers 200",
+          "ok": true
+        },
+        {
+          "check": "the response loan_id matches the requested id",
+          "ok": true
+        },
+        {
+          "check": "eligibility contains eligible and checks fields",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_repayments_exist",
+      "method": "GET",
+      "endpoint": "/api/repayments",
+      "outcome": "passed",
+      "duration_s": 0.004,
+      "checks": [
+        {
+          "check": "the repayments endpoint answers 200",
+          "ok": true
+        },
+        {
+          "check": "the response contains at least one repayment",
+          "ok": true
+        },
+        {
+          "check": "every repayment has repayment_id, loan_id and due_date",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_repayment_by_id",
+      "method": "GET",
+      "endpoint": "/api/repayments/{repayment_id}",
+      "outcome": "passed",
+      "duration_s": 0.009,
+      "checks": [
+        {
+          "check": "a repayment is available to look up",
+          "ok": true
+        },
+        {
+          "check": "the repayment-by-id endpoint answers 200",
+          "ok": true
+        },
+        {
+          "check": "the response repayment_id matches the requested id",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_upcoming_repayments",
+      "method": "GET",
+      "endpoint": "/api/repayments/upcoming",
+      "outcome": "passed",
+      "duration_s": 0.007,
+      "checks": [
+        {
+          "check": "the upcoming-repayments endpoint answers 200",
+          "ok": true
+        },
+        {
+          "check": "the response is a list",
+          "ok": true
+        }
+      ],
+      "error": ""
+    }
+  ],
+  "summary": {
+    "endpoints": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "checks": 21,
+    "duration_s": 0.221,
+    "result": "passed"
+  }
+}
