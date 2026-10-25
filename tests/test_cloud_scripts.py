@@ -42,7 +42,7 @@ def run_script(tmp_path):
                          '  "api repos/"*) echo 7 ;;\n'
                          'esac\n')
     inherited = {k: v for k, v in os.environ.items()
-                 if k not in ("AI_MODE_ENABLED", "MCP_ENABLED", "MULTI_AGENT_ENABLED", "GEMINI_API_KEY")}
+                 if k not in ("AI_MODE_ENABLED", "MCP_ENABLED", "RAG_ENABLED", "MULTI_AGENT_ENABLED", "GEMINI_API_KEY")}
     env = {**inherited, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "ACR_NAME": "smartbanktest",
            "IMAGE_TAG": "abc123", "REPORT_DIR": str(tmp_path / "reports")}
 
@@ -157,3 +157,12 @@ def test_deploy_removes_an_ai_server_whose_switch_is_off(run_script):
     # Removed before the resource list is written, so the report does not list it.
     lists = [i for i, c in enumerate(calls) if c.startswith("az containerapp list") and "runningStatus" in c]
     assert calls.index(deletes[0]) < lists[0]
+
+
+def test_a_switch_reads_true_in_any_case_as_checks_py_does(run_script):
+    # checks.py lowercases the variable; if deploy.sh did not, "True" would make
+    # deploy.sh delete the server while the report still expects it to be on.
+    calls = run_script("deploy.sh", MCP_ENABLED="True")
+    create = next(c for c in calls if c.startswith("az deployment group create"))
+    assert "mcpEnabled=true" in create
+    assert not [c for c in calls if c.startswith("az containerapp delete") and "--name mcp-server" in c]

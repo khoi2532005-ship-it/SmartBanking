@@ -7,7 +7,7 @@ follows the reference architecture in Lecture 11 (slides 12-14) and Lab 11 §5.
 
 | What | Where |
 |---|---|
-| The 16 container apps: one public frontend per feature plus the home page; APIs and databases internal. Plus the MCP and Multi-Agent servers, internal, in the bonus profile only | `deploy/azure/apps.json` |
+| The 16 container apps: one public frontend per feature plus the home page; APIs and databases internal. Plus the MCP, RAG and Multi-Agent servers, internal, in the bonus profile only | `deploy/azure/apps.json` |
 | Infrastructure as code (Bicep, compiled to ARM) | `deploy/azure/main.bicep` |
 | Reusable scripts | `deploy/azure/{oidc-setup,setup,build-images,deploy,cleanup}.sh` |
 | Endpoint and CRUD checks, and the deployment report | `deploy/azure/checks.py` |
@@ -140,8 +140,13 @@ Then deploy as in section 3.
   needs it stores it as a Container Apps secret and reads it as `GEMINI_API_KEY`.
   With one of those variables on and no secret, `deploy.sh` stops before deploying.
 - **The backends and the Multi-Agent Server share a bearer token**
-  (`MULTI_AGENT_API_TOKEN`). `main.bicep` makes a new one on every deployment,
-  so nobody stores it.
+  (`MULTI_AGENT_API_TOKEN`). `main.bicep` derives it from the resource group,
+  so it is the same on every deployment and nobody stores it; a container that
+  restarts later reads the same value as the others.
+- **Checks wait for a cold start.** Each AI check retries for up to two minutes
+  while its server is still starting (no reply, or a 5xx that is not "switched
+  off"), and the RAG question may take up to 100 s, as long as fraud's backend
+  waits for an answer.
 - **The report** says `"profile": "bonus"` and expects exactly the services
   asked for to be on. For each server that is on, it does that server's real
   job through the fraud frontend and backend, which is what the bonus marks ask

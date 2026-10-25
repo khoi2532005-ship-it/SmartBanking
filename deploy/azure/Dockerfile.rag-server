@@ -21,7 +21,8 @@ COPY rag_server/ ./rag_server/
 # embeddings are deterministic and need no model or network, and the server
 # then starts with its index ready instead of building it on the first request.
 ENV ANONYMIZED_TELEMETRY=False
-RUN python -c "from rag_server.server import get_retriever; print(get_retriever().refresh())"
+# The build fails if the index comes out empty or stale, so a broken one never ships.
+RUN python -c "from rag_server.server import get_retriever; r = get_retriever(); s = r.refresh(); print(s); assert s['vector_indexed'] > 0 and not r.index_stale(), s"
 
 # main.bicep gives GEMINI_API_KEY as a Container Apps secret. Bound to every
 # interface so the ingress reaches it; only apps in the environment can.

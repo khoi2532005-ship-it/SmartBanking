@@ -4,7 +4,7 @@
     "tests/test_cloud_infra.py checks them. {acr}, {tag} and {defaultDomain} are filled in at",
     "deploy time. Only frontends are public; databases stay at one replica (SQLite);",
     "every backend starts with the four AI services off (the required cloud baseline).",
-    "An app with a \"switch\" (the shared MCP and Multi-Agent servers) is deployed only when",
+    "An app with a \"switch\" (the shared MCP, RAG and Multi-Agent servers) is deployed only when",
     "that switch is on: the bonus profile."
   ],
   "apps": [

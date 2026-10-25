@@ -178,7 +178,10 @@ def test_the_rag_image_bakes_in_the_index_of_the_approved_documents():
     text = (ROOT / "deploy/azure/Dockerfile.rag-server").read_text()
     assert "requirements-rag.txt" in text and "COPY rag_server/" in text
     assert "COPY agentic/" in text and "COPY prompts/" in text   # the generator reuses agentic/llm.py and prompts/
-    assert re.search(r"RUN python .*refresh\(\)", text), "the index is built at image build time"
+    build = re.search(r"RUN python .*refresh\(\).*", text)
+    assert build, "the index is built at image build time"
+    # ...and the build fails if it comes out empty or stale, instead of shipping a broken index.
+    assert "assert" in build.group(0) and "index_stale()" in build.group(0)
     assert "RAG_PORT=8200" in text and 'CMD ["python", "-m", "rag_server.server"]' in text
 
 
@@ -202,9 +205,13 @@ def test_mcp_and_multi_agent_are_switches_that_start_off():
     params = compiled_template()["parameters"]
     for name in ("mcpEnabled", "ragEnabled", "multiAgentEnabled"):
         assert (params[name]["type"], params[name]["defaultValue"]) == ("bool", False), name
-    # A new token on every deployment, given to the server and the backends
-    # alike: nobody has to store it.
-    assert (params["multiAgentToken"]["type"], params["multiAgentToken"]["defaultValue"]) == ("securestring", "[newGuid()]")
+    # The token is the same on every deployment to this resource group, so a
+    # container that restarts later reads the same value as its peers (a new
+    # one per deployment left running replicas with the old one: 401s), and
+    # nobody has to store it.
+    token = params["multiAgentToken"]
+    assert token["type"] == "securestring" and "newGuid" not in token["defaultValue"]
+    assert token["defaultValue"].startswith("[guid(resourceGroup().id")
 
 
 def test_an_ai_server_is_deployed_only_when_its_switch_is_on():

@@ -18,7 +18,8 @@ IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse HEAD)}"
 REPORT_DIR="${REPORT_DIR:-reports/cloud}"
 mkdir -p "$REPORT_DIR"
 
-on() { [ "${!1:-false}" = true ] && echo true || echo false; }
+# True, TRUE and true all count, as in checks.py; anything else is off.
+on() { [ "$(printf '%s' "${!1:-false}" | tr '[:upper:]' '[:lower:]')" = true ] && echo true || echo false; }
 
 ai_params=(aiModeEnabled="$(on AI_MODE_ENABLED)" mcpEnabled="$(on MCP_ENABLED)" ragEnabled="$(on RAG_ENABLED)"
            multiAgentEnabled="$(on MULTI_AGENT_ENABLED)")
