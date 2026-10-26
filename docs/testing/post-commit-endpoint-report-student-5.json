@@ -4,11 +4,11 @@
   "feature": "transactions",
   "workflow": "student-5-transactions-ci",
   "job": "endpoint-tests",
-  "commit": "6c97f6d",
+  "commit": "ddd6881",
   "branch": "main",
   "run_id": "local",
   "run_url": "",
-  "ran_at": "2026-10-26T11:18:45Z",
+  "ran_at": "2026-10-26T12:40:41Z",
   "api_url": "http://localhost:5005",
   "integrations": {
     "mcp": "disabled",
@@ -22,11 +22,12 @@
       "method": "GET",
       "endpoint": "/api/health",
       "outcome": "passed",
-      "duration_s": 0.02,
+      "duration_s": 0.026,
       "checks": [
         {
           "check": "the health endpoint answers 200",
-          "ok": true
+          "ok": true,
+          "detail": "status=200"
         },
         {
           "check": "the service identifies itself as transactions-service",
@@ -44,11 +45,12 @@
       "method": "GET",
       "endpoint": "/api/transactions",
       "outcome": "passed",
-      "duration_s": 0.016,
+      "duration_s": 0.018,
       "checks": [
         {
           "check": "the transactions endpoint answers 200",
-          "ok": true
+          "ok": true,
+          "detail": "status=200"
         },
         {
           "check": "the response contains at least one transaction",
@@ -66,11 +68,12 @@
       "method": "POST",
       "endpoint": "/api/transactions",
       "outcome": "passed",
-      "duration_s": 1.243,
+      "duration_s": 0.062,
       "checks": [
         {
           "check": "the create transaction endpoint answers 201",
-          "ok": true
+          "ok": true,
+          "detail": "status=201, body={\"message\":\"Transaction created\",\"transaction_id\":41}\n"
         },
         {
           "check": "the response contains a positive transaction_id",
@@ -88,11 +91,12 @@
       "method": "GET",
       "endpoint": "/api/transactions/{transaction_id}",
       "outcome": "passed",
-      "duration_s": 0.009,
+      "duration_s": 0.024,
       "checks": [
         {
           "check": "the transaction-by-id endpoint answers 200",
-          "ok": true
+          "ok": true,
+          "detail": "status=200"
         },
         {
           "check": "the response transaction_id matches the requested id",
@@ -110,11 +114,12 @@
       "method": "DELETE",
       "endpoint": "/api/transactions/{transaction_id}",
       "outcome": "passed",
-      "duration_s": 0.032,
+      "duration_s": 0.021,
       "checks": [
         {
           "check": "the delete transaction endpoint answers 200",
-          "ok": true
+          "ok": true,
+          "detail": "status=200"
         },
         {
           "check": "the response contains deleted id matching the transaction",
@@ -130,7 +135,7 @@
     "failed": 0,
     "skipped": 0,
     "checks": 14,
-    "duration_s": 1.32,
+    "duration_s": 0.151,
     "result": "passed"
   }
 }

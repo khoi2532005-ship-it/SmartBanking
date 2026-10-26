@@ -181,24 +181,6 @@ services:
   # ---------------------------------------------------------------------
   # Fraud Alerts (Khoi) - three images: db 5013, api 5003, web 3003
   # ---------------------------------------------------------------------
-  fraud-database-service:
-    build:
-      context: .
-      dockerfile: services/fraud-alerts/database/Dockerfile
-    image: smartbank-fraud-db:0.1
-    container_name: fraud-database-service
-    ports:
-      - "5013:5013"
-    volumes:
-      - fraud-data:/app/data
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5013/')"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
-    restart: unless-stopped
-    networks: [smartbank]
 
   fraud-service:
     build:
@@ -210,7 +192,6 @@ services:
       - "5003:5003"
     environment:
       <<: *llm-env
-      FRAUD_DB_URL: http://fraud-database-service:5013
       ACCOUNTS_SERVICE_URL: http://accounts:5001
       TRANSACTIONS_SERVICE_URL: http://transactions:5005
       TRANSACTIONS_SOURCE: ${TRANSACTIONS_SOURCE:-seed}
@@ -219,8 +200,6 @@ services:
       FRAUD_FRONTEND_ORIGINS: ${FRAUD_FRONTEND_ORIGINS:-}
     extra_hosts: *host-gateway
     depends_on:
-      fraud-database-service:
-        condition: service_healthy
       accounts:
         condition: service_started
       transactions:

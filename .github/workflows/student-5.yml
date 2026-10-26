@@ -241,7 +241,7 @@ jobs:
           ENDPOINT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           python -m pytest services/transactions/backend/tests/post_commit \
-            -v --junitxml=reports/student-5-endpoint-tests.xml
+            -v -o junit_family=xunit1 --junitxml=reports/student-5-endpoint-tests.xml
 
       - name: Endpoint test report to the job summary
         if: always()

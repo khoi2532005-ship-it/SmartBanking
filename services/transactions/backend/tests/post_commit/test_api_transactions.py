@@ -10,15 +10,23 @@ TIMEOUT = 10
 _shared = {}
 
 
-def _record(record_property, desc: str, ok: bool):
-    record_property("check", json.dumps({"check": desc, "ok": ok}))
-    assert ok, desc
+def _record(record_property, desc: str, ok: bool, detail: str = ""):
+    data = {"check": desc, "ok": ok}
+    if detail:
+        data["detail"] = detail
+    record_property("check", json.dumps(data))
+    assert ok, f"{desc}: {detail}" if detail else desc
 
 
 @pytest.mark.endpoint("GET", "/api/health")
 def test_service_health(record_property):
     response = requests.get(f"{API_URL}/api/health", timeout=TIMEOUT)
-    _record(record_property, "the health endpoint answers 200", response.status_code == 200)
+    _record(
+        record_property,
+        "the health endpoint answers 200",
+        response.status_code == 200,
+        detail=f"status={response.status_code}",
+    )
 
     data = response.json()
     _record(
@@ -36,7 +44,12 @@ def test_service_health(record_property):
 @pytest.mark.endpoint("GET", "/api/transactions")
 def test_transactions_list(record_property):
     response = requests.get(f"{API_URL}/api/transactions", timeout=TIMEOUT)
-    _record(record_property, "the transactions endpoint answers 200", response.status_code == 200)
+    _record(
+        record_property,
+        "the transactions endpoint answers 200",
+        response.status_code == 200,
+        detail=f"status={response.status_code}",
+    )
 
     txs = response.json()
     _record(
@@ -66,9 +79,14 @@ def test_create_transaction(record_property):
         "date": "2026-10-26",
     }
     response = requests.post(f"{API_URL}/api/transactions", json=payload, timeout=TIMEOUT)
-    _record(record_property, "the create transaction endpoint answers 201", response.status_code == 201)
+    _record(
+        record_property,
+        "the create transaction endpoint answers 201",
+        response.status_code == 201,
+        detail=f"status={response.status_code}, body={response.text[:200]}",
+    )
 
-    data = response.json()
+    data = response.json() if response.status_code == 201 else {}
     tx_id = data.get("transaction_id")
     _shared["created_id"] = tx_id
     _record(
@@ -91,7 +109,12 @@ def test_transaction_by_id(record_property):
         tx_id = txs[0]["transaction_id"]
 
     response = requests.get(f"{API_URL}/api/transactions/{tx_id}", timeout=TIMEOUT)
-    _record(record_property, "the transaction-by-id endpoint answers 200", response.status_code == 200)
+    _record(
+        record_property,
+        "the transaction-by-id endpoint answers 200",
+        response.status_code == 200,
+        detail=f"status={response.status_code}",
+    )
 
     data = response.json()
     _record(
@@ -110,21 +133,25 @@ def test_transaction_by_id(record_property):
 def test_delete_transaction(record_property):
     tx_id = _shared.get("created_id")
     if not tx_id:
-        # Create a temporary transaction to delete
         payload = {
             "account_id": 1,
             "amount": 10.0,
             "currency": "AUD",
             "type": "Withdrawal",
             "category": "Other",
-            "description": "Temp deletion test",
             "date": "2026-10-26",
         }
         create_res = requests.post(f"{API_URL}/api/transactions", json=payload, timeout=TIMEOUT)
-        tx_id = create_res.json().get("transaction_id")
+        if create_res.status_code == 201:
+            tx_id = create_res.json().get("transaction_id")
 
     response = requests.delete(f"{API_URL}/api/transactions/{tx_id}", timeout=TIMEOUT)
-    _record(record_property, "the delete transaction endpoint answers 200", response.status_code == 200)
+    _record(
+        record_property,
+        "the delete transaction endpoint answers 200",
+        response.status_code == 200,
+        detail=f"status={response.status_code}",
+    )
 
     data = response.json()
     _record(

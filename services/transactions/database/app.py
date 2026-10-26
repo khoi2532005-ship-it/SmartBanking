@@ -1,12 +1,37 @@
 import os
 import sqlite3
+import threading
+import time
 
 import requests
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://localhost:5001")
+ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://localhost:5001").rstrip("/")
+_accounts_online = False
+
+
+def _probe_accounts():
+    global _accounts_online
+    if not ACCOUNTS_SERVICE_URL:
+        _accounts_online = False
+        return
+    try:
+        res = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/health", timeout=2)
+        _accounts_online = (res.status_code == 200)
+    except Exception:
+        _accounts_online = False
+
+
+def _accounts_monitor():
+    while True:
+        _probe_accounts()
+        time.sleep(30)
+
+
+_monitor_thread = threading.Thread(target=_accounts_monitor, daemon=True)
+_monitor_thread.start()
 
 
 @app.errorhandler(Exception)
@@ -46,6 +71,8 @@ def health():
 
 @app.get("/customers")
 def get_customers():
+    if not _accounts_online:
+        return jsonify([])
     try:
         response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/customers", timeout=5)
         response.raise_for_status()
@@ -57,6 +84,8 @@ def get_customers():
 
 @app.get("/accounts")
 def get_accounts():
+    if not _accounts_online:
+        return jsonify([])
     try:
         response = requests.get(
             f"{ACCOUNTS_SERVICE_URL}/api/accounts",
@@ -81,14 +110,22 @@ def create_transaction():
         if field not in data or data.get(field) in (None, ""):
             return jsonify({"error": f"{field} required"}), 400
 
-    try:
-        response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/accounts/{data['account_id']}", timeout=5)
-        if response.status_code == 404:
-            return jsonify({"error": "Account not found"}), 404
-        response.raise_for_status()
-    except Exception as exc:
-        app.logger.exception("Failed to validate account with accounts service", exc_info=exc)
-        return jsonify({"error": f"accounts service unavailable: {exc}"}), 503
+    if _accounts_online:
+        try:
+            response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/accounts/{data['account_id']}", timeout=2)
+            if response.status_code == 404:
+                return jsonify({"error": "Account not found"}), 404
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                return jsonify({"error": "Account not found"}), 404
+            app.logger.warning("Accounts service HTTP error during validation: %s", exc)
+        except Exception as exc:
+            app.logger.warning(
+                "Accounts service unreachable (%s); proceeding with unvalidated account_id %s",
+                exc,
+                data["account_id"],
+            )
 
     conn = get_db_connection()
     cursor = conn.execute(
@@ -127,7 +164,7 @@ def get_transactions():
         params.append(account_id)
 
     customer_id = request.args.get("customer_id")
-    if customer_id:
+    if customer_id and _accounts_online:
         try:
             accounts_response = requests.get(
                 f"{ACCOUNTS_SERVICE_URL}/api/accounts",
@@ -230,17 +267,24 @@ def update_transaction(transaction_id):
         conn.close()
         return jsonify({"error": "Transaction not found"}), 404
 
-    if "account_id" in data:
+    if "account_id" in data and _accounts_online:
         try:
-            response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/accounts/{data['account_id']}", timeout=5)
+            response = requests.get(f"{ACCOUNTS_SERVICE_URL}/api/accounts/{data['account_id']}", timeout=2)
             if response.status_code == 404:
                 conn.close()
                 return jsonify({"error": "Account not found"}), 404
             response.raise_for_status()
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                conn.close()
+                return jsonify({"error": "Account not found"}), 404
+            app.logger.warning("Accounts service HTTP error during validation: %s", exc)
         except Exception as exc:
-            conn.close()
-            app.logger.exception("Failed to validate updated account with accounts service", exc_info=exc)
-            return jsonify({"error": f"accounts service unavailable: {exc}"}), 503
+            app.logger.warning(
+                "Accounts service unreachable (%s); proceeding with update: %s",
+                exc,
+                data["account_id"],
+            )
 
     conn.execute(
         """
