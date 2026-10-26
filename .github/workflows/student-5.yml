@@ -193,12 +193,79 @@ jobs:
         run: docker compose -f "$COMPOSE_FILE" down -v
 
   # =====================================================================
-  # 4. Evidence gate - run-linked report for the technical report
+  # 4. Endpoint test gate - pytest endpoint suite against the running stack
+  # =====================================================================
+  endpoint-tests:
+    name: Endpoint tests
+    runs-on: ubuntu-latest
+    needs: [build-image, unit-tests]
+    timeout-minutes: 15
+    env:
+      COMPOSE_FILE: docker-compose.yml
+      SERVICES: transactions
+      MCP_ENABLED: "false"
+      RAG_ENABLED: "false"
+      MULTI_AGENT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test runner dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests
+
+      - name: Start the transactions stack
+        run: docker compose -f "$COMPOSE_FILE" up -d --no-deps $SERVICES
+
+      - name: Probe transactions endpoint
+        run: |
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 2 "http://localhost:5005/api/health" || true)
+            if [ "$code" = "200" ]; then
+              echo "transactions API is healthy"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run transactions post-commit endpoint tests
+        env:
+          TRANSACTIONS_API_URL: http://localhost:5005
+          ENDPOINT_REPORT_DIR: reports
+          ENDPOINT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          ENDPOINT_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          python -m pytest services/transactions/backend/tests/post_commit \
+            -v --junitxml=reports/student-5-endpoint-tests.xml
+
+      - name: Endpoint test report to the job summary
+        if: always()
+        run: cat reports/post-commit-endpoint-report-student-5.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no endpoint report was written" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" down -v
+
+      - name: Upload endpoint test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-5-endpoint-tests
+          path: reports/
+          retention-days: 30
+
+  # =====================================================================
+  # 5. Evidence gate - run-linked report for the technical report
   # =====================================================================
   evidence-pack:
     name: Evidence pack
     runs-on: ubuntu-latest
-    needs: smoke-check
+    needs: [smoke-check, endpoint-tests]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -219,7 +286,8 @@ jobs:
             "generated_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "gates": {
               "build": "passed",
-              "smoke": "passed"
+              "smoke": "passed",
+              "endpoint_tests": "passed"
             }
           }
           JSON
@@ -239,6 +307,7 @@ jobs:
 
           - Build: transactions service image built successfully
           - Smoke: ports 5015, 5005 and 3005 returned HTTP 200
+          - Endpoint tests: pytest endpoint test suite passed
           - MCP/RAG: integrations retained in the feature but disabled in CI (MCP_ENABLED=false, RAG_ENABLED=false)
           - Teardown: \`docker compose down -v\` ran
 

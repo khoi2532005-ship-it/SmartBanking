@@ -9,6 +9,11 @@ os.makedirs(DATA_DIR, exist_ok=True)
 conn = sqlite3.connect(DATABASE_NAME)
 cursor = conn.cursor()
 
+# Drop legacy tables from earlier releases if present
+cursor.execute("DROP TABLE IF EXISTS transactions")
+cursor.execute("DROP TABLE IF EXISTS accounts")
+cursor.execute("DROP TABLE IF EXISTS customers")
+
 # Transactions table
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS transactions (
