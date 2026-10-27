@@ -2,22 +2,34 @@
 platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0 -- /opt/hostedtoolcache/Python/3.12.15/x64/bin/python
 cachedir: .pytest_cache
 rootdir: /home/runner/work/SmartBanking/SmartBanking/services/fraud-alerts/backend
-collecting ... collected 14 items
+collecting ... collected 26 items
 
-tests/post_commit/test_alerts_endpoint.py::test_list_returns_alerts_newest_first PASSED [  7%]
-tests/post_commit/test_alerts_endpoint.py::test_filters_return_exactly_the_matching_alerts[status] PASSED [ 14%]
-tests/post_commit/test_alerts_endpoint.py::test_filters_return_exactly_the_matching_alerts[customer_id] PASSED [ 21%]
-tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params0-status must be one of new, reviewed, dismissed, confirmed] PASSED [ 28%]
-tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params1-min_amount must be a number] PASSED [ 35%]
-tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params2-customer_id must be a positive integer] PASSED [ 42%]
-tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params3-date_from must be an ISO date] PASSED [ 50%]
-tests/post_commit/test_rules_endpoint.py::test_rule_crud_cycle PASSED    [ 57%]
-tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body0-rule_name is required] PASSED [ 64%]
-tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body1-rule_type must be one of] PASSED [ 71%]
-tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body2-velocity needs threshold_secondary] PASSED [ 78%]
-tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body3-start and end hours must differ] PASSED [ 85%]
-tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body4-threshold_value must be a finite number] PASSED [ 92%]
-tests/post_commit/test_rules_endpoint.py::test_form_posts_are_400 PASSED [100%]
+tests/post_commit/test_alerts_endpoint.py::test_list_returns_alerts_newest_first PASSED [  3%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params0-expected0] PASSED [  7%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params1-expected1] PASSED [ 11%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params2-expected2] PASSED [ 15%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params3-expected3] PASSED [ 19%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params4-expected4] PASSED [ 23%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params5-expected5] PASSED [ 26%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params6-expected6] PASSED [ 30%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params7-expected7] PASSED [ 34%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params8-expected8] PASSED [ 38%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params9-expected9] PASSED [ 42%]
+tests/post_commit/test_alerts_endpoint.py::test_each_filter_returns_exactly_the_matching_alerts[params10-expected10] PASSED [ 46%]
+tests/post_commit/test_alerts_endpoint.py::test_a_filter_on_its_own_returns_only_matching_alerts PASSED [ 50%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params0-status must be one of new, reviewed, dismissed, confirmed] PASSED [ 53%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params1-min_amount must be a number] PASSED [ 57%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params2-customer_id must be a positive integer] PASSED [ 61%]
+tests/post_commit/test_alerts_endpoint.py::test_unusable_filters_are_400[params3-date_from must be an ISO date] PASSED [ 65%]
+tests/post_commit/test_rules_endpoint.py::test_rule_crud_cycle PASSED    [ 69%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body0-rule_name is required] PASSED [ 73%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body1-rule_type must be one of] PASSED [ 76%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body2-velocity needs threshold_secondary] PASSED [ 80%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body3-start and end hours must differ] PASSED [ 84%]
+tests/post_commit/test_rules_endpoint.py::test_invalid_rules_are_400_and_store_nothing[body4-threshold_value must be a finite number] PASSED [ 88%]
+tests/post_commit/test_rules_endpoint.py::test_form_posts_are_400 PASSED [ 92%]
+tests/post_commit/test_rules_endpoint.py::test_sweep_removes_what_an_interrupted_run_left PASSED [ 96%]
+tests/post_commit/test_rules_endpoint.py::test_a_test_rule_with_other_customers_alerts_is_left_for_a_person PASSED [100%]
 
 - generated xml file: /home/runner/work/SmartBanking/SmartBanking/services/fraud-alerts/backend/reports/student-3-endpoint-tests.xml -
-============================== 14 passed in 0.21s ==============================
+============================== 26 passed in 0.49s ==============================
