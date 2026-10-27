@@ -1,0 +1,9 @@
+{
+  "commit": "dc11f1f",
+  "run_id": "40550213747",
+  "tests": [
+    {"method": "POST", "endpoint": "/api/agents/workflow", "outcome": "passed"},
+    {"method": "GET", "endpoint": "/api/agents/workflow/<id>", "outcome": "passed"}
+  ],
+  "summary": {"passed": 2, "checks": 6, "result": "passed"}
+}
