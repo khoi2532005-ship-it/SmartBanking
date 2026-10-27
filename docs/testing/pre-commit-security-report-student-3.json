@@ -1,0 +1,72 @@
+{
+  "student": "student-3",
+  "name": "Khoi",
+  "feature": "fraud-alerts",
+  "paths": [
+    "services/fraud-alerts",
+    ".github/workflows/student-3.yml"
+  ],
+  "commit": "12a2cb1",
+  "ran_at": "2026-10-27T02:40:46Z",
+  "config": ".pre-commit-config.yaml",
+  "command": "pre-commit run --files $(git ls-files services/fraud-alerts .github/workflows/student-3.yml)",
+  "tools": {
+    "ruff": "0.6.9",
+    "detect-secrets": "1.5.0",
+    "pip-audit": "2.7.3"
+  },
+  "scans": [
+    {
+      "name": "ruff-security",
+      "rules": "S (flake8-bandit); S101 ignored in test files only",
+      "result": "passed",
+      "findings": 2,
+      "fixed": 0,
+      "accepted": [
+        {
+          "id": "S104",
+          "file": "services/fraud-alerts/backend/app.py",
+          "line": 122,
+          "reason": "the backend binds 0.0.0.0 so the frontend and the other services can reach it on the Docker network"
+        },
+        {
+          "id": "S104",
+          "file": "services/fraud-alerts/database/app.py",
+          "line": 418,
+          "reason": "the database service binds 0.0.0.0 so the fraud backend can reach it on the Docker network"
+        }
+      ],
+      "note": "counted with --ignore-noqa: these two lines are the only S findings in services/fraud-alerts"
+    },
+    {
+      "name": "detect-secrets",
+      "baseline": ".secrets.baseline",
+      "result": "passed",
+      "findings": 0,
+      "fixed": 0,
+      "accepted": [],
+      "note": "no secrets in the fraud files; the baseline is empty, so nothing is allowlisted"
+    },
+    {
+      "name": "pip-audit",
+      "files": [
+        "services/fraud-alerts/backend/requirements.txt",
+        "services/fraud-alerts/database/requirements.txt"
+      ],
+      "result": "passed",
+      "findings": 0,
+      "fixed": 0,
+      "accepted": [],
+      "note": "both fraud requirements hooks passed with no reported advisories"
+    }
+  ],
+  "summary": {
+    "scans": 3,
+    "passed": 3,
+    "failed": 0,
+    "findings": 2,
+    "fixed": 0,
+    "accepted": 2,
+    "result": "passed"
+  }
+}
