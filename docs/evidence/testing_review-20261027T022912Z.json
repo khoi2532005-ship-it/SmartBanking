@@ -1,0 +1,219 @@
+{
+  "mode": "testing_review",
+  "timestamp": "20261027T022912Z",
+  "plan": {
+    "goal": "Review every student's pre-commit security report and post-commit endpoint test report and write the Testing Review entry from their figures",
+    "checks": [
+      "the reports under docs/testing follow the team naming convention (student-1 to student-5)",
+      "each pre-commit report names its scans with findings, fixed and accepted counts and a result",
+      "each post-commit report names the endpoints tested, their outcomes and the check count (or JUnit totals)",
+      "the entry quotes every scan name, count, outcome and the coverage exactly as the reports say",
+      "a failed report or a student without a report makes the verdict ATTENTION, never PASS"
+    ],
+    "stop_condition": "An entry passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "Pre-commit reports: student-2 ruff-security 3/0/3 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-4 ruff-security 21/0/21 passed, detect-secrets 0/0/0 passed, pip-audit 7/7/0 passed; no pre-commit report: student-1, student-3, student-5. Post-commit reports: student-2 GET /api/health passed, GET /api/loans passed, GET /api/loans/{loan_id} passed, GET /api/loans/{loan_id}/eligibility passed, GET /api/repayments passed, GET /api/repayments/{repayment_id} passed, GET /api/repayments/upcoming passed (7/7 endpoints, 21 checks); student-3 14 tests 0 failures 0 errors (junit); student-4 GET /api/budgets/summary passed, POST /api/budgets passed (2/2 endpoints, 31 checks); no post-commit report: student-1, student-5. Coverage 2 of 5 pre-commit, 3 of 5 post-commit; missing one or both: student-1, student-3, student-5; failed: none",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "reports_dir": "docs/testing",
+      "students": [
+        {
+          "student": "student-1",
+          "feature": "accounts",
+          "pre_commit": null,
+          "post_commit": null
+        },
+        {
+          "student": "student-2",
+          "feature": "loans",
+          "pre_commit": {
+            "file": "docs/testing/pre-commit-security-report-student-2.json",
+            "commit": "f5125cc",
+            "scans": [
+              {
+                "name": "ruff-security",
+                "result": "passed",
+                "findings": 3,
+                "fixed": 0,
+                "accepted": 3
+              },
+              {
+                "name": "detect-secrets",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "pip-audit",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              }
+            ],
+            "result": "passed"
+          },
+          "post_commit": {
+            "file": "docs/testing/post-commit-endpoint-report-student-2.json",
+            "source": "json",
+            "commit": "f5125cc",
+            "run_id": "39757287753",
+            "tests": [
+              {
+                "method": "GET",
+                "endpoint": "/api/health",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans/{loan_id}",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans/{loan_id}/eligibility",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments/{repayment_id}",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments/upcoming",
+                "outcome": "passed"
+              }
+            ],
+            "endpoints": 7,
+            "passed": 7,
+            "checks": 21,
+            "result": "passed"
+          }
+        },
+        {
+          "student": "student-3",
+          "feature": "fraud-alerts",
+          "pre_commit": null,
+          "post_commit": {
+            "file": "docs/release-2/ci/student-3/student-3-endpoint-tests.xml",
+            "source": "junit",
+            "tests": 14,
+            "failures": 0,
+            "errors": 0,
+            "result": "passed"
+          }
+        },
+        {
+          "student": "student-4",
+          "feature": "budgeting",
+          "pre_commit": {
+            "file": "docs/testing/pre-commit-security-report-student-4.json",
+            "commit": "fa227e0",
+            "scans": [
+              {
+                "name": "ruff-security",
+                "result": "passed",
+                "findings": 21,
+                "fixed": 0,
+                "accepted": 21
+              },
+              {
+                "name": "detect-secrets",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "pip-audit",
+                "result": "passed",
+                "findings": 7,
+                "fixed": 7,
+                "accepted": 0
+              }
+            ],
+            "result": "passed"
+          },
+          "post_commit": {
+            "file": "docs/testing/post-commit-endpoint-report-student-4.json",
+            "source": "json",
+            "commit": "fa227e0",
+            "run_id": "39725293520",
+            "tests": [
+              {
+                "method": "GET",
+                "endpoint": "/api/budgets/summary",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/budgets",
+                "outcome": "passed"
+              }
+            ],
+            "endpoints": 2,
+            "passed": 2,
+            "checks": 31,
+            "result": "passed"
+          }
+        },
+        {
+          "student": "student-5",
+          "feature": "transactions",
+          "pre_commit": null,
+          "post_commit": null
+        }
+      ],
+      "with_pre_commit": [
+        "student-2",
+        "student-4"
+      ],
+      "with_post_commit": [
+        "student-2",
+        "student-3",
+        "student-4"
+      ],
+      "missing": [
+        "student-1",
+        "student-3",
+        "student-5"
+      ],
+      "failed": [],
+      "unreadable": [],
+      "attention": true,
+      "student_count": 5
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Pre-commit: student-1 none; student-2 ruff-security 3/0/3 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-3 none; student-4 ruff-security 21/0/21 passed, detect-secrets 0/0/0 passed, pip-audit 7/7/0 passed; student-5 none\nPost-commit: student-1 none; student-2 GET /api/health passed, GET /api/loans passed, GET /api/loans/{loan_id} passed, GET /api/loans/{loan_id}/eligibility passed, GET /api/repayments passed, GET /api/repayments/{repayment_id} passed, GET /api/repayments/upcoming passed (7/7 endpoints, 21 checks); student-3 14 tests 0 failures 0 errors (junit); student-4 GET /api/budgets/summary passed, POST /api/budgets passed (2/2 endpoints, 31 checks); student-5 none\nCoverage: 2 of 5 students have a pre-commit report, 3 of 5 have a post-commit report; missing: student-1, student-3, student-5\nRecommendation: The team must provide missing pre-commit and post-commit testing evidence for student-1 and student-5, and a pre-commit report for student-3.\nVerdict: ATTENTION - The testing evidence is incomplete because student-1 and student-5 are missing both pre-commit and post-commit reports, and student-3 is missing a pre-commit report.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: No evidence-backed risk identified.\nCorrection: No correction required.\nRetest: Repeat validation after future changes.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}
