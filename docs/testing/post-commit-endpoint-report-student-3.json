@@ -1,0 +1,479 @@
+{
+  "student": "student-3",
+  "name": "Khoi",
+  "feature": "fraud-alerts",
+  "workflow": "student-3-fraud-ci",
+  "job": "endpoint-tests",
+  "commit": "6c97f6d",
+  "branch": "main",
+  "run_id": "40203858561",
+  "run_url": "https://github.com/khoi2532005-ship-it/SmartBanking/actions/runs/40203858561",
+  "ran_at": "2026-10-25T14:48:05Z",
+  "api_url": "http://localhost:5003",
+  "integrations": {
+    "ai_mode": "disabled",
+    "mcp": "disabled",
+    "rag": "disabled",
+    "multi_agent": "disabled"
+  },
+  "endpoint_functions": [
+    "GET /api/alerts",
+    "POST /api/rules"
+  ],
+  "pytest_exit_status": 0,
+  "tests": [
+    {
+      "test": "test_list_returns_alerts_newest_first",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.046,
+      "checks": [
+        {
+          "check": "answers 200",
+          "ok": true
+        },
+        {
+          "check": "lists the planted alerts newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params0-expected0]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.007,
+      "checks": [
+        {
+          "check": "no filter returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params1-expected1]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.007,
+      "checks": [
+        {
+          "check": "status=reviewed returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params2-expected2]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.006,
+      "checks": [
+        {
+          "check": "customer_id=<test customer> returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params3-expected3]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.007,
+      "checks": [
+        {
+          "check": "customer_id=<another customer> returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params4-expected4]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.009,
+      "checks": [
+        {
+          "check": "min_amount=5000 returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params5-expected5]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.01,
+      "checks": [
+        {
+          "check": "max_amount=5000 returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params6-expected6]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.009,
+      "checks": [
+        {
+          "check": "date_from=2026-02-15 returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params7-expected7]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.007,
+      "checks": [
+        {
+          "check": "date_to=2026-02-15 returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params8-expected8]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.006,
+      "checks": [
+        {
+          "check": "q=Gamma (recipient) returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params9-expected9]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.006,
+      "checks": [
+        {
+          "check": "q=transfer (category) returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_each_filter_returns_exactly_the_matching_alerts[params10-expected10]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.006,
+      "checks": [
+        {
+          "check": "status=new and max_amount=100 returns exactly the matching alerts, newest first",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_a_filter_on_its_own_returns_only_matching_alerts",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.006,
+      "checks": [
+        {
+          "check": "a single filter returns only alerts that match it",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_unusable_filters_are_400[params0-status must be one of new, reviewed, dismissed, confirmed]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.003,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: status must be one of new, reviewed, dismissed, confirmed",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_unusable_filters_are_400[params1-min_amount must be a number]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.003,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: min_amount must be a number",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_unusable_filters_are_400[params2-customer_id must be a positive integer]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.003,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: customer_id must be a positive integer",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_unusable_filters_are_400[params3-date_from must be an ISO date]",
+      "method": "GET",
+      "endpoint": "/api/alerts",
+      "outcome": "passed",
+      "duration_s": 0.061,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: date_from must be an ISO date",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_rule_crud_cycle",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.062,
+      "checks": [
+        {
+          "check": "create answers 201 and stores the rule disabled",
+          "ok": true
+        },
+        {
+          "check": "read returns the stored fields",
+          "ok": true
+        },
+        {
+          "check": "update answers 200 and the rule stays disabled",
+          "ok": true
+        },
+        {
+          "check": "delete answers 200",
+          "ok": true
+        },
+        {
+          "check": "a deleted rule reads as 404",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_invalid_rules_are_400_and_store_nothing[body0-rule_name is required]",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.009,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: rule_name is required",
+          "ok": true
+        },
+        {
+          "check": "nothing is stored",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_invalid_rules_are_400_and_store_nothing[body1-rule_type must be one of]",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.009,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: rule_type must be one of",
+          "ok": true
+        },
+        {
+          "check": "nothing is stored",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_invalid_rules_are_400_and_store_nothing[body2-velocity needs threshold_secondary]",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.009,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: velocity needs threshold_secondary",
+          "ok": true
+        },
+        {
+          "check": "nothing is stored",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_invalid_rules_are_400_and_store_nothing[body3-start and end hours must differ]",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.008,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: start and end hours must differ",
+          "ok": true
+        },
+        {
+          "check": "nothing is stored",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_invalid_rules_are_400_and_store_nothing[body4-threshold_value must be a finite number]",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.008,
+      "checks": [
+        {
+          "check": "answers 400",
+          "ok": true
+        },
+        {
+          "check": "error says: threshold_value must be a finite number",
+          "ok": true
+        },
+        {
+          "check": "nothing is stored",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_form_posts_are_400",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.004,
+      "checks": [
+        {
+          "check": "a form-encoded body answers 400 \"JSON body required\"",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_sweep_removes_what_an_interrupted_run_left",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.073,
+      "checks": [
+        {
+          "check": "the sweep removes a test rule and its test alert left by an interrupted run",
+          "ok": true
+        }
+      ],
+      "error": ""
+    },
+    {
+      "test": "test_a_test_rule_with_other_customers_alerts_is_left_for_a_person",
+      "method": "POST",
+      "endpoint": "/api/rules",
+      "outcome": "passed",
+      "duration_s": 0.041,
+      "checks": [
+        {
+          "check": "cleanup refuses a test rule whose alerts belong to another customer",
+          "ok": true
+        },
+        {
+          "check": "that customer's alert is kept",
+          "ok": true
+        }
+      ],
+      "error": ""
+    }
+  ],
+  "summary": {
+    "tests": 26,
+    "passed": 26,
+    "failed": 0,
+    "checks": 46,
+    "endpoint_functions": 2,
+    "duration_s": 0.492,
+    "result": "passed"
+  }
+}
