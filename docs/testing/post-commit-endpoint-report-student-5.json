@@ -4,138 +4,72 @@
   "feature": "transactions",
   "workflow": "student-5-transactions-ci",
   "job": "endpoint-tests",
-  "commit": "ddd6881",
+  "commit": "b64a6a8",
   "branch": "main",
   "run_id": "local",
   "run_url": "",
-  "ran_at": "2026-10-26T12:40:41Z",
+  "ran_at": "2026-10-27T12:51:10Z",
   "api_url": "http://localhost:5005",
   "integrations": {
     "mcp": "disabled",
     "rag": "disabled",
     "multi_agent": "disabled"
   },
-  "pytest_exit_status": 0,
+  "pytest_exit_status": 1,
   "tests": [
     {
       "test": "test_service_health",
       "method": "GET",
       "endpoint": "/api/health",
-      "outcome": "passed",
-      "duration_s": 0.026,
-      "checks": [
-        {
-          "check": "the health endpoint answers 200",
-          "ok": true,
-          "detail": "status=200"
-        },
-        {
-          "check": "the service identifies itself as transactions-service",
-          "ok": true
-        },
-        {
-          "check": "the service status is running",
-          "ok": true
-        }
-      ],
-      "error": ""
+      "outcome": "failed",
+      "duration_s": 0.002,
+      "checks": [],
+      "error": "requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=5005): Max retries exceeded with url: /api/health (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5005): Failed to establish a new connection: [Errno 61] Connection refused\"))"
     },
     {
       "test": "test_transactions_list",
       "method": "GET",
       "endpoint": "/api/transactions",
-      "outcome": "passed",
-      "duration_s": 0.018,
-      "checks": [
-        {
-          "check": "the transactions endpoint answers 200",
-          "ok": true,
-          "detail": "status=200"
-        },
-        {
-          "check": "the response contains at least one transaction",
-          "ok": true
-        },
-        {
-          "check": "every transaction has transaction_id, account_id, amount, and date",
-          "ok": true
-        }
-      ],
-      "error": ""
+      "outcome": "failed",
+      "duration_s": 0.001,
+      "checks": [],
+      "error": "requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=5005): Max retries exceeded with url: /api/transactions (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5005): Failed to establish a new connection: [Errno 61] Connection refused\"))"
     },
     {
       "test": "test_create_transaction",
       "method": "POST",
       "endpoint": "/api/transactions",
-      "outcome": "passed",
-      "duration_s": 0.062,
-      "checks": [
-        {
-          "check": "the create transaction endpoint answers 201",
-          "ok": true,
-          "detail": "status=201, body={\"message\":\"Transaction created\",\"transaction_id\":41}\n"
-        },
-        {
-          "check": "the response contains a positive transaction_id",
-          "ok": true
-        },
-        {
-          "check": "the response confirms transaction creation",
-          "ok": true
-        }
-      ],
-      "error": ""
+      "outcome": "failed",
+      "duration_s": 0.001,
+      "checks": [],
+      "error": "requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=5005): Max retries exceeded with url: /api/transactions (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5005): Failed to establish a new connection: [Errno 61] Connection refused\"))"
     },
     {
       "test": "test_transaction_by_id",
       "method": "GET",
       "endpoint": "/api/transactions/{transaction_id}",
-      "outcome": "passed",
-      "duration_s": 0.024,
-      "checks": [
-        {
-          "check": "the transaction-by-id endpoint answers 200",
-          "ok": true,
-          "detail": "status=200"
-        },
-        {
-          "check": "the response transaction_id matches the requested id",
-          "ok": true
-        },
-        {
-          "check": "the response contains account_id and amount",
-          "ok": true
-        }
-      ],
-      "error": ""
+      "outcome": "failed",
+      "duration_s": 0.001,
+      "checks": [],
+      "error": "requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=5005): Max retries exceeded with url: /api/transactions (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5005): Failed to establish a new connection: [Errno 61] Connection refused\"))"
     },
     {
       "test": "test_delete_transaction",
       "method": "DELETE",
       "endpoint": "/api/transactions/{transaction_id}",
-      "outcome": "passed",
-      "duration_s": 0.021,
-      "checks": [
-        {
-          "check": "the delete transaction endpoint answers 200",
-          "ok": true,
-          "detail": "status=200"
-        },
-        {
-          "check": "the response contains deleted id matching the transaction",
-          "ok": true
-        }
-      ],
-      "error": ""
+      "outcome": "failed",
+      "duration_s": 0.001,
+      "checks": [],
+      "error": "requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=5005): Max retries exceeded with url: /api/transactions (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5005): Failed to establish a new connection: [Errno 61] Connection refused\"))"
     }
   ],
   "summary": {
     "endpoints": 5,
-    "passed": 5,
-    "failed": 0,
+    "passed": 0,
+    "failed": 5,
     "skipped": 0,
-    "checks": 14,
-    "duration_s": 0.151,
-    "result": "passed"
+    "checks": 0,
+    "duration_s": 0.006,
+    "result": "failed"
   }
 }

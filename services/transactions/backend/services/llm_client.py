@@ -44,7 +44,7 @@ def _get_client():
             raise RuntimeError(
                 f"No API key configured for LLM_PROVIDER={name!r}."
             )
-        _client = OpenAI(base_url=config["base_url"], api_key=config["api_key"], timeout=3.0)
+        _client = OpenAI(base_url=config["base_url"], api_key=config["api_key"], timeout=3.0, max_retries=0)
         _client_provider = name
 
     return _client
