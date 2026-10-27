@@ -5,7 +5,7 @@ import requests
 
 DATABASE_SERVICE_URL = os.getenv("DATABASE_SERVICE_URL", "http://localhost:5015")
 ACCOUNTS_SERVICE_URL = os.getenv("ACCOUNTS_SERVICE_URL", "http://localhost:5001")
-TIMEOUT = 5
+TIMEOUT = 10
 
 
 def _params(query):
@@ -13,23 +13,29 @@ def _params(query):
 
 
 def search_customers(filters=None):
-    response = requests.get(
-        f"{ACCOUNTS_SERVICE_URL}/api/customers",
-        params=_params(filters),
-        timeout=TIMEOUT,
-    )
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = requests.get(
+            f"{ACCOUNTS_SERVICE_URL}/api/customers",
+            params=_params(filters),
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return []
 
 
 def search_accounts(filters=None):
-    response = requests.get(
-        f"{ACCOUNTS_SERVICE_URL}/api/accounts",
-        params=_params(filters),
-        timeout=TIMEOUT,
-    )
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = requests.get(
+            f"{ACCOUNTS_SERVICE_URL}/api/accounts",
+            params=_params(filters),
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return []
 
 
 def get_account_response(account_id):
