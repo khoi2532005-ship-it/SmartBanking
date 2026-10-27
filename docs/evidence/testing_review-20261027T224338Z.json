@@ -1,0 +1,711 @@
+{
+  "mode": "testing_review",
+  "timestamp": "20261027T224338Z",
+  "plan": {
+    "goal": "Review every student's pre-commit security report and post-commit endpoint test report and write the Testing Review entry from their figures",
+    "checks": [
+      "the reports under docs\\testing follow the team naming convention (student-1 to student-5)",
+      "each pre-commit report names its scans with findings, fixed and accepted counts and a result",
+      "each post-commit report names the endpoints tested, their outcomes and the check count (or JUnit totals)",
+      "the entry quotes every scan name, count, outcome and the coverage exactly as the reports say",
+      "a failed report or a student without a report makes the verdict ATTENTION, never PASS"
+    ],
+    "stop_condition": "An entry passes OBSERVE, or the retry budget is spent."
+  },
+  "evidence": {
+    "ok": true,
+    "summary": "Pre-commit reports: student-1 ruff-security 0/0/0 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-2 ruff-security 3/0/3 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-3 ruff-security 2/0/2 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-4 ruff-security 21/0/21 passed, detect-secrets 0/0/0 passed, pip-audit 7/7/0 passed; student-5 ruff-security 5/0/5 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; no pre-commit report: none. Post-commit reports: student-1 POST /api/agents/workflow 1/1 passed, GET /api/agents/workflow/<id> 1/1 passed (2 endpoints, 2/2 tests, 6 checks); student-2 GET /api/health 1/1 passed, GET /api/loans 1/1 passed, GET /api/loans/{loan_id} 1/1 passed, GET /api/loans/{loan_id}/eligibility 1/1 passed, GET /api/repayments 1/1 passed, GET /api/repayments/{repayment_id} 1/1 passed, GET /api/repayments/upcoming 1/1 passed (7 endpoints, 7/7 tests, 21 checks); student-3 GET /api/alerts 17/17 passed, POST /api/rules 9/9 passed (2 endpoints, 26/26 tests, 46 checks); student-4 GET /api/budgets/summary 1/1 passed, POST /api/budgets 1/1 passed (2 endpoints, 2/2 tests, 31 checks); student-5 GET /api/health 1/1 passed, GET /api/transactions 1/1 passed, POST /api/transactions 1/1 passed, GET /api/transactions/{transaction_id} 1/1 passed, DELETE /api/transactions/{transaction_id} 1/1 passed (5 endpoints, 5/5 tests, 14 checks); no post-commit report: none. Coverage 5 of 5 pre-commit, 5 of 5 post-commit; missing one or both: none; failed: none",
+    "degraded": false,
+    "note": "",
+    "facts": {
+      "reports_dir": "docs\\testing",
+      "students": [
+        {
+          "student": "student-1",
+          "feature": "accounts",
+          "pre_commit": {
+            "file": "docs\\testing\\pre-commit-security-report-student-1.json",
+            "commit": "46f3539",
+            "scans": [
+              {
+                "name": "ruff-security",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "detect-secrets",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "pip-audit",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              }
+            ],
+            "result": "passed"
+          },
+          "post_commit": {
+            "file": "docs\\testing\\post-commit-endpoint-report-student-1.json",
+            "source": "json",
+            "commit": "dc11f1f",
+            "run_id": "40550213747",
+            "tests": [
+              {
+                "method": "POST",
+                "endpoint": "/api/agents/workflow",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/agents/workflow/<id>",
+                "outcome": "passed"
+              }
+            ],
+            "endpoint_groups": [
+              {
+                "method": "POST",
+                "endpoint": "/api/agents/workflow",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "POST /api/agents/workflow 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/agents/workflow/<id>",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/agents/workflow/<id> 1/1 passed"
+              }
+            ],
+            "endpoints": 2,
+            "test_count": 2,
+            "passed": 2,
+            "checks": 6,
+            "result": "passed"
+          }
+        },
+        {
+          "student": "student-2",
+          "feature": "loans",
+          "pre_commit": {
+            "file": "docs\\testing\\pre-commit-security-report-student-2.json",
+            "commit": "f5125cc",
+            "scans": [
+              {
+                "name": "ruff-security",
+                "result": "passed",
+                "findings": 3,
+                "fixed": 0,
+                "accepted": 3
+              },
+              {
+                "name": "detect-secrets",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "pip-audit",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              }
+            ],
+            "result": "passed"
+          },
+          "post_commit": {
+            "file": "docs\\testing\\post-commit-endpoint-report-student-2.json",
+            "source": "json",
+            "commit": "f5125cc",
+            "run_id": "39757287753",
+            "tests": [
+              {
+                "method": "GET",
+                "endpoint": "/api/health",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans/{loan_id}",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans/{loan_id}/eligibility",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments/{repayment_id}",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments/upcoming",
+                "outcome": "passed"
+              }
+            ],
+            "endpoint_groups": [
+              {
+                "method": "GET",
+                "endpoint": "/api/health",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/health 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/loans 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans/{loan_id}",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/loans/{loan_id} 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/loans/{loan_id}/eligibility",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/loans/{loan_id}/eligibility 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/repayments 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments/{repayment_id}",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/repayments/{repayment_id} 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/repayments/upcoming",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/repayments/upcoming 1/1 passed"
+              }
+            ],
+            "endpoints": 7,
+            "test_count": 7,
+            "passed": 7,
+            "checks": 21,
+            "result": "passed"
+          }
+        },
+        {
+          "student": "student-3",
+          "feature": "fraud-alerts",
+          "pre_commit": {
+            "file": "docs\\testing\\pre-commit-security-report-student-3.json",
+            "commit": "12a2cb1",
+            "scans": [
+              {
+                "name": "ruff-security",
+                "result": "passed",
+                "findings": 2,
+                "fixed": 0,
+                "accepted": 2
+              },
+              {
+                "name": "detect-secrets",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "pip-audit",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              }
+            ],
+            "result": "passed"
+          },
+          "post_commit": {
+            "file": "docs\\testing\\post-commit-endpoint-report-student-3.json",
+            "source": "json",
+            "commit": "6c97f6d",
+            "run_id": "40203858561",
+            "tests": [
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcome": "passed"
+              }
+            ],
+            "endpoint_groups": [
+              {
+                "method": "GET",
+                "endpoint": "/api/alerts",
+                "outcomes": [
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed"
+                ],
+                "tests": 17,
+                "passed": 17,
+                "text": "GET /api/alerts 17/17 passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/rules",
+                "outcomes": [
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed",
+                  "passed"
+                ],
+                "tests": 9,
+                "passed": 9,
+                "text": "POST /api/rules 9/9 passed"
+              }
+            ],
+            "endpoints": 2,
+            "test_count": 26,
+            "passed": 26,
+            "checks": 46,
+            "result": "passed"
+          }
+        },
+        {
+          "student": "student-4",
+          "feature": "budgeting",
+          "pre_commit": {
+            "file": "docs\\testing\\pre-commit-security-report-student-4.json",
+            "commit": "fa227e0",
+            "scans": [
+              {
+                "name": "ruff-security",
+                "result": "passed",
+                "findings": 21,
+                "fixed": 0,
+                "accepted": 21
+              },
+              {
+                "name": "detect-secrets",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "pip-audit",
+                "result": "passed",
+                "findings": 7,
+                "fixed": 7,
+                "accepted": 0
+              }
+            ],
+            "result": "passed"
+          },
+          "post_commit": {
+            "file": "docs\\testing\\post-commit-endpoint-report-student-4.json",
+            "source": "json",
+            "commit": "fa227e0",
+            "run_id": "39725293520",
+            "tests": [
+              {
+                "method": "GET",
+                "endpoint": "/api/budgets/summary",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/budgets",
+                "outcome": "passed"
+              }
+            ],
+            "endpoint_groups": [
+              {
+                "method": "GET",
+                "endpoint": "/api/budgets/summary",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/budgets/summary 1/1 passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/budgets",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "POST /api/budgets 1/1 passed"
+              }
+            ],
+            "endpoints": 2,
+            "test_count": 2,
+            "passed": 2,
+            "checks": 31,
+            "result": "passed"
+          }
+        },
+        {
+          "student": "student-5",
+          "feature": "transactions",
+          "pre_commit": {
+            "file": "docs\\testing\\pre-commit-security-report-student-5.json",
+            "commit": "6c97f6d",
+            "scans": [
+              {
+                "name": "ruff-security",
+                "result": "passed",
+                "findings": 5,
+                "fixed": 0,
+                "accepted": 5
+              },
+              {
+                "name": "detect-secrets",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              },
+              {
+                "name": "pip-audit",
+                "result": "passed",
+                "findings": 0,
+                "fixed": 0,
+                "accepted": 0
+              }
+            ],
+            "result": "passed"
+          },
+          "post_commit": {
+            "file": "docs\\testing\\post-commit-endpoint-report-student-5.json",
+            "source": "json",
+            "commit": "ddd6881",
+            "run_id": "local",
+            "tests": [
+              {
+                "method": "GET",
+                "endpoint": "/api/health",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/transactions",
+                "outcome": "passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/transactions",
+                "outcome": "passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/transactions/{transaction_id}",
+                "outcome": "passed"
+              },
+              {
+                "method": "DELETE",
+                "endpoint": "/api/transactions/{transaction_id}",
+                "outcome": "passed"
+              }
+            ],
+            "endpoint_groups": [
+              {
+                "method": "GET",
+                "endpoint": "/api/health",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/health 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/transactions",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/transactions 1/1 passed"
+              },
+              {
+                "method": "POST",
+                "endpoint": "/api/transactions",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "POST /api/transactions 1/1 passed"
+              },
+              {
+                "method": "GET",
+                "endpoint": "/api/transactions/{transaction_id}",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "GET /api/transactions/{transaction_id} 1/1 passed"
+              },
+              {
+                "method": "DELETE",
+                "endpoint": "/api/transactions/{transaction_id}",
+                "outcomes": [
+                  "passed"
+                ],
+                "tests": 1,
+                "passed": 1,
+                "text": "DELETE /api/transactions/{transaction_id} 1/1 passed"
+              }
+            ],
+            "endpoints": 5,
+            "test_count": 5,
+            "passed": 5,
+            "checks": 14,
+            "result": "passed"
+          }
+        }
+      ],
+      "with_pre_commit": [
+        "student-1",
+        "student-2",
+        "student-3",
+        "student-4",
+        "student-5"
+      ],
+      "with_post_commit": [
+        "student-1",
+        "student-2",
+        "student-3",
+        "student-4",
+        "student-5"
+      ],
+      "missing": [],
+      "failed": [],
+      "unreadable": [],
+      "attention": false,
+      "student_count": 5
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "adapt_note": "",
+      "output": "Pre-commit: student-1 ruff-security 0/0/0 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-2 ruff-security 3/0/3 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-3 ruff-security 2/0/2 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed; student-4 ruff-security 21/0/21 passed, detect-secrets 0/0/0 passed, pip-audit 7/7/0 passed; student-5 ruff-security 5/0/5 passed, detect-secrets 0/0/0 passed, pip-audit 0/0/0 passed\nPost-commit: student-1 POST /api/agents/workflow 1/1 passed, GET /api/agents/workflow/<id> 1/1 passed (2 endpoints, 2/2 tests passed, 6 checks); student-2 GET /api/health 1/1 passed, GET /api/loans 1/1 passed, GET /api/loans/{loan_id} 1/1 passed, GET /api/loans/{loan_id}/eligibility 1/1 passed, GET /api/repayments 1/1 passed, GET /api/repayments/{repayment_id} 1/1 passed, GET /api/repayments/upcoming 1/1 passed (7 endpoints, 7/7 tests passed, 21 checks); student-3 GET /api/alerts 17/17 passed, POST /api/rules 9/9 passed (2 endpoints, 26/26 tests passed, 46 checks); student-4 GET /api/budgets/summary 1/1 passed, POST /api/budgets 1/1 passed (2 endpoints, 2/2 tests passed, 31 checks); student-5 GET /api/health 1/1 passed, GET /api/transactions 1/1 passed, POST /api/transactions 1/1 passed, GET /api/transactions/{transaction_id} 1/1 passed, DELETE /api/transactions/{transaction_id} 1/1 passed (5 endpoints, 5/5 tests passed, 14 checks)\nCoverage: 5 of 5 students have a pre-commit report, 5 of 5 have a post-commit report; missing: none\nRecommendation: The testing evidence is complete across all students with no missing reports. The team should maintain their current security practices and ensure accepted security findings are periodically reviewed.\nVerdict: PASS - All 5 students provided complete pre-commit security and post-commit endpoint test reports with passing results.",
+      "passed": true,
+      "reasons": [],
+      "error": ""
+    }
+  ],
+  "review": {
+    "model": "gemini / gemini-flash-lite-latest",
+    "text": "Risk: The recommendation suggests the team should maintain their current security practices and ensure accepted security findings are periodically reviewed, which goes beyond the provided evidence.\nCorrection: Remove the recommendation to periodically review accepted security findings as it is not supported by the evidence.\nRetest: Repeat validation after future changes.",
+    "error": ""
+  },
+  "passed": true,
+  "adapted": false
+}
