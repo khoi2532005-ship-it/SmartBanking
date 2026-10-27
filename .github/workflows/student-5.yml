@@ -202,7 +202,7 @@ jobs:
     timeout-minutes: 15
     env:
       COMPOSE_FILE: docker-compose.yml
-      SERVICES: transactions
+      SERVICES: accounts transactions
       MCP_ENABLED: "false"
       RAG_ENABLED: "false"
       MULTI_AGENT_ENABLED: "false"
