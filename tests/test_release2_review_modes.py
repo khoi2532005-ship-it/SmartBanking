@@ -301,7 +301,7 @@ JUNIT_3 = ('<?xml version="1.0"?><testsuites><testsuite name="pytest" tests="14"
 
 GOOD_TR = (
     "Pre-commit: student-1 none; student-2 none; student-3 none; student-4 ruff-security 4/0/4 passed, detect-secrets 0/0/0 passed, pip-audit 7/7/0 passed; student-5 none\n"
-    "Post-commit: student-1 none; student-2 none; student-3 14 tests 0 failures 0 errors (junit); student-4 GET /api/budgets/summary passed, POST /api/budgets passed (2/2 endpoints, 27 checks); student-5 none\n"
+    "Post-commit: student-1 none; student-2 none; student-3 14 tests 0 failures 0 errors (junit); student-4 GET /api/budgets/summary 1/1 passed, POST /api/budgets 1/1 passed (2 endpoints, 2/2 tests, 27 checks); student-5 none\n"
     "Coverage: 1 of 5 students have a pre-commit report, 2 of 5 have a post-commit report; missing: student-1, student-2, student-3, student-5\n"
     "Recommendation: Students 1, 2 and 5 should commit both reports and student 3 the pre-commit report before the Testing Review can pass.\n"
     "Verdict: ATTENTION - four students are missing a report, although every report present passed."
@@ -347,7 +347,7 @@ def test_testing_invented_scan_is_rejected(answers, reports):
 
 
 def test_testing_wrong_outcome_and_coverage_are_rejected(answers, reports):
-    wrong = GOOD_TR.replace("POST /api/budgets passed", "POST /api/budgets failed").replace("2 of 5 have a post-commit", "1 of 5 have a post-commit")
+    wrong = GOOD_TR.replace("POST /api/budgets 1/1 passed", "POST /api/budgets 0/1 passed").replace("2 of 5 have a post-commit", "1 of 5 have a post-commit")
     answers.extend([wrong, GOOD_TR])
     result = loop.run(TestingReviewMode())
     assert result.ok and result.adapted
@@ -378,17 +378,42 @@ def test_testing_unreadable_report_counts_as_missing_and_degrades(answers, repor
     assert "student-2" in result.evidence.note and "student-2" in result.evidence.facts["missing"]
 
 
-def test_testing_two_tests_of_one_endpoint_are_both_quoted(answers, reports):
+def test_testing_two_tests_of_one_endpoint_are_counted_together(answers, reports):
     post = dict(POST_4, tests=POST_4["tests"] + [{"test": "t3", "method": "POST", "endpoint": "/api/budgets", "outcome": "failed"}],
-                summary={"endpoints": 3, "passed": 2, "failed": 1, "checks": 27, "result": "failed"})
+                summary={"passed": 2, "failed": 1, "checks": 27, "result": "failed"})
     (reports / "post-commit-endpoint-report-student-4.json").write_text(json.dumps(post), encoding="utf-8")
-    both = GOOD_TR.replace("POST /api/budgets passed (2/2 endpoints, 27 checks)",
-                           "POST /api/budgets passed, POST /api/budgets failed (2/3 endpoints, 27 checks)")
-    one = both.replace("POST /api/budgets passed, POST /api/budgets failed", "POST /api/budgets passed")
-    answers.extend([one, both])
+    good = GOOD_TR.replace("POST /api/budgets 1/1 passed (2 endpoints, 2/2 tests, 27 checks)",
+                           "POST /api/budgets 1/2 passed (2 endpoints, 2/3 tests, 27 checks)")
+    answers.extend([good.replace("POST /api/budgets 1/2 passed", "POST /api/budgets 2/2 passed"), good])
     result = loop.run(TestingReviewMode())
     assert result.ok and result.adapted and "student-4" in result.evidence.facts["failed"]
-    assert "misquotes student-4 POST /api/budgets: the report says passed, failed" in result.attempts[0].verdict.feedback
+    assert "POST /api/budgets 1/2 passed" in result.evidence.summary
+    assert "misquotes student-4 POST /api/budgets: the report says 1/2 passed" in result.attempts[0].verdict.feedback
+
+
+def test_testing_many_tests_of_an_endpoint_are_one_line_not_one_per_test(answers, reports):
+    # Fraud's report has 17 tests of GET /api/alerts and 9 of POST /api/rules: two
+    # endpoints, not 26, and the entry names each endpoint once.
+    tests = ([{"test": f"a{i}", "method": "GET", "endpoint": "/api/alerts", "outcome": "passed"} for i in range(17)]
+             + [{"test": f"r{i}", "method": "POST", "endpoint": "/api/rules", "outcome": "passed"} for i in range(9)])
+    post = {"commit": "6c97f6d", "run_id": "40203858561", "tests": tests,
+            "summary": {"tests": 26, "passed": 26, "failed": 0, "checks": 46, "result": "passed"}}
+    (reports / "post-commit-endpoint-report-student-3.json").write_text(json.dumps(post), encoding="utf-8")
+    grouped = "GET /api/alerts 17/17 passed, POST /api/rules 9/9 passed (2 endpoints, 26/26 tests, 46 checks)"
+    good = GOOD_TR.replace("student-3 14 tests 0 failures 0 errors (junit)", f"student-3 {grouped}")
+    per_test = good.replace(grouped, ", ".join(["GET /api/alerts passed"] * 17 + ["POST /api/rules passed"] * 9)
+                            + " (26/26 endpoints, 46 checks)")
+    answers.extend([per_test, good])
+    result = loop.run(TestingReviewMode())
+    assert result.ok and result.adapted
+    assert grouped in result.evidence.summary and result.evidence.summary.count("/api/alerts") == 1
+    feedback = result.attempts[0].verdict.feedback
+    assert "GET /api/alerts: the report says 17/17 passed" in feedback and "student-3: 2 endpoints" in feedback
+
+
+def test_testing_a_single_test_endpoint_may_be_quoted_by_its_outcome(answers, reports):
+    answers.append(GOOD_TR.replace("summary 1/1 passed", "summary passed").replace("budgets 1/1 passed", "budgets passed"))
+    assert loop.run(TestingReviewMode()).ok
 
 
 def test_testing_scan_names_in_the_hooks_own_words_are_accepted(answers, reports):

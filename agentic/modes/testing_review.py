@@ -36,7 +36,9 @@ PROMPT_FAMILY = "_testing_review"
 STUDENTS = {1: "accounts", 2: "loans", 3: "fraud-alerts", 4: "budgeting", 5: "transactions"}
 REQUIRED_LINES = ("pre-commit", "post-commit", "coverage", "recommendation", "verdict")
 COUNTS_RE = re.compile(r"(?<![\d/])(\d+)\s*/\s*(\d+)\s*/\s*(\d+)\s+(passed|failed)\b")   # any scan's figures
-ENDPOINT_RE = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[^\s,;]+?)[\s:]+(passed|failed|error|skipped)\b", re.I)
+# "<METHOD> <path> <passed>/<tests> passed", or for an endpoint with one test, "<METHOD> <path> <outcome>"
+ENDPOINT_RE = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[^\s,;:]+)\s*:?\s*(?:(\d+)\s*/\s*(\d+)\s+)?"
+                         r"(passed|failed|error|skipped)\b", re.I)
 JUNIT_RE = re.compile(r"(\d+)\s+tests?\s+(\d+)\s+failures?\s+(\d+)\s+errors?")
 STUDENT_RE = re.compile(r"student-(\d)\b")
 COVERAGE_RE = re.compile(r"(?<!\d)(\d+)\s+of\s+(\d+)(?!\d)")
@@ -52,6 +54,20 @@ def _label_before(text: str, pos: int) -> str:
     """The words in front of a figure, back to the previous comma or semicolon: the name the entry gave it."""
     start = max(text.rfind(",", 0, pos), text.rfind(";", 0, pos)) + 1
     return " ".join(text[start:pos].split()) or "an unnamed scan"
+
+
+def _endpoints(tests: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """The report's tests grouped by endpoint, in the order the report first names each one."""
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
+    for t in tests:
+        group = groups.setdefault((t["method"], t["endpoint"].lower()),
+                                  {"method": t["method"], "endpoint": t["endpoint"], "outcomes": []})
+        group["outcomes"].append(t["outcome"])
+    for group in groups.values():
+        group["tests"] = len(group["outcomes"])
+        group["passed"] = group["outcomes"].count("passed")
+        group["text"] = f"{group['method']} {group['endpoint']} {group['passed']}/{group['tests']} passed"
+    return list(groups.values())
 
 
 def reports_dir() -> Path:
@@ -97,8 +113,12 @@ def _post_commit_json(path: Path) -> dict[str, Any] | None:
              for t in data["tests"] if isinstance(t, dict) and t.get("endpoint")]
     summary = data.get("summary") or {}
     passed = int(summary.get("passed", sum(1 for t in tests if t["outcome"] == "passed")))
+    # One report may test an endpoint many times (fraud has 17 tests of GET /api/alerts):
+    # the entry names each endpoint once, with its passed and total tests.
+    endpoints = _endpoints(tests)
     return {"file": rel(path), "source": "json", "commit": str(data.get("commit", "")), "run_id": str(data.get("run_id", "")),
-            "tests": tests, "endpoints": len(tests), "passed": passed, "checks": int(summary.get("checks", 0) or 0),
+            "tests": tests, "endpoint_groups": endpoints, "endpoints": len(endpoints), "test_count": len(tests),
+            "passed": passed, "checks": int(summary.get("checks", 0) or 0),
             "result": str(summary.get("result") or ("passed" if tests and passed == len(tests) else "failed")).lower()}
 
 
@@ -178,8 +198,9 @@ class TestingReviewMode(Mode):
             for s in students if s["pre_commit"]) or "none"
         post_text = "; ".join(
             f"{s['student']} " + (
-                ", ".join(f"{t['method']} {t['endpoint']} {t['outcome']}" for t in s["post_commit"]["tests"])
-                + f" ({s['post_commit']['passed']}/{s['post_commit']['endpoints']} endpoints, {s['post_commit']['checks']} checks)"
+                ", ".join(g["text"] for g in s["post_commit"]["endpoint_groups"])
+                + f" ({s['post_commit']['endpoints']} endpoints, {s['post_commit']['passed']}/{s['post_commit']['test_count']} tests,"
+                  f" {s['post_commit']['checks']} checks)"
                 if s["post_commit"]["source"] == "json" else
                 f"{s['post_commit']['tests']} tests {s['post_commit']['failures']} failures {s['post_commit']['errors']} errors (junit)")
             for s in students if s["post_commit"]) or "none"
@@ -206,8 +227,9 @@ class TestingReviewMode(Mode):
             pre_text = ("; ".join(f"{sc['name']} findings {sc['findings']}, fixed {sc['fixed']}, accepted {sc['accepted']}, {sc['result']}"
                                   for sc in pre["scans"]) + f" (commit {pre['commit']}, {pre['file']})") if pre else "no pre-commit report"
             if post and post["source"] == "json":
-                post_text = ("; ".join(f"{t['method']} {t['endpoint']} {t['outcome']}" for t in post["tests"])
-                             + f"; {post['passed']}/{post['endpoints']} endpoints passed, {post['checks']} checks, result {post['result']}"
+                post_text = (", ".join(g["text"] for g in post["endpoint_groups"])
+                             + f"; {post['endpoints']} endpoints, {post['passed']}/{post['test_count']} tests passed,"
+                               f" {post['checks']} checks, result {post['result']}"
                              + f" (commit {post['commit']}, run {post['run_id']}, {post['file']})")
             elif post:
                 post_text = (f"JUnit: {post['tests']} tests, {post['failures']} failures, {post['errors']} errors, "
@@ -293,30 +315,34 @@ class TestingReviewMode(Mode):
                     reasons.append(f"the Post-commit line did not report {s['student']}")
                     continue
                 if post["source"] == "json":
-                    # Outcomes are compared per endpoint as lists, so two tests of one endpoint can both be quoted.
-                    expected: dict[tuple[str, str], list[str]] = {}
-                    shown: dict[tuple[str, str], str] = {}
-                    for t in post["tests"]:
-                        key = (t["method"], t["endpoint"].lower())
-                        expected.setdefault(key, []).append(t["outcome"])
-                        shown[key] = f"{t['method']} {t['endpoint']}"
-                    quoted: dict[tuple[str, str], list[str]] = {}
+                    groups = {(g["method"], g["endpoint"].lower()): g for g in post["endpoint_groups"]}
+                    quoted: dict[tuple[str, str], list[tuple[str | None, str | None, str]]] = {}
                     for m in ENDPOINT_RE.finditer(seg):
-                        quoted.setdefault((m.group(1).upper(), m.group(2).lower()), []).append(m.group(3).lower())
-                    for key, outcomes in expected.items():
+                        quoted.setdefault((m.group(1).upper(), m.group(2).lower()), []).append(
+                            (m.group(3), m.group(4), m.group(5).lower()))
+                    for key, g in groups.items():
                         got = quoted.get(key, [])
                         if not got:
-                            reasons.append(f"the Post-commit line must state for {s['student']}: "
-                                           + ", ".join(f"{shown[key]} {o}" for o in outcomes))
-                        elif Counter(got) != Counter(outcomes):
-                            reasons.append(f"the Post-commit line misquotes {s['student']} {shown[key]}: the report says "
-                                           + ", ".join(outcomes))
-                    for key in sorted(set(quoted) - set(expected)):
+                            reasons.append(f"the Post-commit line must state for {s['student']}: {g['text']}")
+                            continue
+
+                        def faithful(passed: str | None, total: str | None, word: str, g: dict[str, Any] = g) -> bool:
+                            if passed is not None:
+                                return (int(passed), int(total), word) == (g["passed"], g["tests"], "passed")
+                            return g["tests"] == 1 and word == g["outcomes"][0]      # one test: its outcome will do
+                        if not all(faithful(*q) for q in got):
+                            reasons.append(f"the Post-commit line misquotes {s['student']} {g['method']} {g['endpoint']}: "
+                                           f"the report says {g['passed']}/{g['tests']} passed")
+                    for key in sorted(set(quoted) - set(groups)):
                         reasons.append(f"the Post-commit line names {key[0]} {key[1]} for {s['student']}, "
                                        "which that report does not test")
-                    match = re.search(r"(\d+)\s*/\s*(\d+)\s+endpoints", seg)
-                    if not match or match.groups() != (str(post["passed"]), str(post["endpoints"])):
-                        reasons.append(f"the Post-commit line must state for {s['student']}: {post['passed']}/{post['endpoints']} endpoints")
+                    match = re.search(r"(?<![\d/])(\d+)\s+endpoints?\b", seg)
+                    if not match or int(match.group(1)) != post["endpoints"]:
+                        reasons.append(f"the Post-commit line must state for {s['student']}: {post['endpoints']} endpoints")
+                    match = re.search(r"(?<![\d/])(\d+)\s*/\s*(\d+)\s+tests\b", seg)
+                    if not match or (int(match.group(1)), int(match.group(2))) != (post["passed"], post["test_count"]):
+                        reasons.append(f"the Post-commit line must state for {s['student']}: "
+                                       f"{post['passed']}/{post['test_count']} tests")
                     if not re.search(rf"(?<![\d/]){post['checks']}\s+checks", seg):
                         reasons.append(f"the Post-commit line must state for {s['student']}: {post['checks']} checks")
                 else:
