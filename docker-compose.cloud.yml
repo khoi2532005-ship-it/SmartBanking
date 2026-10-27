@@ -19,6 +19,9 @@ x-cloud-ai-off: &cloud-ai-off
 
 services:
 
+  fraud-database-service:
+    ports: !reset []
+
   fraud-service:
     ports: !reset []
     environment:
