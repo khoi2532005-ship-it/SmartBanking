@@ -17,7 +17,7 @@
       "env": {
         "SMARTBANK_FRONTENDS": "{\"3001\": \"https://accounts-frontend-service.{defaultDomain}\", \"3002\": \"https://loans-frontend-service.{defaultDomain}\", \"3003\": \"https://fraud-frontend-service.{defaultDomain}\", \"3004\": \"https://budgeting-frontend-service.{defaultDomain}\", \"3005\": \"https://transactions-frontend-service.{defaultDomain}\"}"
       },
-      "minReplicas": 0,
+      "minReplicas": 1,
       "maxReplicas": 1
     },
     {
