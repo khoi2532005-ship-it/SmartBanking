@@ -17,7 +17,7 @@
       "env": {
         "SMARTBANK_FRONTENDS": "{\"3001\": \"https://accounts-frontend-service.{defaultDomain}\", \"3002\": \"https://loans-frontend-service.{defaultDomain}\", \"3003\": \"https://fraud-frontend-service.{defaultDomain}\", \"3004\": \"https://budgeting-frontend-service.{defaultDomain}\", \"3005\": \"https://transactions-frontend-service.{defaultDomain}\"}"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -53,7 +53,7 @@
         "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1,
       "command": [
         "python",
@@ -70,7 +70,7 @@
         "API_UPSTREAM": "https://accounts.internal.{defaultDomain}",
         "SMARTBANK_SAME_ORIGIN_API": "true"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -100,7 +100,7 @@
         "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -113,7 +113,7 @@
         "API_UPSTREAM": "https://loans-service.internal.{defaultDomain}",
         "SMARTBANK_SAME_ORIGIN_API": "true"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -146,7 +146,7 @@
         "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -159,7 +159,7 @@
         "API_UPSTREAM": "https://fraud-service.internal.{defaultDomain}",
         "SMARTBANK_SAME_ORIGIN_API": "true"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -191,7 +191,7 @@
         "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -204,7 +204,7 @@
         "API_UPSTREAM": "https://budgeting-service.internal.{defaultDomain}",
         "SMARTBANK_SAME_ORIGIN_API": "true"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
@@ -243,7 +243,7 @@
         "RAG_SERVER_URL": "http://rag-server",
         "MULTI_AGENT_SERVER_URL": "http://multi-agent-server"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1,
       "command": [
         "python",
@@ -260,7 +260,7 @@
         "API_UPSTREAM": "https://transactions.internal.{defaultDomain}",
         "SMARTBANK_SAME_ORIGIN_API": "true"
       },
-      "minReplicas": 1,
+      "minReplicas": 0,
       "maxReplicas": 1
     },
     {
